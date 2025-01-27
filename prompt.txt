@@ -1,0 +1,327 @@
+Act a an experienced fullstack developer. I am building an app using laravel 11 breeze, react, typescript and tailwind, my database is mysql and I do not use axios to fetch data.
+
+I have 3 tables: vinos, uvas and vino_uvas.
+
+vinos table has the following fields:
+Schema::create('vinos', function (Blueprint $table) {
+$table->id(); // Using the default 'id' column for primary key
+$table->string('name', 100)->comment('Name of the wine');
+$table->decimal('price', 10, 2)->comment('Price of the wine');
+$table->integer('stock')->default(0)->comment('Stock quantity of the wine');
+$table->integer('vintage_year')->nullable()->comment('Vintage year of the wine');
+$table->string('image_url', 255)->nullable()->comment('Image URL of the wine');
+$table->text('description')->nullable()->comment('Description of the wine');
+$table->text('visual')->nullable()->comment('Visual characteristics of the wine');
+$table->text('aromas')->nullable()->comment('Aromas of the wine');
+$table->text('taste')->nullable()->comment('Taste and finish of the wine');
+$table->integer('capacity')->nullable()->comment('Bottle capacity in milliliters');
+$table->decimal('minimum_temperature', 5, 2)->nullable()->comment('Minimum serving temperature of the wine');
+$table->decimal('maximum_temperature', 5, 2)->nullable()->comment('Maximum serving temperature of the wine');
+$table->decimal('alcohol', 5, 2)->nullable()->comment('Alcohol content of the wine');
+$table->text('food_pairing')->nullable()->comment('Food pairings for the wine');
+$table->boolean('blocked')->default(false)->comment('Indicates if the wine is blocked');
+$table->unsignedBigInteger('bodega_id')->comment('Foreign key to the bodegas table');
+$table->unsignedBigInteger('denominacion_id')->comment('Foreign key to the denominaciones table');
+$table->unsignedBigInteger('categoria_id')->comment('Foreign key to the categorias table');
+
+// Define foreign keys with cascading actions
+$table->foreign('bodega_id')->references('id')->on('bodegas')->onDelete('cascade')->onUpdate('cascade');
+$table->foreign('denominacion_id')->references('id')->on('denominaciones')->onDelete('cascade')->onUpdate('cascade');
+$table->foreign('categoria_id')->references('id')->on('categorias')->onDelete('cascade')->onUpdate('cascade');
+
+$table->timestamps(); // Fields de created_at y updated_at
+});
+
+uvas table has the following fields:
+Schema::create('uvas', function (Blueprint $table) {
+$table->id()->comment('Auto-incrementing primary key');
+$table->string('name', 100)->comment('Name of the grape variety');
+$table->timestamps(); // Automatically adds 'created_at' and 'updated_at' columns
+});
+
+vino_uvas table has the following fields:
+Schema::create('vino_uvas', function (Blueprint $table) {
+
+// Define the columns
+$table->unsignedBigInteger('vino_id')->comment('Foreign key to the vinos table');
+$table->unsignedBigInteger('uva_id')->comment('Foreign key to the uvas table');
+$table->decimal('percent', 5, 2);
+
+// Set the primary key
+$table->primary(['vino_id', 'uva_id']);
+
+// Define foreign keys with cascading actions
+$table->foreign('vino_id')->references('id')->on('vinos')->onDelete('cascade')->onUpdate('cascade');
+$table->foreign('uva_id')->references('id')->on('uvas')->onDelete('cascade')->onUpdate('cascade');
+
+$table->timestamps(); // Automatically adds 'created_at' and 'updated_at' columns
+});
+
+Also vino_uvas table keeps the relationship between vinos and uvas tables:
+- A vino can have 0 or more uva varieties
+- A uva variety can be used in 0 or more vinos
+- if a a uva variety is used in a vino, the percent field is the percentage of that the uva variety is used in the vino
+- the percent of uvas variety used in a vino must be between 0 and 100
+- the total percent of uvas varieties used in a vino must be 100
+- The primary key of the vino_uvas table is the combination of the vino_id and uva_id fields
+
+I have created this vino controller:
+// ----------------------------------
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\StoreVinoRequest;
+use App\Http\Resources\VinoResource;
+use App\Models\Vino;
+use Illuminate\Support\Facades\Redirect;
+use Inertia\Inertia;
+use App\Services\CloudinaryService;
+use Exception;
+use Illuminate\Support\Facades\Log;
+
+class VinoController extends Controller
+{
+    protected $cloudinaryService;
+
+    public function __construct(CloudinaryService $cloudinaryService)
+    {
+        $this->cloudinaryService = $cloudinaryService;
+    }
+
+    public function index()
+    {
+        $paginationLimit = config('settings.pagination_limit', 5); // Configurable pagination limit
+        $paginated = Vino::with('uvas')->latest()->paginate($paginationLimit); // Eager load relationships
+
+        return Inertia::render('Vino/Index', [
+            'vinos' => VinoResource::collection($paginated)
+        ]);
+    }
+
+    public function create()
+    {
+        return Inertia::render('Vino/Create');
+    }
+
+    public function store(StoreVinoRequest $request)
+    {
+        $validatedData = $request->validated();
+
+        try {
+            $this->handleImageUpload($request, $validatedData);
+
+            $vino = Vino::create($validatedData);
+
+            return Redirect::route('vino.index')->with('success', 'Vino created successfully.');
+        } catch (Exception $e) {
+            Log::error('Failed to create vino: ' . $e->getMessage(), ['exception' => $e]);
+            return Redirect::back()->with('error', 'Failed to create vino. ' . $e->getMessage());
+        }
+    }
+
+    public function show(Vino $vino)
+    {
+        return Inertia::render('Vino/Show', [
+            'vino' => new VinoResource($vino)
+        ]);
+    }
+
+    public function edit(Vino $vino)
+    {
+        return Inertia::render('Vino/Edit', [
+            'vino' => new VinoResource($vino)
+        ]);
+    }
+
+    public function update(StoreVinoRequest $request, Vino $vino)
+    {
+        $validatedData = $request->validated();
+
+        try {
+            $this->handleImageUpload($request, $validatedData, $vino);
+
+            unset($validatedData['image'], $validatedData['uvas']); // Remove unnecessary fields
+            $vino->update($validatedData);
+
+            return Redirect::route('vino.index')->with('success', 'Vino updated successfully.');
+        } catch (Exception $e) {
+            Log::error('Failed to update vino: ' . $e->getMessage(), ['exception' => $e]);
+            return Redirect::back()->with('error', 'Failed to update vino.');
+        }
+    }
+
+    public function destroy(Vino $vino)
+    {
+        try {
+            if ($vino->public_id) {
+                $this->cloudinaryService->deleteImage($vino->public_id);
+            }
+            $vino->delete();
+
+            return Redirect::route('vino.index')->with('success', 'Vino deleted successfully.');
+        } catch (Exception $e) {
+            Log::error('Failed to delete vino: ' . $e->getMessage(), ['exception' => $e]);
+            return Redirect::back()->with('error', 'Failed to delete vino.');
+        }
+    }
+
+    /**
+     * Handle image upload and deletion.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param array $validatedData
+     * @param \App\Models\Vino|null $vino
+     */
+    private function handleImageUpload($request, &$validatedData, $vino = null)
+    {
+        if ($request->hasFile('image')) {
+            if ($vino && $vino->public_id) {
+                $this->cloudinaryService->deleteImage($vino->public_id);
+            }
+            $imageData = $this->cloudinaryService->uploadImage($request->file('image')->getRealPath());
+            $validatedData['image_url'] = $imageData['url'];
+            $validatedData['public_id'] = $imageData['public_id'];
+        } elseif ($request->has('image_url') && $request->input('image_url') === '') {
+            if ($vino && $vino->public_id) {
+                $this->cloudinaryService->deleteImage($vino->public_id);
+            }
+            $validatedData['image_url'] = null;
+            $validatedData['public_id'] = null;
+        }
+    }
+}
+// ----------------------------------
+
+Right now I have this vino resource:
+// ----------------------------------
+<?php
+
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+use App\Http\Resources\BodegaResource;
+use App\Http\Resources\DenominacionResource;
+use App\Http\Resources\CategoriaResource;
+
+use function Laravel\Prompts\error;
+
+/**
+ * Class VinoResource
+ *
+ * A resource class to transform a Vino model instance into an array for JSON responses.
+ * This class includes relationships with Bodega, Denominacion, and Categoria models.
+ */
+class VinoResource extends JsonResource
+{
+    // Disables wrapping the response in a data key
+    public static $wrap = false;
+
+    /**
+     * Transform the resource into an array.
+     *
+     * This method is responsible for converting the Vino model attributes and related models
+     * into a structured array that can be easily converted to JSON.
+     *
+     * @param Request $request The incoming HTTP request.
+     * @return array An associative array representing the Vino resource.
+     */
+    public function toArray(Request $request): array
+    {
+        // Initialize related resources if they exist, otherwise set to null
+        $bodega = $this->bodega ? new BodegaResource($this->bodega) : null;
+        $denominacion = $this->denominacion ? new DenominacionResource($this->denominacion) : null;
+        $categoria = $this->categoria ? new CategoriaResource($this->categoria) : null;
+
+        // Return an array representation of the Vino resource
+        return [
+            'id' => $this->id, // Unique identifier for the vino
+            'name' => $this->name, // Name of the vino
+            'price' => $this->price, // Price of the vino
+            'stock' => $this->stock, // Available stock quantity
+            'vintage_year' => $this->vintage_year, // Vintage year of the vino
+            'image_url' => $this->image_url, // URL to the image of the vino
+            'description' => $this->description, // Description of the vino
+            'visual' => $this->visual, // Visual characteristics of the vino
+            'aromas' => $this->aromas, // Aromas detected in the vino
+            'taste' => $this->taste, // Taste profile of the vino
+            'capacity' => $this->capacity, // Bottle capacity of the vino
+            'minimum_temperature' => $this->minimum_temperature, // Minimum serving temperature
+            'maximum_temperature' => $this->maximum_temperature, // Maximum serving temperature
+            'alcohol' => $this->alcohol, // Alcohol content of the vino
+            'food_pairing' => $this->food_pairing, // Suggested food pairings
+            'blocked' => $this->blocked, // Whether the vino is blocked or not
+            'bodega' => $bodega, // Full Bodega resource
+            'categoria' => $categoria, // Full Categoria resource
+            'denominacion' => $denominacion, // Full Denominacion resource
+            'bodega_name' => optional($bodega)->name, // Name of the bodega
+            'denominacion_name' => optional($denominacion)->name, // Name of the denominacion
+            'categoria_name' => optional($categoria)->name, // Name of the categoria
+            'bodega_id' => optional($bodega)->id, // ID of the bodega
+            'denominacion_id' => optional($denominacion)->id, // ID of the denominacion
+            'categoria_id' => optional($categoria)->id, // ID of the categoria
+            'created_at' => $this->created_at->format('Y-m-d H:i:s'), // Creation timestamp of the vino record
+        ];
+    }
+}
+// ----------------------------------
+
+I need to create a CRUD to manage the relationship between vinos and uvas tables.
+
+I need to be able to:
+- when I am creating a vino I need to be able to select the uva varieties that are used in the vino and the percentage of each uva variety used in the vino; add or delete a new uva variety and its percentage.
+- when I am editing a vino I need to be able to select the uva varieties that are used in the vino and the percentage of each uva variety used in the vino; add or delete a new uva variety and its percentage.
+- when I am viewing a vino I need to be able to see the uva varieties that are used in the vino and the percentage of each uva variety used in the vino
+- when I am deleting a vino I need to be able to delete the uva varieties that are used in the vino and the percentage of each uva variety used in the vino
+
+I need models, controllers, resources, requests, routes and react components to manage the relationship between vinos and uvas tables.
+
+Thanks, I forgot to mention that I need to show the vino uva relationshipo as a single component named GrapesSection with the following props:
+// ----------------------------------
+interface GrapesSectionProps {
+    data: Vino;
+    onChange: (field: keyof Vino, value: any) => void;
+    errors: Record<string, string>;
+}
+
+const GrapesSection: React.FC<GrapesSectionProps> = ({
+    data,
+    onChange,
+    errors,
+}) => {}
+// ----------------------------------
+That is how the GrapesSection component should be used in the app:
+// ----------------------------------
+<VarietiesSection
+    data={data}
+    onChange={handleFieldChange}
+    errors={errors}
+/>
+// ----------------------------------
+And this is the handleFieldChange function:
+// ----------------------------------
+ /**
+ * Handles changes to the form fields.
+ *
+ * @param {keyof Vino} field - The field name.
+ * @param {any} value - The new value for the field.
+ */
+const handleFieldChange = (field: keyof Vino, value: any) => {
+    setData(field as keyof Vino, value);
+};
+// ----------------------------------
+
+And als I forgot give you examples of vino data used in the app:
+- A vino with 0 uva varieties:
+// ----------------------------------
+{"id":1,"name":"Vino Tinto Joven","price":"8.50","stock":100,"vintage_year":2022,"image_url":"imagen1.jpg","description":"Vino tinto joven de la región.","visual":"Color rojo brillante.","aromas":"Aromas frutales.","taste":"Sabor fresco y ligero.","capacity":750,"minimum_temperature":"12.00","maximum_temperature":"18.00","alcohol":"13.50","food_pairing":"Carnes rojas, pastas.","blocked":0,"bodega":{"id":1,"name":"Bodega Pago de Jotrón","city":"Málaga","province":"Málaga","blocked":0,"created_at":"2025-01-01 14:07:31"},"categoria":{"id":1,"name":"Vino Tinto Joven","created_at":"2025-01-01 14:07:30"},"denominacion":{"id":5,"name":"DO Málaga","blocked":0,"created_at":"2025-01-01 14:07:30"},"bodega_name":"Bodega Pago de Jotrón","denominacion_name":"DO Málaga","categoria_name":"Vino Tinto Joven","bodega_id":1,"denominacion_id":5,"categoria_id":1,"uvas":[],"created_at":"2025-01-01 14:07:31"}
+// ----------------------------------
+- A vino with 1 uva varieties:
+// ----------------------------------
+{"id":1,"name":"Vino Tinto Joven","price":"8.50","stock":100,"vintage_year":2022,"image_url":"imagen1.jpg","description":"Vino tinto joven de la región.","visual":"Color rojo brillante.","aromas":"Aromas frutales.","taste":"Sabor fresco y ligero.","capacity":750,"minimum_temperature":"12.00","maximum_temperature":"18.00","alcohol":"13.50","food_pairing":"Carnes rojas, pastas.","blocked":0,"bodega":{"id":1,"name":"Bodega Pago de Jotrón","city":"Málaga","province":"Málaga","blocked":0,"created_at":"2025-01-01 14:07:31"},"categoria":{"id":1,"name":"Vino Tinto Joven","created_at":"2025-01-01 14:07:30"},"denominacion":{"id":5,"name":"DO Málaga","blocked":0,"created_at":"2025-01-01 14:07:30"},"bodega_name":"Bodega Pago de Jotrón","denominacion_name":"DO Málaga","categoria_name":"Vino Tinto Joven","bodega_id":1,"denominacion_id":5,"categoria_id":1,"uvas":[{"id":36,"name":"Tempranillo","percent":"100.00"}],"created_at":"2025-01-01 14:07:31"}
+// ----------------------------------
+- A vino with 2 uva varieties:
+// ----------------------------------
+{"id":1,"name":"Vino Tinto Joven","price":"8.50","stock":100,"vintage_year":2022,"image_url":"imagen1.jpg","description":"Vino tinto joven de la región.","visual":"Color rojo brillante.","aromas":"Aromas frutales.","taste":"Sabor fresco y ligero.","capacity":750,"minimum_temperature":"12.00","maximum_temperature":"18.00","alcohol":"13.50","food_pairing":"Carnes rojas, pastas.","blocked":0,"bodega":{"id":1,"name":"Bodega Pago de Jotrón","city":"Málaga","province":"Málaga","blocked":0,"created_at":"2025-01-01 14:07:31"},"categoria":{"id":1,"name":"Vino Tinto Joven","created_at":"2025-01-01 14:07:30"},"denominacion":{"id":5,"name":"DO Málaga","blocked":0,"created_at":"2025-01-01 14:07:30"},"bodega_name":"Bodega Pago de Jotrón","denominacion_name":"DO Málaga","categoria_name":"Vino Tinto Joven","bodega_id":1,"denominacion_id":5,"categoria_id":1,"uvas":[{"id":36,"name":"Tempranillo","percent":"30.00"},{"id":2,"name": "Cabernet Franc","percent":"70.00"}],"created_at":"2025-01-01 14:07:31"}
+// ----------------------------------
