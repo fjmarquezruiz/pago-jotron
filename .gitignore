@@ -44,5 +44,7 @@ auth.json
 /.nova
 /.vscode
 /.zed
+/.idx
+.idx
 
 
