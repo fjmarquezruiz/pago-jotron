@@ -1,4 +1,3 @@
-import Public from "@/Layouts/PublicLayout";
 import { PageProps } from "@/types";
 import { Head } from "@inertiajs/react";
 import { useMemo, useState } from "react";
@@ -357,7 +356,7 @@ const Index = ({ auth }: PageProps) => {
     }, [filteredProducts, currentPage, productsPerPage]);
 
     return (
-        <Public>
+        <>
             <Head title="The shop" />
             <HeroSection
                 section="The shop"
@@ -405,7 +404,7 @@ const Index = ({ auth }: PageProps) => {
                     </div>
                 </div>
             </div>
-        </Public>
+        </>
     );
 };
 

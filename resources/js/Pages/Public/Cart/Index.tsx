@@ -1,7 +1,6 @@
 "use client";
 
 import { useCart } from "@/contexts/cart-context";
-import Public from "@/Layouts/PublicLayout";
 import { PageProps } from "@/types";
 import { Head } from "@inertiajs/react";
 import HeroSection from "../Layout/HeroSection";
@@ -11,7 +10,7 @@ const Index = ({ auth }: PageProps) => {
 
     if (state.items.length === 0) {
         return (
-            <Public>
+            <>
                 <Head title="The cart" />
                 <HeroSection
                     section="The cart"
@@ -30,12 +29,12 @@ const Index = ({ auth }: PageProps) => {
                         </div>
                     </main>
                 </div>
-            </Public>
+            </>
         );
     }
 
     return (
-        <Public>
+        <>
             <Head title="The cart" />
             <HeroSection
                 section="The cart"
@@ -62,7 +61,16 @@ const Index = ({ auth }: PageProps) => {
                                                 height={96}
                                                 className="h-full w-full object-cover object-center"
                                             /> */}
-                                            imagen ---
+                                            <img
+                                                src={
+                                                    item.imageUrl ||
+                                                    "/placeholder.svg"
+                                                }
+                                                alt={item.name}
+                                                width={96}
+                                                height={96}
+                                                className="h-full w-full object-cover object-center"
+                                            />
                                         </div>
                                         <div className="flex flex-1 flex-col">
                                             <div className="flex justify-between text-base font-medium text-gray-900">
@@ -116,7 +124,7 @@ const Index = ({ auth }: PageProps) => {
                     </div>
                 </main>
             </div>
-        </Public>
+        </>
     );
 };
 

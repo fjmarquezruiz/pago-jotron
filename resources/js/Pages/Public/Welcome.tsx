@@ -1,4 +1,3 @@
-import Public from "@/Layouts/PublicLayout";
 import { PageProps } from "@/types";
 import { Head, Link } from "@inertiajs/react";
 import HeroSection from "./Layout/HeroSection";
@@ -20,7 +19,7 @@ export default function Welcome({
     };
 
     return (
-        <Public>
+        <>
             <Head title="Store Welcome" />
             <HeroSection
                 section="HOME"
@@ -357,6 +356,6 @@ export default function Welcome({
                     </footer>
                 </div>
             </div>
-        </Public>
+        </>
     );
 }
