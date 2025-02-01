@@ -27,14 +27,14 @@ class VinoController extends Controller
         $paginationLimit = config('settings.pagination_limit', 15); // Configurable pagination limit
         $paginated = Vino::with('uvas')->latest()->paginate($paginationLimit); // Eager load relationships
 
-        return Inertia::render('Vino/Index', [
+        return Inertia::render('Dashboard/Vino/Index', [
             'vinos' => VinoResource::collection($paginated)
         ]);
     }
 
     public function create()
     {
-        return Inertia::render('Vino/Create');
+        return Inertia::render('Dashboard/Vino/Create');
     }
 
     public function store(StoreVinoRequest $request)
@@ -66,14 +66,14 @@ class VinoController extends Controller
 
     public function show(Vino $vino)
     {
-        return Inertia::render('Vino/Show', [
+        return Inertia::render('Dashboard/Vino/Show', [
             'vino' => new VinoResource($vino)
         ]);
     }
 
     public function edit(Vino $vino)
     {
-        return Inertia::render('Vino/Edit', [
+        return Inertia::render('Dashboard/Vino/Edit', [
             'vino' => new VinoResource($vino)
         ]);
     }

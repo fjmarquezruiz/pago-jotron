@@ -59,12 +59,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware(['verified'])->group(function () {
         // Dashboard route
         Route::get('/dashboard', function () {
-            return Inertia::render('Dashboard');
+            return Inertia::render('Dashboard/Index');
         })->name('dashboard');
-
-        // Resource routes with permissions
-        // Route::get('/feature', [FeatureController::class, 'index'])->name('feature.index');
-        Route::resource('feature', FeatureController::class)->middleware('can:' . PermissionsEnum::ManageFeatures->value);
 
         // Route::get('/vino', [VinoController::class, 'index'])->name('vino.index');
         Route::resource('vino', VinoController::class)->middleware('can:' . PermissionsEnum::ManageVinos->value);
@@ -72,8 +68,14 @@ Route::middleware('auth')->group(function () {
         Route::post('/vino/{vino}/update-blocked', [VinoController::class, 'updateBlocked'])->name('vino.update-blocked');
 
         Route::resource('bodega', BodegaController::class);
+
         Route::resource('denominacion', DenominacionController::class);
+
         Route::resource('uva', UvaController::class);
+
+        // Resource routes with permissions
+        // Route::get('/feature', [FeatureController::class, 'index'])->name('feature.index');
+        Route::resource('feature', FeatureController::class)->middleware('can:' . PermissionsEnum::ManageFeatures->value);
 
         Route::prefix('vinos/{vino}')->group(function () {
             Route::get('/uvas', [VinoUvaController::class, 'index'])->name('vino.uvas.index');

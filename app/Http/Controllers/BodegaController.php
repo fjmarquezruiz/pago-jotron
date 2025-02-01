@@ -24,7 +24,7 @@ class BodegaController extends Controller
     {
         $paginated = Bodega::latest()->paginate();
 
-        return Inertia::render('Bodega/Index', [
+        return Inertia::render('Dashboard/Bodega/Index', [
             'bodegas' => BodegaResource::collection($paginated)
         ]);
     }
@@ -36,7 +36,7 @@ class BodegaController extends Controller
      */
     public function create()
     {
-        return Inertia::render('Bodega/Create');
+        return Inertia::render('Dashboard/Bodega/Create');
     }
 
     /**
@@ -70,7 +70,7 @@ class BodegaController extends Controller
      */
     public function show(Bodega $bodega)
     {
-        return Inertia::render('Bodega/Show', [
+        return Inertia::render('Dashboard/Bodega/Show', [
             'bodega' => new BodegaResource($bodega)
         ]);
     }
@@ -83,7 +83,7 @@ class BodegaController extends Controller
      */
     public function edit(Bodega $bodega)
     {
-        return Inertia::render('Bodega/Edit', [
+        return Inertia::render('Dashboard/Bodega/Edit', [
             'bodega' => new BodegaResource($bodega)
         ]);
     }

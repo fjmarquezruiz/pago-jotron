@@ -28,7 +28,7 @@ class UserController extends Controller
         $paginated = User::latest()->paginate($paginationLimit);
 
         // Render the Inertia.js component with the paginated UVAs
-        return Inertia::render('User/Index', [
+        return Inertia::render('Dashboard/User/Index', [
             'users' => AuthUserResource::collection($paginated)
         ]);
     }
@@ -38,7 +38,7 @@ class UserController extends Controller
      */
     public function create()
     {
-        return Inertia::render('User/Create', [
+        return Inertia::render('Dashboard/User/Create', [
             'roles' => Role::all(),
             'roleLabels' => RolesEnum::labels()
         ]);
@@ -79,7 +79,7 @@ class UserController extends Controller
      */
     public function show(User $user)
     {
-        return Inertia::render('User/Show', [
+        return Inertia::render('Dashboard/User/Show', [
             'user' => new AuthUserResource($user),
             'roles' => Role::all(),
             'roleLabels' => RolesEnum::labels()
@@ -91,7 +91,7 @@ class UserController extends Controller
      */
     public function edit(User $user)
     {
-        return Inertia::render('User/Edit', [
+        return Inertia::render('Dashboard/User/Edit', [
             'user' => new AuthUserResource($user),
             'roles' => Role::all(),
             'roleLabels' => RolesEnum::labels()

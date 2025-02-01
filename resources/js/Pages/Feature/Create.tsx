@@ -3,7 +3,7 @@ import InputLabel from "@/Components/InputLabel";
 import PrimaryButton from "@/Components/PrimaryButton";
 import TextAreaInput from "@/Components/TextAreaInput";
 import TextInput from "@/Components/TextInput";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import AuthenticatedLayout from "@/Layouts/Dashboard/AuthenticatedLayout";
 import { Transition } from "@headlessui/react";
 import { Head, useForm } from "@inertiajs/react";
 import { FormEventHandler } from "react";
@@ -42,8 +42,8 @@ export default function Create() {
         >
             <Head title="Create new feature" />
 
-            <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg dark:bg-gray-800 mb-4">
-                <div className="p-6 text-gray-900 dark:text-gray-100 flex gap-8">
+            <div className="mb-4 overflow-hidden bg-white shadow-sm dark:bg-gray-800 sm:rounded-lg">
+                <div className="flex gap-8 p-6 text-gray-900 dark:text-gray-100">
                     <form onSubmit={createFeature} className="flex-1 space-y-6">
                         <div>
                             <InputLabel htmlFor="name" value="Name" />

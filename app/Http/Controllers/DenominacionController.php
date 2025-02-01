@@ -21,7 +21,7 @@ class DenominacionController extends Controller
     {
         $paginated = Denominacion::latest()->paginate();
 
-        return Inertia::render('Denominacion/Index', [
+        return Inertia::render('Dashboard/Denominacion/Index', [
             'denominaciones' => DenominacionResource::collection($paginated)
         ]);
     }
@@ -31,7 +31,7 @@ class DenominacionController extends Controller
      */
     public function create()
     {
-        return Inertia::render('Denominacion/Create');
+        return Inertia::render('Dashboard/Denominacion/Create');
     }
 
     /**
@@ -56,7 +56,7 @@ class DenominacionController extends Controller
      */
     public function show(Denominacion $denominacion)
     {
-        return Inertia::render('Denominacion/Show', [
+        return Inertia::render('Dashboard/Denominacion/Show', [
             'denominacion' => new DenominacionResource($denominacion)
         ]);
     }
@@ -66,7 +66,7 @@ class DenominacionController extends Controller
      */
     public function edit(Denominacion $denominacion)
     {
-        return Inertia::render('Denominacion/Edit', [
+        return Inertia::render('Dashboard/Denominacion/Edit', [
             'denominacion' => new DenominacionResource($denominacion)
         ]);
     }

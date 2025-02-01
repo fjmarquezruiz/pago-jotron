@@ -24,7 +24,7 @@ class UvaController extends Controller
         $paginated = Uva::latest()->paginate($paginationLimit);
 
         // Render the Inertia.js component with the paginated UVAs
-        return Inertia::render('Uva/Index', [
+        return Inertia::render('Dashboard/Uva/Index', [
             'uvas' => UvaResource::collection($paginated)
         ]);
     }
@@ -37,7 +37,7 @@ class UvaController extends Controller
     public function create()
     {
         // Render the Inertia.js component for creating a new UVA
-        return Inertia::render('Uva/Create');
+        return Inertia::render('Dashboard/Uva/Create');
     }
 
     /**
@@ -72,7 +72,7 @@ class UvaController extends Controller
     public function show(Uva $uva)
     {
         // Render the Inertia.js component to show the details of a specific UVA
-        return Inertia::render('Uva/Show', [
+        return Inertia::render('Dashboard/Uva/Show', [
             'uva' => new UvaResource($uva)
         ]);
     }
@@ -86,7 +86,7 @@ class UvaController extends Controller
     public function edit(Uva $uva)
     {
         // Render the Inertia.js component for editing a specific UVA
-        return Inertia::render('Uva/Edit', [
+        return Inertia::render('Dashboard/Uva/Edit', [
             'uva' => new UvaResource($uva)
         ]);
     }

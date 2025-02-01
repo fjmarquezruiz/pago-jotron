@@ -1,7 +1,7 @@
 import FeatureItem from "@/Components/FeatureItem";
 import { can } from "@/helpers";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { Feature, PaginatedData, PageProps } from "@/types";
+import AuthenticatedLayout from "@/Layouts/Dashboard/AuthenticatedLayout";
+import { Feature, PageProps, PaginatedData } from "@/types";
 import { Head, Link } from "@inertiajs/react";
 
 export default function Index({
