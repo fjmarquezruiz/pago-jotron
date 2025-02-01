@@ -29,6 +29,9 @@ Route::get('/', function () {
 Route::get('/shop', function () {
     return Inertia::render('Public/Shop/Index');
 })->name('shop');
+Route::get('/cart', function () {
+    return Inertia::render('Public/Cart/Index');
+})->name('cart');
 
 
 // Route::get('/dashboard', function () {
