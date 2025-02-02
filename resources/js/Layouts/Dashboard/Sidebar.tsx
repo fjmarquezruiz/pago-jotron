@@ -1,7 +1,7 @@
 import DividerFields from "@/Components/Forms/DividerFields";
 import NavLinkIcon from "@/Components/NavLinkIcon";
 import { can } from "@/helpers";
-import { usePage } from "@inertiajs/react";
+import { Link, usePage } from "@inertiajs/react";
 import {
     IconBarrel,
     IconBottle,
@@ -110,7 +110,7 @@ export default function Sidebar({
                     <h1
                         className={`text-2xl font-bold ${isOpen ? "" : "hidden"}`}
                     >
-                        bodega jotron
+                        <Link href={route("/")}>bodega jotron</Link>
                     </h1>
                     {isMobile && isOpen && (
                         <button

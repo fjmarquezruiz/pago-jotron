@@ -7,10 +7,18 @@ export default function Authenticated({
     header,
     children,
 }: PropsWithChildren<{ header?: ReactNode }>) {
-    const user = usePage().props.auth.user;
+    // const user = usePage().props.auth.user;
 
-    const success: string = usePage().props.success;
-    const error: string = usePage().props.error;
+    // const success: string = usePage().props.success;
+    // const error: string = usePage().props.error;
+    const user = (
+        usePage().props as unknown as { auth: { user: { name: string } } }
+    ).auth.user;
+
+    const success: string = (usePage().props as unknown as { success: string })
+        .success;
+    const error: string = (usePage().props as unknown as { error: string })
+        .error;
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isMobile, setIsMobile] = useState(false);

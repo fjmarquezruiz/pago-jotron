@@ -8,40 +8,26 @@ import HeroSection from "../Layout/HeroSection";
 const Index = ({ auth }: PageProps) => {
     const { state, dispatch } = useCart();
 
-    if (state.items.length === 0) {
-        return (
-            <>
-                <Head title="The cart" />
-                <HeroSection
-                    section="The cart"
-                    title="The cart best wines of Andalusia"
-                />
-                <div className="min-h-screen bg-white">
-                    <main className="container mx-auto px-4 py-8">
-                        <div className="text-center">
-                            <h1 className="mb-4 text-2xl font-bold">
-                                Your cart is empty
-                            </h1>
-                            <p className="mb-8 text-gray-600">
-                                Add some wines to your cart to get started!
-                            </p>
-                            {/* Add a link or button to redirect to the shop */}
-                        </div>
-                    </main>
-                </div>
-            </>
-        );
-    }
-
     return (
         <>
             <Head title="The cart" />
             <HeroSection
+                auth={auth}
                 section="The cart"
                 title="The cart best wines of Andalusia"
             />
-            <div className="min-h-screen bg-white">
-                <main className="container mx-auto px-4 py-8">
+            <main className="container mx-auto flex-1 border border-red-800 px-4 py-8">
+                {state.items.length === 0 ? (
+                    <div className="text-center">
+                        <h1 className="mb-4 text-2xl font-bold">
+                            Your cart is empty
+                        </h1>
+                        <p className="mb-8 text-gray-600">
+                            Add some wines to your cart to get started!
+                        </p>
+                        {/* Add a link or button to redirect to the shop */}
+                    </div>
+                ) : (
                     <div className="lg:grid lg:grid-cols-12 lg:gap-12">
                         <div className="lg:col-span-7">
                             <h1 className="mb-8 text-2xl font-bold">
@@ -122,8 +108,8 @@ const Index = ({ auth }: PageProps) => {
                             {/* Add checkout button */}
                         </div>
                     </div>
-                </main>
-            </div>
+                )}
+            </main>
         </>
     );
 };

@@ -18,10 +18,13 @@ export default function Welcome({
         document.getElementById("background")?.classList.add("!hidden");
     };
 
+    console.log("welcome -> ", auth);
+
     return (
         <>
             <Head title="Store Welcome" />
             <HeroSection
+                auth={auth}
                 section="HOME"
                 title="History and future from the heart of the Natural Park of Montes de Málaga"
             />

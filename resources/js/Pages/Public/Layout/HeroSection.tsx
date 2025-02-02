@@ -1,13 +1,17 @@
 "use client";
 
+import { User } from "@/types";
 import Header from "./Header";
 
 interface HeroSectionProps {
+    auth: {
+        user: User;
+    };
     section: string;
     title: string;
 }
 
-const HeroSection = ({ section = "", title = "" }: HeroSectionProps) => {
+const HeroSection = ({ auth, section = "", title = "" }: HeroSectionProps) => {
     // Determine the minimum height class based on the section
     const minHeightClass =
         section.toLowerCase() === "home"
@@ -63,7 +67,7 @@ const HeroSection = ({ section = "", title = "" }: HeroSectionProps) => {
                 <div className="absolute inset-0 bg-black/50" />
             </div>
 
-            <Header section={section} />
+            <Header auth={auth} section={section} />
 
             <div className="container relative mx-auto flex flex-1 flex-col justify-center px-4">
                 <div className={headerClass}>

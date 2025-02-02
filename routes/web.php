@@ -23,7 +23,7 @@ Route::get('/', function () {
         'laravelVersion' => FoundationApplication::VERSION,
         'phpVersion' => PHP_VERSION,
     ]);
-});
+})->name('/');
 // Route::redirect('/', '/dashboard');
 
 Route::get('/shop', function () {

@@ -359,6 +359,7 @@ const Index = ({ auth }: PageProps) => {
         <>
             <Head title="The shop" />
             <HeroSection
+                auth={auth}
                 section="The shop"
                 title="The best wines of Andalusia"
             />
