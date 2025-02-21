@@ -23,7 +23,8 @@ interface PaginationMeta {
     total: number;
 }
 
-interface QueryParams {
+interface QueryParams extends Record<string, any> {
+    page?: string;
     priceRange?: string[];
     wineTypes?: string[];
     denominations?: string[];
@@ -68,7 +69,10 @@ const Index = ({ auth, vinos, queryParams = {} }: PageProps<IndexProps>) => {
 
     // Function to update filters and trigger server-side request
     const updateFilters = (newFilters: Partial<QueryParams>) => {
-        const updatedFilters: QueryParams = { ...filters, ...newFilters };
+        const updatedFilters = {
+            ...filters,
+            ...newFilters,
+        };
         // Prevent redundant API calls if filters haven’t changed
         if (JSON.stringify(updatedFilters) === JSON.stringify(filters)) return;
 
