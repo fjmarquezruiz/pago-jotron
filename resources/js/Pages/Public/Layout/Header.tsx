@@ -44,8 +44,6 @@ const Header = ({ auth, section = "" }: HeaderProps) => {
         setCurrentPath(window.location.pathname);
     }, []);
 
-    console.log("Header -> ", auth);
-
     return (
         <header className="relative z-10">
             <div className="container mx-auto px-4 text-white">

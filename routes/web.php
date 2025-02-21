@@ -7,6 +7,7 @@ use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\DenominacionController;
 use App\Http\Controllers\FeatureController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ShopController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VinoController;
 use App\Http\Controllers\UvaController;
@@ -26,9 +27,10 @@ Route::get('/', function () {
 })->name('/');
 // Route::redirect('/', '/dashboard');
 
-Route::get('/shop', function () {
-    return Inertia::render('Public/Shop/Index');
-})->name('shop');
+// Route::get('/shop', function () {
+//     return Inertia::render('Public/Shop/Index');
+// })->name('shop');
+Route::get('/shop', [ShopController::class, 'index'])->name('shop');
 
 Route::get('/cart', function () {
     return Inertia::render('Public/Cart/Index');

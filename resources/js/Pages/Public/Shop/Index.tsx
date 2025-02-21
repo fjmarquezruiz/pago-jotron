@@ -1,359 +1,118 @@
 import { PageProps } from "@/types";
-import { Head } from "@inertiajs/react";
-import { useMemo, useState } from "react";
+import { Vino } from "@/types/vino";
+import { Head, router } from "@inertiajs/react";
+import debounce from "lodash/debounce";
+import { useState } from "react";
 import HeroSection from "../Layout/HeroSection";
 import FilterSidebar from "./FilterSidebar";
-import { Pagination } from "./Pagination";
+import Pagination from "./Pagination";
 import { ProductGrid } from "./ProductGrid";
 
-// Mock products related to Andalusian wines
-const mockProducts = [
-    {
-        id: 1,
-        name: "La Encina del Inglés",
-        price: 7.69,
-        originalPrice: 9.0,
-        region: "SIERRA DE MÁLAGA",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Sweet wine",
-        denomination: "DO Málaga",
-        grapeType: "Doradilla",
-    },
-    {
-        id: 2,
-        name: "El Jardín Secreto",
-        price: 12.5,
-        originalPrice: 14.0,
-        region: "COSTA DEL SOL",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Semi-sweet",
-        denomination: "DO Montilla-Moriles",
-        grapeType: "Doradilla",
-    },
-    {
-        id: 3,
-        name: "Bodegas Mijares",
-        price: 18.99,
-        originalPrice: 21.0,
-        region: "SIERRA DE MÁLAGA",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Dry white",
-        denomination: "DO Sierra de Mijares",
-        grapeType: "Palomino",
-    },
-    {
-        id: 4,
-        name: "Vinos del Alba",
-        price: 15.5,
-        originalPrice: 17.0,
-        region: "JEREZ",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Sherry",
-        denomination: "DO Jerez-Xérès-Sherry",
-        grapeType: "Pedro Ximénez",
-    },
-    {
-        id: 5,
-        name: "Miguel Torres",
-        price: 22.99,
-        originalPrice: 25.0,
-        region: "COSTA DEL SOL",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Rose",
-        denomination: "DO Costers del Segura",
-        grapeType: "Garnacha",
-    },
-    {
-        id: 6,
-        name: "Viñedos del Marques",
-        price: 10.99,
-        originalPrice: 12.0,
-        region: "SIERRA DE MÁLAGA",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Dry red",
-        denomination: "DO Sierra de Mijares",
-        grapeType: "Monastrell",
-    },
-    {
-        id: 7,
-        name: "Bodegas Tradición",
-        price: 14.99,
-        originalPrice: 16.0,
-        region: "SIERRA DE MÁLAGA",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Sweet wine",
-        denomination: "DO Málaga",
-        grapeType: "Doradilla",
-    },
-    {
-        id: 8,
-        name: "Viñedos del Sur",
-        price: 19.99,
-        originalPrice: 22.0,
-        region: "COSTA DEL SOL",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Dry white",
-        denomination: "DO Costers del Segura",
-        grapeType: "Macabeo",
-    },
-    {
-        id: 9,
-        name: "Bodegas Alfonso",
-        price: 24.99,
-        originalPrice: 27.0,
-        region: "JEREZ",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Sherry",
-        denomination: "DO Jerez-Xérès-Sherry",
-        grapeType: "Fino",
-    },
-    {
-        id: 10,
-        name: "Vinos del Mediterráneo",
-        price: 17.99,
-        originalPrice: 20.0,
-        region: "SIERRA DE MÁLAGA",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Dry red",
-        denomination: "DO Sierra de Mijares",
-        grapeType: "Tempranillo",
-    },
-    {
-        id: 11,
-        name: "Bodegas La Bota",
-        price: 9.99,
-        originalPrice: 11.0,
-        region: "COSTA DEL SOL",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Semi-sweet",
-        denomination: "DO Málaga",
-        grapeType: "Doradilla",
-    },
-    {
-        id: 12,
-        name: "Viñedos del Sol",
-        price: 21.99,
-        originalPrice: 24.0,
-        region: "SIERRA DE MÁLAGA",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Dry white",
-        denomination: "DO Sierra de Mijares",
-        grapeType: "Palomino",
-    },
-    {
-        id: 13,
-        name: "Bodegas El Bosque",
-        price: 16.99,
-        originalPrice: 18.0,
-        region: "JEREZ",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Sherry",
-        denomination: "DO Jerez-Xérès-Sherry",
-        grapeType: "Pedro Ximénez",
-    },
-    {
-        id: 14,
-        name: "Vinos del Alba",
-        price: 13.99,
-        originalPrice: 15.0,
-        region: "COSTA DEL SOL",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Rose",
-        denomination: "DO Costers del Segura",
-        grapeType: "Garnacha",
-    },
-    {
-        id: 15,
-        name: "Bodegas del Sur",
-        price: 11.99,
-        originalPrice: 13.0,
-        region: "SIERRA DE MÁLAGA",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Dry red",
-        denomination: "DO Sierra de Mijares",
-        grapeType: "Monastrell",
-    },
-    {
-        id: 16,
-        name: "Viñedos Tradición",
-        price: 15.99,
-        originalPrice: 17.0,
-        region: "SIERRA DE MÁLAGA",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Sweet wine",
-        denomination: "DO Málaga",
-        grapeType: "Doradilla",
-    },
-    {
-        id: 17,
-        name: "Bodegas del Marques",
-        price: 19.99,
-        originalPrice: 22.0,
-        region: "COSTA DEL SOL",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Dry white",
-        denomination: "DO Costers del Segura",
-        grapeType: "Macabeo",
-    },
-    {
-        id: 18,
-        name: "Viñedos Alfonso",
-        price: 23.99,
-        originalPrice: 26.0,
-        region: "JEREZ",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Sherry",
-        denomination: "DO Jerez-Xérès-Sherry",
-        grapeType: "Fino",
-    },
-    {
-        id: 19,
-        name: "Bodegas del Mediterráneo",
-        price: 18.99,
-        originalPrice: 21.0,
-        region: "SIERRA DE MÁLAGA",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Dry red",
-        denomination: "DO Sierra de Mijares",
-        grapeType: "Tempranillo",
-    },
-    {
-        id: 20,
-        name: "Viñedos La Bota",
-        price: 10.99,
-        originalPrice: 12.0,
-        region: "COSTA DEL SOL",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Semi-sweet",
-        denomination: "DO Málaga",
-        grapeType: "Doradilla",
-    },
-    {
-        id: 21,
-        name: "Bodegas del Sol",
-        price: 22.99,
-        originalPrice: 25.0,
-        region: "SIERRA DE MÁLAGA",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Dry white",
-        denomination: "DO Sierra de Mijares",
-        grapeType: "Palomino",
-    },
-    {
-        id: 22,
-        name: "Viñedos El Bosque",
-        price: 17.99,
-        originalPrice: 19.0,
-        region: "JEREZ",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Sherry",
-        denomination: "DO Jerez-Xérès-Sherry",
-        grapeType: "Pedro Ximénez",
-    },
-    {
-        id: 23,
-        name: "Bodegas del Alba",
-        price: 14.99,
-        originalPrice: 16.0,
-        region: "COSTA DEL SOL",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Rose",
-        denomination: "DO Costers del Segura",
-        grapeType: "Garnacha",
-    },
-    {
-        id: 24,
-        name: "Viñedos del Sur",
-        price: 12.99,
-        originalPrice: 14.0,
-        region: "SIERRA DE MÁLAGA",
-        imageUrl: "/placeholder.svg?height=400&width=300",
-        type: "Dry red",
-        denomination: "DO Sierra de Mijares",
-        grapeType: "Monastrell",
-    },
-];
+interface Links {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
 
-const Index = ({ auth }: PageProps) => {
-    const [currentPage, setCurrentPage] = useState(1);
-    const [filters, setFilters] = useState<{
-        priceRange: [number, number];
-        wineTypes: string[];
-        denominations: string[];
-        grapeTypes: string[];
-        winery: string | null;
-    }>({
-        priceRange: [4, 370],
-        wineTypes: [],
-        denominations: [],
-        grapeTypes: [],
-        winery: null,
-    });
+interface PaginationMeta {
+    current_page: number;
+    from: number;
+    last_page: number;
+    links: Links[];
+    per_page: number;
+    total: number;
+}
 
-    const [sortOrder, setSortOrder] = useState<string>("Relevance");
+interface QueryParams {
+    priceRange?: string[];
+    wineTypes?: string[];
+    denominations?: string[];
+    grapeTypes?: string[];
+    winery?: string | null;
+    sortField?: string;
+    sortDirection?: string;
+}
 
-    const handleFilterChange = (newFilters: any) => {
-        setFilters(newFilters);
-        setCurrentPage(1); // Reset to first page when filters change
+interface IndexProps extends Record<string, unknown> {
+    vinos: {
+        data: Vino[];
+        meta: PaginationMeta;
+    };
+    queryParams?: QueryParams;
+}
+
+const Index = ({ auth, vinos, queryParams = {} }: PageProps<IndexProps>) => {
+    // Get initial filter/sort values from URL (queryParams)
+    const initialFilters = {
+        priceRange: queryParams.priceRange ?? [],
+        wineTypes: queryParams.wineTypes ?? [],
+        denominations: queryParams.denominations ?? [],
+        grapeTypes: queryParams.grapeTypes ?? [],
+        winery: queryParams.winery ?? null,
+        sortField: queryParams.sortField ?? "name",
+        sortDirection: queryParams.sortDirection ?? "asc",
     };
 
-    const handleSortOrderChange = (
-        event: React.ChangeEvent<HTMLSelectElement>,
-    ) => {
-        setSortOrder(event.target.value);
-        setCurrentPage(1); // Reset to first page when sort order changes
-    };
+    const [filters, setFilters] = useState(initialFilters);
+    const [currentPage, setCurrentPage] = useState<number>(
+        vinos.meta.current_page,
+    );
 
-    const filteredProducts = useMemo(() => {
-        let filtered = mockProducts.filter((product) => {
-            const withinPriceRange =
-                product.price >= filters.priceRange[0] &&
-                product.price <= filters.priceRange[1];
-            const matchesWineType =
-                filters.wineTypes.length === 0 ||
-                filters.wineTypes.includes(product.type); // Assuming `type` exists in product
-            const matchesDenomination =
-                filters.denominations.length === 0 ||
-                filters.denominations.includes(product.denomination); // Assuming `denomination` exists in product
-            const matchesGrapeType =
-                filters.grapeTypes.length === 0 ||
-                filters.grapeTypes.includes(product.grapeType); // Assuming `grapeType` exists in product
-            const matchesWinery =
-                !filters.winery || product.region === filters.winery;
-
-            return (
-                withinPriceRange &&
-                matchesWineType &&
-                matchesDenomination &&
-                matchesGrapeType &&
-                matchesWinery
-            );
+    // Debounce API calls (wait 300ms before making a request)
+    const debouncedUpdateFilters = debounce((newFilters: QueryParams) => {
+        router.get(route("shop"), newFilters, {
+            preserveState: true,
+            replace: true,
         });
+    }, 300);
 
-        // Apply sorting based on selected order
-        switch (sortOrder) {
-            case "Price: Low to High":
-                filtered.sort((a, b) => a.price - b.price);
-                break;
-            case "Price: High to Low":
-                filtered.sort((a, b) => b.price - a.price);
-                break;
-            default:
-                // Default to no specific order or relevance
-                break;
-        }
+    // Function to update filters and trigger server-side request
+    const updateFilters = (newFilters: Partial<QueryParams>) => {
+        const updatedFilters: QueryParams = { ...filters, ...newFilters };
+        // Prevent redundant API calls if filters haven’t changed
+        if (JSON.stringify(updatedFilters) === JSON.stringify(filters)) return;
 
-        return filtered;
-    }, [filters, sortOrder]);
+        setFilters(updatedFilters);
+        setCurrentPage(1);
 
-    const productsPerPage = 9;
-    const totalProducts = filteredProducts.length;
-    const totalPages = Math.ceil(totalProducts / productsPerPage);
+        // Construct query parameters
+        const queryParams: QueryParams = {
+            page: "1",
+            priceRange: updatedFilters.priceRange?.length
+                ? updatedFilters.priceRange
+                : undefined,
+            wineTypes: updatedFilters.wineTypes?.length
+                ? updatedFilters.wineTypes
+                : undefined,
+            denominations: updatedFilters.denominations?.length
+                ? updatedFilters.denominations
+                : undefined,
+            grapeTypes: updatedFilters.grapeTypes?.length
+                ? updatedFilters.grapeTypes
+                : undefined,
+            winery: updatedFilters.winery,
+            sortField: updatedFilters.sortField,
+            sortDirection: updatedFilters.sortDirection,
+        };
 
-    const paginatedProducts = useMemo(() => {
-        const startIndex = (currentPage - 1) * productsPerPage;
-        return filteredProducts.slice(startIndex, startIndex + productsPerPage);
-    }, [filteredProducts, currentPage, productsPerPage]);
+        debouncedUpdateFilters(queryParams);
+    };
+
+    // Function to update sorting
+    const updateSortOrder = (event: React.ChangeEvent<HTMLSelectElement>) => {
+        const [sortField, sortDirection] = event.target.value.split("_");
+        updateFilters({ sortField, sortDirection });
+    };
+
+    // Function to change page
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+        router.get(
+            route("shop"),
+            { ...filters, page },
+            { preserveState: true, replace: true },
+        );
+    };
 
     return (
         <>
@@ -363,38 +122,41 @@ const Index = ({ auth }: PageProps) => {
                 section="The shop"
                 title="The best wines of Andalusia"
             />
-            <div className="container mx-auto border border-red-800 px-4 py-8">
+
+            <div className="container mx-auto px-4 py-8">
                 <div className="flex gap-8">
-                    <FilterSidebar onFilterChange={handleFilterChange} />
+                    <FilterSidebar onFilterChange={updateFilters} />
 
                     <div className="flex-1">
                         <div className="mb-6 flex items-center justify-between">
                             <div className="text-sm text-gray-500">
-                                Showing {totalProducts} results
+                                Showing {vinos.data.length} of{" "}
+                                {vinos.meta.total} results
                             </div>
                             <select
                                 className="rounded-md border p-2 text-sm"
-                                value={sortOrder}
-                                onChange={handleSortOrderChange}
+                                value={`${filters.sortField}_${filters.sortDirection}`}
+                                onChange={updateSortOrder}
                             >
-                                <option value="Relevance">Relevance</option>
-                                <option value="Price: Low to High">
+                                <option value="">Order by</option>
+                                <option value="name_asc">Name: A-Z</option>
+                                <option value="name_desc">Name: Z-A</option>
+                                <option value="price_asc">
                                     Price: Low to High
                                 </option>
-                                <option value="Price: High to Low">
+                                <option value="price_desc">
                                     Price: High to Low
                                 </option>
                             </select>
                         </div>
 
-                        {paginatedProducts.length > 0 ? (
+                        {vinos.data.length > 0 ? (
                             <>
-                                <ProductGrid products={paginatedProducts} />
-
+                                <ProductGrid products={vinos.data} />
                                 <Pagination
                                     currentPage={currentPage}
-                                    totalPages={totalPages}
-                                    onPageChange={setCurrentPage}
+                                    totalPages={vinos.meta.last_page}
+                                    onPageChange={handlePageChange}
                                 />
                             </>
                         ) : (

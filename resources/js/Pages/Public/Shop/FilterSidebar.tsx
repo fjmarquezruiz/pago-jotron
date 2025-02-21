@@ -1,7 +1,7 @@
+// FilterSidebar.tsx
 "use client";
 
 import { Button } from "@/Components/ui/button";
-import { Checkbox } from "@/Components/ui/checkbox";
 import {
     Select,
     SelectContent,
@@ -10,7 +10,9 @@ import {
     SelectValue,
 } from "@/Components/ui/select";
 import { Slider } from "@/Components/ui/slider";
+import { VinoOption } from "@/types/vino";
 import { useEffect, useState } from "react";
+import ToggleList from "./ToogleList";
 
 interface FilterSidebarProps {
     onFilterChange: (filters: any) => void;
@@ -24,31 +26,12 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
     >([]);
     const [selectedGrapeTypes, setSelectedGrapeTypes] = useState<string[]>([]);
     const [selectedWinery, setSelectedWinery] = useState<string | null>(null);
-
-    const wineTypes = [
-        "Rosés",
-        "Sparkling wine",
-        "Vermouth",
-        "Sweet wine",
-        "Semi-sweet white wine",
-        "Semi-sweet sparkling wine",
-    ];
-
-    const denominations = [
-        "DO Jerez-Xérès-Sherry",
-        "DO Manzanilla-Sanlúcar de Barrameda",
-        "DO Montilla-Moriles",
-        "DO Condado de Huelva",
-        "DO Málaga",
-    ];
-
-    const grapeTypes = [
-        "Cabernet Franc",
-        "Cabernet Sauvignon",
-        "Chardonnay",
-        "Colombard",
-        "Doradilla",
-    ];
+    const [categorias, setCategorias] = useState<VinoOption[]>([]);
+    const [denominaciones, setDenominaciones] = useState<VinoOption[]>([]);
+    const [uvas, setUvas] = useState<VinoOption[]>([]);
+    const [bodegas, setBodegas] = useState<VinoOption[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const filters = {
@@ -67,6 +50,51 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
         selectedWinery,
         onFilterChange,
     ]);
+
+    useEffect(() => {
+        const fetchData = async (
+            url: string,
+            setState: React.Dispatch<React.SetStateAction<VinoOption[]>>,
+            directData: boolean = false,
+        ) => {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                const data = await response.json();
+                if (!Array.isArray(directData ? data : data.data)) {
+                    throw new Error(`${url} data is not an array`);
+                }
+                setState(directData ? data : data.data);
+            } catch (err) {
+                console.error(`Error fetching data from ${url}:`, err);
+                setError(
+                    `Failed to load data from ${url}. Please try again later.`,
+                );
+            }
+        };
+
+        const fetchAllData = async () => {
+            await Promise.all([
+                fetchData("/api/categorias", setCategorias),
+                fetchData("/api/denominaciones", setDenominaciones),
+                fetchData("/api/uvas", setUvas, true), // Direct data for /api/uvas
+                fetchData("/api/bodegas", setBodegas),
+            ]);
+            setLoading(false);
+        };
+
+        fetchAllData();
+    }, []);
+
+    if (loading) {
+        return <div>Loading...</div>;
+    }
+
+    if (error) {
+        return <div>{error}</div>;
+    }
 
     const handleWineTypeChange = (type: string) => {
         setSelectedWineTypes((prev) =>
@@ -100,9 +128,8 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
                         <h3 className="mb-4 font-semibold">FILTERS</h3>
                         <Button
                             variant="ghost"
-                            className="text-primary text-sm"
+                            className="text-sm text-primary"
                             onClick={() => {
-                                setPriceRange([4, 370]);
                                 setSelectedWineTypes([]);
                                 setSelectedDenominations([]);
                                 setSelectedGrapeTypes([]);
@@ -113,30 +140,12 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
                         </Button>
                     </div>
 
-                    <div>
-                        <h4 className="mb-3 font-medium">Wine Type</h4>
-                        <div className="space-y-2">
-                            {wineTypes.map((type) => (
-                                <div key={type} className="flex items-center">
-                                    <Checkbox
-                                        id={type}
-                                        checked={selectedWineTypes.includes(
-                                            type,
-                                        )}
-                                        onCheckedChange={() =>
-                                            handleWineTypeChange(type)
-                                        }
-                                    />
-                                    <label
-                                        htmlFor={type}
-                                        className="ml-2 text-sm"
-                                    >
-                                        {type}
-                                    </label>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <ToggleList
+                        title="Wine Type"
+                        items={categorias}
+                        selectedItems={selectedWineTypes}
+                        onItemChange={handleWineTypeChange}
+                    />
 
                     <div>
                         <h4 className="mb-3 font-medium">Price Range</h4>
@@ -166,75 +175,31 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
                                 <SelectValue placeholder="Select a winery" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="sierra">
-                                    Sierra de Málaga
-                                </SelectItem>
-                                <SelectItem value="costa">
-                                    Costa del Sol
-                                </SelectItem>
-                                <SelectItem value="almeria">
-                                    Costa de Almería
-                                </SelectItem>
+                                {bodegas.map((type) => (
+                                    <SelectItem
+                                        key={type.id}
+                                        value={type.id.toString()}
+                                    >
+                                        {type.name}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
 
-                    <div>
-                        <h4 className="mb-3 font-medium">
-                            Denomination of Origin
-                        </h4>
-                        <div className="space-y-2">
-                            {denominations.map((denomination) => (
-                                <div
-                                    key={denomination}
-                                    className="flex items-center"
-                                >
-                                    <Checkbox
-                                        id={denomination}
-                                        checked={selectedDenominations.includes(
-                                            denomination,
-                                        )}
-                                        onCheckedChange={() =>
-                                            handleDenominationChange(
-                                                denomination,
-                                            )
-                                        }
-                                    />
-                                    <label
-                                        htmlFor={denomination}
-                                        className="ml-2 text-sm"
-                                    >
-                                        {denomination}
-                                    </label>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <ToggleList
+                        title="Denomination of Origin"
+                        items={denominaciones}
+                        selectedItems={selectedDenominations}
+                        onItemChange={handleDenominationChange}
+                    />
 
-                    <div>
-                        <h4 className="mb-3 font-medium">Grape Type</h4>
-                        <div className="space-y-2">
-                            {grapeTypes.map((grape) => (
-                                <div key={grape} className="flex items-center">
-                                    <Checkbox
-                                        id={grape}
-                                        checked={selectedGrapeTypes.includes(
-                                            grape,
-                                        )}
-                                        onCheckedChange={() =>
-                                            handleGrapeTypeChange(grape)
-                                        }
-                                    />
-                                    <label
-                                        htmlFor={grape}
-                                        className="ml-2 text-sm"
-                                    >
-                                        {grape}
-                                    </label>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <ToggleList
+                        title="Grape Type"
+                        items={uvas}
+                        selectedItems={selectedGrapeTypes}
+                        onItemChange={handleGrapeTypeChange}
+                    />
                 </div>
             </div>
         </div>

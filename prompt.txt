@@ -1,327 +1,1088 @@
-Act a an experienced fullstack developer. I am building an app using laravel 11 breeze, react, typescript and tailwind, my database is mysql and I do not use axios to fetch data.
+Act a an experienced fullstack developer. I am building an ecommerce app using laravel 11 breeze, react, typescript and tailwind, my database is mysql and I do not use axios to fetch data.
 
-I have 3 tables: vinos, uvas and vino_uvas.
+When I add items to the cart, but I cannot load the /cart view and the current cart. Check the code and give me a solution.
 
-vinos table has the following fields:
+These are the views that I am using:
+
+app.tsx
+------------------------------------------
+import '../css/app.css';
+import './bootstrap';
+
+import { createInertiaApp } from '@inertiajs/react';
+import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
+import { createRoot, hydrateRoot } from 'react-dom/client';
+
+const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+
+createInertiaApp({
+    title: (title) => `${title} - ${appName}`,
+    resolve: (name) =>
+        resolvePageComponent(
+            `./Pages/${name}.tsx`,
+            import.meta.glob('./Pages/**/*.tsx'),
+        ),
+    setup({ el, App, props }) {
+        if (import.meta.env.SSR) {
+            hydrateRoot(el, <App {...props} />);
+            return;
+        }
+
+        createRoot(el).render(<App {...props} />);
+    },
+    progress: {
+        color: '#4B5563',
+    },
+});
+------------------------------------------
+
+PublicLayout.tsx
+------------------------------------------
+import { Toaster } from "@/Components/ui/toaster";
+import { CartProvider } from "@/contexts/cart-context";
+import { PropsWithChildren } from "react";
+
+export default function Public({ children }: PropsWithChildren) {
+    return (
+        <CartProvider>
+            <link rel="preconnect" href="https://fonts.googleapis.com"></link>
+            <link
+                rel="preconnect"
+                href="https://fonts.gstatic.com"
+                crossOrigin="anonymous"
+            ></link>
+            <link
+                href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&display=swap"
+                rel="stylesheet"
+            ></link>
+
+            <div className="flex min-h-screen flex-col items-center bg-red-100 text-gray-900 dark:bg-gray-900 dark:text-white/5">
+                <div>cominezo Estas en PUBLIC</div>
+                {children}
+                <div>fin Estas en PUBLIC</div>
+            </div>
+            <Toaster />
+        </CartProvider>
+    );
+}
+------------------------------------------
+
+Cart - index
+------------------------------------------
+"use client";
+
+import { useCart } from "@/contexts/cart-context";
+import Public from "@/Layouts/PublicLayout";
+import { PageProps } from "@/types";
+import { Head } from "@inertiajs/react";
+import HeroSection from "../Layout/HeroSection";
+// import Image from "next/image";
+// import Link from "next/link";
+
+const Index = ({ auth }: PageProps) => {
+    const { state, dispatch } = useCart();
+
+    // if (state.items.length === 0) {
+    //     return (
+    //         <Public>
+    //             <Head title="The cart" />
+    //             <HeroSection
+    //                 section="The cart"
+    //                 title="The cart best wines of Andalusia"
+    //             />
+    //             <div className="min-h-screen bg-white">
+    //                 <main className="container mx-auto px-4 py-8">
+    //                     <div className="text-center">
+    //                         <h1 className="mb-4 text-2xl font-bold">
+    //                             Your cart is empty
+    //                         </h1>
+    //                         <p className="mb-8 text-gray-600">
+    //                             Add some wines to your cart to get started!
+    //                         </p>
+    //                         <Link href="/shop">
+    //                             <Button>Continue Shopping</Button>
+    //                         </Link>
+    //                     </div>
+    //                 </main>
+    //             </div>
+    //         </Public>
+    //     );
+    // }
+
+    // return (
+    //     <Public>
+    //         <Head title="The cart" />
+    //         <HeroSection
+    //             section="The cart"
+    //             title="The cart best wines of Andalusia"
+    //         />
+    //         <div className="min-h-screen bg-white">
+    //             <main className="container mx-auto px-4 py-8">
+    //                 <div className="lg:grid lg:grid-cols-12 lg:gap-12">
+    //                     <div className="lg:col-span-7">
+    //                         <h1 className="mb-8 text-2xl font-bold">
+    //                             Shopping Cart
+    //                         </h1>
+    //                         <div className="space-y-8">
+    //                             {state.items.map((item) => (
+    //                                 <div key={item.id} className="flex gap-6">
+    //                                     <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-md border">
+    //                                         {/* <Image
+    //                                         src={
+    //                                             item.imageUrl ||
+    //                                             "/placeholder.svg"
+    //                                         }
+    //                                         alt={item.name}
+    //                                         width={96}
+    //                                         height={96}
+    //                                         className="h-full w-full object-cover object-center"
+    //                                     /> */}
+    //                                         imagen ---
+    //                                     </div>
+    //                                     <div className="flex flex-1 flex-col">
+    //                                         <div className="flex justify-between text-base font-medium text-gray-900">
+    //                                             <h3>{item.name}</h3>
+    //                                             <p className="ml-4">
+    //                                                 {(
+    //                                                     item.price *
+    //                                                     item.quantity
+    //                                                 ).toFixed(2)}{" "}
+    //                                                 €
+    //                                             </p>
+    //                                         </div>
+    //                                         <p className="mt-1 text-sm text-gray-500">
+    //                                             {item.region}
+    //                                         </p>
+    //                                         <div className="mt-4 flex items-center justify-between">
+    //                                             <div className="flex items-center gap-2">
+    //                                                 <Button
+    //                                                     variant="outline"
+    //                                                     size="icon"
+    //                                                     onClick={() => {
+    //                                                         dispatch({
+    //                                                             type: "UPDATE_QUANTITY",
+    //                                                             itemId: item.id,
+    //                                                             quantity:
+    //                                                                 item.quantity -
+    //                                                                 1,
+    //                                                         });
+    //                                                     }}
+    //                                                     disabled={
+    //                                                         item.quantity <= 1
+    //                                                     }
+    //                                                 >
+    //                                                     <Minus className="h-4 w-4" />
+    //                                                 </Button>
+    //                                                 <span className="w-8 text-center">
+    //                                                     {item.quantity}
+    //                                                 </span>
+    //                                                 <Button
+    //                                                     variant="outline"
+    //                                                     size="icon"
+    //                                                     onClick={() => {
+    //                                                         dispatch({
+    //                                                             type: "UPDATE_QUANTITY",
+    //                                                             itemId: item.id,
+    //                                                             quantity:
+    //                                                                 item.quantity +
+    //                                                                 1,
+    //                                                         });
+    //                                                     }}
+    //                                                 >
+    //                                                     <Plus className="h-4 w-4" />
+    //                                                 </Button>
+    //                                             </div>
+    //                                             <Button
+    //                                                 variant="ghost"
+    //                                                 size="icon"
+    //                                                 onClick={() => {
+    //                                                     dispatch({
+    //                                                         type: "REMOVE_ITEM",
+    //                                                         itemId: item.id,
+    //                                                     });
+    //                                                 }}
+    //                                             >
+    //                                                 <Trash2 className="h-4 w-4" />
+    //                                             </Button>
+    //                                         </div>
+    //                                     </div>
+    //                                 </div>
+    //                             ))}
+    //                         </div>
+    //                     </div>
+    //                     <div className="mt-16 rounded-lg bg-gray-50 px-4 py-6 sm:p-6 lg:col-span-5 lg:mt-0 lg:p-8">
+    //                         <h2 className="text-lg font-medium text-gray-900">
+    //                             Order summary
+    //                         </h2>
+    //                         <div className="mt-6 space-y-4">
+    //                             <div className="flex items-center justify-between">
+    //                                 <p className="text-sm text-gray-600">
+    //                                     Subtotal
+    //                                 </p>
+    //                                 <p className="text-sm font-medium text-gray-900">
+    //                                     {state.total.toFixed(2)} €
+    //                                 </p>
+    //                             </div>
+    //                             <div className="flex items-center justify-between border-t border-gray-200 pt-4">
+    //                                 <p className="text-base font-medium text-gray-900">
+    //                                     Order total
+    //                                 </p>
+    //                                 <p className="text-base font-medium text-gray-900">
+    //                                     {state.total.toFixed(2)} €
+    //                                 </p>
+    //                             </div>
+    //                         </div>
+    //                         <Button className="mt-6 w-full" size="lg">
+    //                             Checkout
+    //                         </Button>
+    //                     </div>
+    //                 </div>
+    //             </main>
+    //         </div>
+    //     </Public>
+    // );
+
+    return (
+        <Public>
+            <Head title="The cart" />
+            <HeroSection
+                section="The cart"
+                title="The cart best wines of Andalusia"
+            />
+            <div className="container mx-auto border border-red-800 px-4 py-8">
+                Estoy en cart
+            </div>
+        </Public>
+    );
+};
+
+export default Index;
+
+------------------------------------------
+
+Shop - index
+------------------------------------------
+import Public from "@/Layouts/PublicLayout";
+import { PageProps } from "@/types";
+import { Head } from "@inertiajs/react";
+import { useMemo, useState } from "react";
+import HeroSection from "../Layout/HeroSection";
+import FilterSidebar from "./FilterSidebar";
+import { Pagination } from "./Pagination";
+import { ProductGrid } from "./ProductGrid";
+
+// Mock products related to Andalusian wines
+const mockProducts = [
+    {
+        id: 1,
+        name: "La Encina del Inglés",
+        price: 7.69,
+        originalPrice: 9.0,
+        region: "SIERRA DE MÁLAGA",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Sweet wine",
+        denomination: "DO Málaga",
+        grapeType: "Doradilla",
+    },
+    {
+        id: 2,
+        name: "El Jardín Secreto",
+        price: 12.5,
+        originalPrice: 14.0,
+        region: "COSTA DEL SOL",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Semi-sweet",
+        denomination: "DO Montilla-Moriles",
+        grapeType: "Doradilla",
+    },
+    {
+        id: 3,
+        name: "Bodegas Mijares",
+        price: 18.99,
+        originalPrice: 21.0,
+        region: "SIERRA DE MÁLAGA",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Dry white",
+        denomination: "DO Sierra de Mijares",
+        grapeType: "Palomino",
+    },
+    {
+        id: 4,
+        name: "Vinos del Alba",
+        price: 15.5,
+        originalPrice: 17.0,
+        region: "JEREZ",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Sherry",
+        denomination: "DO Jerez-Xérès-Sherry",
+        grapeType: "Pedro Ximénez",
+    },
+    {
+        id: 5,
+        name: "Miguel Torres",
+        price: 22.99,
+        originalPrice: 25.0,
+        region: "COSTA DEL SOL",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Rose",
+        denomination: "DO Costers del Segura",
+        grapeType: "Garnacha",
+    },
+    {
+        id: 6,
+        name: "Viñedos del Marques",
+        price: 10.99,
+        originalPrice: 12.0,
+        region: "SIERRA DE MÁLAGA",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Dry red",
+        denomination: "DO Sierra de Mijares",
+        grapeType: "Monastrell",
+    },
+    {
+        id: 7,
+        name: "Bodegas Tradición",
+        price: 14.99,
+        originalPrice: 16.0,
+        region: "SIERRA DE MÁLAGA",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Sweet wine",
+        denomination: "DO Málaga",
+        grapeType: "Doradilla",
+    },
+    {
+        id: 8,
+        name: "Viñedos del Sur",
+        price: 19.99,
+        originalPrice: 22.0,
+        region: "COSTA DEL SOL",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Dry white",
+        denomination: "DO Costers del Segura",
+        grapeType: "Macabeo",
+    },
+    {
+        id: 9,
+        name: "Bodegas Alfonso",
+        price: 24.99,
+        originalPrice: 27.0,
+        region: "JEREZ",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Sherry",
+        denomination: "DO Jerez-Xérès-Sherry",
+        grapeType: "Fino",
+    },
+    {
+        id: 10,
+        name: "Vinos del Mediterráneo",
+        price: 17.99,
+        originalPrice: 20.0,
+        region: "SIERRA DE MÁLAGA",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Dry red",
+        denomination: "DO Sierra de Mijares",
+        grapeType: "Tempranillo",
+    },
+    {
+        id: 11,
+        name: "Bodegas La Bota",
+        price: 9.99,
+        originalPrice: 11.0,
+        region: "COSTA DEL SOL",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Semi-sweet",
+        denomination: "DO Málaga",
+        grapeType: "Doradilla",
+    },
+    {
+        id: 12,
+        name: "Viñedos del Sol",
+        price: 21.99,
+        originalPrice: 24.0,
+        region: "SIERRA DE MÁLAGA",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Dry white",
+        denomination: "DO Sierra de Mijares",
+        grapeType: "Palomino",
+    },
+    {
+        id: 13,
+        name: "Bodegas El Bosque",
+        price: 16.99,
+        originalPrice: 18.0,
+        region: "JEREZ",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Sherry",
+        denomination: "DO Jerez-Xérès-Sherry",
+        grapeType: "Pedro Ximénez",
+    },
+    {
+        id: 14,
+        name: "Vinos del Alba",
+        price: 13.99,
+        originalPrice: 15.0,
+        region: "COSTA DEL SOL",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Rose",
+        denomination: "DO Costers del Segura",
+        grapeType: "Garnacha",
+    },
+    {
+        id: 15,
+        name: "Bodegas del Sur",
+        price: 11.99,
+        originalPrice: 13.0,
+        region: "SIERRA DE MÁLAGA",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Dry red",
+        denomination: "DO Sierra de Mijares",
+        grapeType: "Monastrell",
+    },
+    {
+        id: 16,
+        name: "Viñedos Tradición",
+        price: 15.99,
+        originalPrice: 17.0,
+        region: "SIERRA DE MÁLAGA",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Sweet wine",
+        denomination: "DO Málaga",
+        grapeType: "Doradilla",
+    },
+    {
+        id: 17,
+        name: "Bodegas del Marques",
+        price: 19.99,
+        originalPrice: 22.0,
+        region: "COSTA DEL SOL",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Dry white",
+        denomination: "DO Costers del Segura",
+        grapeType: "Macabeo",
+    },
+    {
+        id: 18,
+        name: "Viñedos Alfonso",
+        price: 23.99,
+        originalPrice: 26.0,
+        region: "JEREZ",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Sherry",
+        denomination: "DO Jerez-Xérès-Sherry",
+        grapeType: "Fino",
+    },
+    {
+        id: 19,
+        name: "Bodegas del Mediterráneo",
+        price: 18.99,
+        originalPrice: 21.0,
+        region: "SIERRA DE MÁLAGA",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Dry red",
+        denomination: "DO Sierra de Mijares",
+        grapeType: "Tempranillo",
+    },
+    {
+        id: 20,
+        name: "Viñedos La Bota",
+        price: 10.99,
+        originalPrice: 12.0,
+        region: "COSTA DEL SOL",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Semi-sweet",
+        denomination: "DO Málaga",
+        grapeType: "Doradilla",
+    },
+    {
+        id: 21,
+        name: "Bodegas del Sol",
+        price: 22.99,
+        originalPrice: 25.0,
+        region: "SIERRA DE MÁLAGA",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Dry white",
+        denomination: "DO Sierra de Mijares",
+        grapeType: "Palomino",
+    },
+    {
+        id: 22,
+        name: "Viñedos El Bosque",
+        price: 17.99,
+        originalPrice: 19.0,
+        region: "JEREZ",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Sherry",
+        denomination: "DO Jerez-Xérès-Sherry",
+        grapeType: "Pedro Ximénez",
+    },
+    {
+        id: 23,
+        name: "Bodegas del Alba",
+        price: 14.99,
+        originalPrice: 16.0,
+        region: "COSTA DEL SOL",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Rose",
+        denomination: "DO Costers del Segura",
+        grapeType: "Garnacha",
+    },
+    {
+        id: 24,
+        name: "Viñedos del Sur",
+        price: 12.99,
+        originalPrice: 14.0,
+        region: "SIERRA DE MÁLAGA",
+        imageUrl: "/placeholder.svg?height=400&width=300",
+        type: "Dry red",
+        denomination: "DO Sierra de Mijares",
+        grapeType: "Monastrell",
+    },
+];
+
+const Index = ({ auth }: PageProps) => {
+    const [currentPage, setCurrentPage] = useState(1);
+    const [filters, setFilters] = useState<{
+        priceRange: [number, number];
+        wineTypes: string[];
+        denominations: string[];
+        grapeTypes: string[];
+        winery: string | null;
+    }>({
+        priceRange: [4, 370],
+        wineTypes: [],
+        denominations: [],
+        grapeTypes: [],
+        winery: null,
+    });
+
+    const [sortOrder, setSortOrder] = useState<string>("Relevance");
+
+    const handleFilterChange = (newFilters: any) => {
+        setFilters(newFilters);
+        setCurrentPage(1); // Reset to first page when filters change
+    };
+
+    const handleSortOrderChange = (
+        event: React.ChangeEvent<HTMLSelectElement>,
+    ) => {
+        setSortOrder(event.target.value);
+        setCurrentPage(1); // Reset to first page when sort order changes
+    };
+
+    const filteredProducts = useMemo(() => {
+        let filtered = mockProducts.filter((product) => {
+            const withinPriceRange =
+                product.price >= filters.priceRange[0] &&
+                product.price <= filters.priceRange[1];
+            const matchesWineType =
+                filters.wineTypes.length === 0 ||
+                filters.wineTypes.includes(product.type); // Assuming `type` exists in product
+            const matchesDenomination =
+                filters.denominations.length === 0 ||
+                filters.denominations.includes(product.denomination); // Assuming `denomination` exists in product
+            const matchesGrapeType =
+                filters.grapeTypes.length === 0 ||
+                filters.grapeTypes.includes(product.grapeType); // Assuming `grapeType` exists in product
+            const matchesWinery =
+                !filters.winery || product.region === filters.winery;
+
+            return (
+                withinPriceRange &&
+                matchesWineType &&
+                matchesDenomination &&
+                matchesGrapeType &&
+                matchesWinery
+            );
+        });
+
+        // Apply sorting based on selected order
+        switch (sortOrder) {
+            case "Price: Low to High":
+                filtered.sort((a, b) => a.price - b.price);
+                break;
+            case "Price: High to Low":
+                filtered.sort((a, b) => b.price - a.price);
+                break;
+            default:
+                // Default to no specific order or relevance
+                break;
+        }
+
+        return filtered;
+    }, [filters, sortOrder]);
+
+    const productsPerPage = 9;
+    const totalProducts = filteredProducts.length;
+    const totalPages = Math.ceil(totalProducts / productsPerPage);
+
+    const paginatedProducts = useMemo(() => {
+        const startIndex = (currentPage - 1) * productsPerPage;
+        return filteredProducts.slice(startIndex, startIndex + productsPerPage);
+    }, [filteredProducts, currentPage, productsPerPage]);
+
+    return (
+        <Public>
+            <Head title="The shop" />
+            <HeroSection
+                section="The shop"
+                title="The best wines of Andalusia"
+            />
+            <div className="container mx-auto border border-red-800 px-4 py-8">
+                <div className="flex gap-8">
+                    <FilterSidebar onFilterChange={handleFilterChange} />
+
+                    <div className="flex-1">
+                        <div className="mb-6 flex items-center justify-between">
+                            <div className="text-sm text-gray-500">
+                                Showing {totalProducts} results
+                            </div>
+                            <select
+                                className="rounded-md border p-2 text-sm"
+                                value={sortOrder}
+                                onChange={handleSortOrderChange}
+                            >
+                                <option value="Relevance">Relevance</option>
+                                <option value="Price: Low to High">
+                                    Price: Low to High
+                                </option>
+                                <option value="Price: High to Low">
+                                    Price: High to Low
+                                </option>
+                            </select>
+                        </div>
+
+                        {paginatedProducts.length > 0 ? (
+                            <>
+                                <ProductGrid products={paginatedProducts} />
+
+                                <Pagination
+                                    currentPage={currentPage}
+                                    totalPages={totalPages}
+                                    onPageChange={setCurrentPage}
+                                />
+                            </>
+                        ) : (
+                            <div className="mt-10 text-center text-gray-500">
+                                No products found matching your filters.
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </Public>
+    );
+};
+
+export default Index;
+
+------------------------------------------
+
+ProductGrid.tsx
+------------------------------------------
+"use client";
+
+import { Button } from "@/Components/ui/button";
+import { useCart } from "@/contexts/cart-context";
+import { useToast } from "@/hooks/use-toast";
+// import Image from "next/image";
+import { useCallback } from "react";
+
+interface Product {
+    id: number;
+    name: string;
+    price: number;
+    originalPrice: number;
+    region: string;
+    imageUrl: string;
+}
+
+interface ProductGridProps {
+    products: Product[];
+}
+
+export function ProductGrid({ products }: ProductGridProps) {
+    const { dispatch } = useCart();
+    const { toast } = useToast();
+
+    const handleAddToCart = useCallback(
+        (product: Product) => {
+            dispatch({
+                type: "ADD_ITEM",
+                item: {
+                    id: product.id,
+                    name: product.name,
+                    price: product.price,
+                    imageUrl: product.imageUrl,
+                    region: product.region,
+                },
+            });
+            toast({
+                title: "Added to cart",
+                description: `${product.name} has been added to your cart.`,
+            });
+        },
+        [dispatch, toast],
+    );
+
+    return (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {products.map((product) => (
+                <div key={product.id} className="group relative">
+                    <div className="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg">
+                        {/* <Image
+                            src={product.imageUrl || "/placeholder.svg"}
+                            alt={product.name}
+                            width={300}
+                            height={400}
+                            className="h-full w-full object-cover object-center"
+                        /> */}
+                        <img
+                            src={product.imageUrl || "/placeholder.svg"}
+                            alt={product.name}
+                            width={300}
+                            height={400}
+                            className="h-full w-full object-cover object-center"
+                        />
+                    </div>
+                    <div className="mt-4 flex justify-between">
+                        <div>
+                            <h3 className="text-sm font-medium text-gray-900">
+                                {product.name}
+                            </h3>
+                            <p className="mt-1 text-sm text-gray-500">
+                                {product.region}
+                            </p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-sm font-medium text-gray-900">
+                                {product.price.toFixed(2)} €
+                            </p>
+                            {product.originalPrice > product.price && (
+                                <p className="text-sm text-gray-500 line-through">
+                                    {product.originalPrice.toFixed(2)} €
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                    <Button
+                        onClick={() => handleAddToCart(product)}
+                        className="mt-4 w-full bg-green-600 hover:bg-green-700"
+                    >
+                        Quick Add
+                    </Button>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+------------------------------------------
+
+CartBadge.tsx
+------------------------------------------
+"use client";
+
+import { useCart } from "@/contexts/cart-context";
+import { Link } from "@inertiajs/react";
+import { IconShoppingBag } from "@tabler/icons-react";
+import { useRoute } from "../../../../../vendor/tightenco/ziggy/src/js";
+
+export function CartBadge() {
+    const router = useRoute();
+    const { state } = useCart();
+
+    const itemCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
+
+    return (
+        <>
+            <Link
+                href={route("cart")}
+                as="button"
+                className="relative inline-flex items-center gap-2 rounded border border-transparent bg-transparent p-2 text-sm font-medium leading-4 text-white transition duration-150 ease-in-out hover:bg-white/10 focus:bg-white/20 focus:outline-none dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300 dark:focus:bg-gray-700"
+                aria-label="Cart"
+                title="Cart"
+                // onClick={() => router.push("/cart")}
+            >
+                <IconShoppingBag stroke={1.5} className="size-5" />
+                {itemCount > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-medium text-gray-900">
+                        {itemCount}
+                    </span>
+                )}
+                <span className="sr-only">Cart</span>
+            </Link>
+            {/* <Button
+                variant="ghost"
+                size="icon"
+                className="relative"
+                onClick={() => router.push("/cart")}
+            >
+                <IconShoppingBag stroke={1.5} className="size-5" />
+                {itemCount > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-medium text-gray-900">
+                        {itemCount}
+                    </span>
+                )}
+                <span className="sr-only">Cart</span>
+            </Button> */}
+        </>
+    );
+}
+
+------------------------------------------
+
+cart-context.tsx
+------------------------------------------
+"use client";
+
+import { createContext, useContext, useMemo, useReducer } from "react";
+
+export interface CartItem {
+    id: number;
+    name: string;
+    price: number;
+    quantity: number;
+    imageUrl: string;
+    region: string;
+}
+
+interface CartState {
+    items: CartItem[];
+    total: number;
+}
+
+type CartAction =
+    | { type: "ADD_ITEM"; item: Omit<CartItem, "quantity"> }
+    | { type: "REMOVE_ITEM"; itemId: number }
+    | { type: "UPDATE_QUANTITY"; itemId: number; quantity: number };
+
+const CartContext = createContext<{
+    state: CartState;
+    dispatch: React.Dispatch<CartAction>;
+} | null>(null);
+
+function cartReducer(state: CartState, action: CartAction): CartState {
+    switch (action.type) {
+        case "ADD_ITEM": {
+            const existingItemIndex = state.items.findIndex(
+                (item) => item.id === action.item.id,
+            );
+            if (existingItemIndex !== -1) {
+                const updatedItems = [...state.items];
+                updatedItems[existingItemIndex] = {
+                    ...updatedItems[existingItemIndex],
+                    quantity: updatedItems[existingItemIndex].quantity + 1,
+                };
+                return {
+                    ...state,
+                    items: updatedItems,
+                    total: calculateTotal(updatedItems),
+                };
+            }
+            const newItems = [...state.items, { ...action.item, quantity: 1 }];
+            return {
+                ...state,
+                items: newItems,
+                total: calculateTotal(newItems),
+            };
+        }
+        case "REMOVE_ITEM": {
+            const newItems = state.items.filter(
+                (item) => item.id !== action.itemId,
+            );
+            return {
+                ...state,
+                items: newItems,
+                total: calculateTotal(newItems),
+            };
+        }
+        case "UPDATE_QUANTITY": {
+            if (action.quantity < 1) return state;
+            const updatedItems = state.items.map((item) =>
+                item.id === action.itemId
+                    ? { ...item, quantity: action.quantity }
+                    : item,
+            );
+            return {
+                ...state,
+                items: updatedItems,
+                total: calculateTotal(updatedItems),
+            };
+        }
+        default:
+            return state;
+    }
+}
+
+function calculateTotal(items: CartItem[]): number {
+    return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+}
+
+export function CartProvider({ children }: { children: React.ReactNode }) {
+    const [state, dispatch] = useReducer(cartReducer, { items: [], total: 0 });
+
+    const contextValue = useMemo(() => ({ state, dispatch }), [state]);
+
+    return (
+        <CartContext.Provider value={contextValue}>
+            {children}
+        </CartContext.Provider>
+    );
+}
+
+export function useCart() {
+    const context = useContext(CartContext);
+    if (!context) {
+        throw new Error("useCart must be used within a CartProvider");
+    }
+    return context;
+}
+
+------------------------------------------
+------------------------------------------
+------------------------------------------
+
+
+
+Act a an experienced fullstack developer. I am building an ecommerce app using laravel 11 breeze, react, typescript and tailwind, my database is mysql and I do not use axios to fetch data.
+
+I have 3 tables: vinos, uvas and vino_uvas. vinos and uvas has the followin relationship:
+- a vino can have many uvas
+- a uva can be part of many vinos
+
+These are the vinos table fields:
+---
 Schema::create('vinos', function (Blueprint $table) {
-$table->id(); // Using the default 'id' column for primary key
-$table->string('name', 100)->comment('Name of the wine');
-$table->decimal('price', 10, 2)->comment('Price of the wine');
-$table->integer('stock')->default(0)->comment('Stock quantity of the wine');
-$table->integer('vintage_year')->nullable()->comment('Vintage year of the wine');
-$table->string('image_url', 255)->nullable()->comment('Image URL of the wine');
-$table->text('description')->nullable()->comment('Description of the wine');
-$table->text('visual')->nullable()->comment('Visual characteristics of the wine');
-$table->text('aromas')->nullable()->comment('Aromas of the wine');
-$table->text('taste')->nullable()->comment('Taste and finish of the wine');
-$table->integer('capacity')->nullable()->comment('Bottle capacity in milliliters');
-$table->decimal('minimum_temperature', 5, 2)->nullable()->comment('Minimum serving temperature of the wine');
-$table->decimal('maximum_temperature', 5, 2)->nullable()->comment('Maximum serving temperature of the wine');
-$table->decimal('alcohol', 5, 2)->nullable()->comment('Alcohol content of the wine');
-$table->text('food_pairing')->nullable()->comment('Food pairings for the wine');
-$table->boolean('blocked')->default(false)->comment('Indicates if the wine is blocked');
-$table->unsignedBigInteger('bodega_id')->comment('Foreign key to the bodegas table');
-$table->unsignedBigInteger('denominacion_id')->comment('Foreign key to the denominaciones table');
-$table->unsignedBigInteger('categoria_id')->comment('Foreign key to the categorias table');
+    $table->id(); // Using the default 'id' column for primary key
+    $table->string('name', 100)->comment('Name of the wine');
+    $table->decimal('price', 10, 2)->comment('Price of the wine');
+    $table->integer('stock')->default(0)->comment('Stock quantity of the wine');
+    $table->integer('vintage_year')->nullable()->comment('Vintage year of the wine');
+    $table->string('image_url', 255)->nullable()->comment('Image URL of the wine');
+    $table->text('description')->nullable()->comment('Description of the wine');
+    $table->text('visual')->nullable()->comment('Visual characteristics of the wine');
+    $table->text('aromas')->nullable()->comment('Aromas of the wine');
+    $table->text('taste')->nullable()->comment('Taste and finish of the wine');
+    $table->integer('capacity')->nullable()->comment('Bottle capacity in milliliters');
+    $table->decimal('minimum_temperature', 5, 2)->nullable()->comment('Minimum serving temperature of the wine');
+    $table->decimal('maximum_temperature', 5, 2)->nullable()->comment('Maximum serving temperature of the wine');
+    $table->decimal('alcohol', 5, 2)->nullable()->comment('Alcohol content of the wine');
+    $table->text('food_pairing')->nullable()->comment('Food pairings for the wine');
+    $table->boolean('blocked')->default(false)->comment('Indicates if the wine is blocked');
+    $table->unsignedBigInteger('bodega_id')->comment('Foreign key to the bodegas table');
+    $table->unsignedBigInteger('denominacion_id')->comment('Foreign key to the denominaciones table');
+    $table->unsignedBigInteger('categoria_id')->comment('Foreign key to the categorias table');
 
-// Define foreign keys with cascading actions
-$table->foreign('bodega_id')->references('id')->on('bodegas')->onDelete('cascade')->onUpdate('cascade');
-$table->foreign('denominacion_id')->references('id')->on('denominaciones')->onDelete('cascade')->onUpdate('cascade');
-$table->foreign('categoria_id')->references('id')->on('categorias')->onDelete('cascade')->onUpdate('cascade');
+    // Define foreign keys with cascading actions
+    $table->foreign('bodega_id')->references('id')->on('bodegas')->onDelete('cascade')->onUpdate('cascade');
+    $table->foreign('denominacion_id')->references('id')->on('denominaciones')->onDelete('cascade')->onUpdate('cascade');
+    $table->foreign('categoria_id')->references('id')->on('categorias')->onDelete('cascade')->onUpdate('cascade');
 
-$table->timestamps(); // Fields de created_at y updated_at
+    $table->timestamps(); // Fields de created_at y updated_at
 });
-
-uvas table has the following fields:
+---
+These are the uvas table fields:
+---
 Schema::create('uvas', function (Blueprint $table) {
-$table->id()->comment('Auto-incrementing primary key');
-$table->string('name', 100)->comment('Name of the grape variety');
-$table->timestamps(); // Automatically adds 'created_at' and 'updated_at' columns
+    $table->id()->comment('Auto-incrementing primary key');
+    $table->string('name', 100)->comment('Name of the grape variety');
+    $table->timestamps(); // Automatically adds 'created_at' and 'updated_at' columns
 });
-
-vino_uvas table has the following fields:
+---
+These are the vinos_uvas table fields:
+---
 Schema::create('vino_uvas', function (Blueprint $table) {
 
-// Define the columns
-$table->unsignedBigInteger('vino_id')->comment('Foreign key to the vinos table');
-$table->unsignedBigInteger('uva_id')->comment('Foreign key to the uvas table');
-$table->decimal('percent', 5, 2);
+    // Define the columns
+    $table->unsignedBigInteger('vino_id')->comment('Foreign key to the vinos table');
+    $table->unsignedBigInteger('uva_id')->comment('Foreign key to the uvas table');
+    $table->decimal('percent', 5, 2);
 
-// Set the primary key
-$table->primary(['vino_id', 'uva_id']);
+    // Set the primary key
+    $table->primary(['vino_id', 'uva_id']);
 
-// Define foreign keys with cascading actions
-$table->foreign('vino_id')->references('id')->on('vinos')->onDelete('cascade')->onUpdate('cascade');
-$table->foreign('uva_id')->references('id')->on('uvas')->onDelete('cascade')->onUpdate('cascade');
+    // Define foreign keys with cascading actions
+    $table->foreign('vino_id')->references('id')->on('vinos')->onDelete('cascade')->onUpdate('cascade');
+    $table->foreign('uva_id')->references('id')->on('uvas')->onDelete('cascade')->onUpdate('cascade');
 
-$table->timestamps(); // Automatically adds 'created_at' and 'updated_at' columns
+    $table->timestamps(); // Automatically adds 'created_at' and 'updated_at' columns
 });
+---
 
-Also vino_uvas table keeps the relationship between vinos and uvas tables:
-- A vino can have 0 or more uva varieties
-- A uva variety can be used in 0 or more vinos
-- if a a uva variety is used in a vino, the percent field is the percentage of that the uva variety is used in the vino
-- the percent of uvas variety used in a vino must be between 0 and 100
-- the total percent of uvas varieties used in a vino must be 100
-- The primary key of the vino_uvas table is the combination of the vino_id and uva_id fields
-
-I have created this vino controller:
-// ----------------------------------
-<?php
-
-namespace App\Http\Controllers;
-
-use App\Http\Requests\StoreVinoRequest;
-use App\Http\Resources\VinoResource;
-use App\Models\Vino;
-use Illuminate\Support\Facades\Redirect;
-use Inertia\Inertia;
-use App\Services\CloudinaryService;
-use Exception;
-use Illuminate\Support\Facades\Log;
-
-class VinoController extends Controller
+At a controller I have a method to filter vinos
+---
+public function index(Request $request)
 {
-    protected $cloudinaryService;
+    $paginationLimit = 9; // Change as needed
 
-    public function __construct(CloudinaryService $cloudinaryService)
-    {
-        $this->cloudinaryService = $cloudinaryService;
+    // Get filters from request
+    // $priceMin = $request->input('price_min', 4);
+    // $priceMax = $request->input('price_max', 370);
+    $wineTypes = $request->input('wineTypes', []);
+    $denominations = $request->input('denominations', []);
+    $grapeTypes = $request->input('grape_types', []);
+    // $region = $request->input('region');
+    $sortField = $request->input('sortField', 'name');
+    $sortDirection = $request->input('sortDirection', 'asc');
+
+    // dd($wineTypes);
+
+
+    // Query builder
+    $query = Vino::with('uvas'); // Keep relationship
+    // $query = Vino::with('uvas') // Keep relationship
+    //     ->whereBetween('price', [$priceMin, $priceMax]);
+
+    // Apply filters
+    if (!empty($wineTypes)) {
+        $query->whereHas('categoria', function ($q) use ($wineTypes) {
+            $q->whereIn('categoria_id', $wineTypes);
+        });
     }
 
-    public function index()
-    {
-        $paginationLimit = config('settings.pagination_limit', 5); // Configurable pagination limit
-        $paginated = Vino::with('uvas')->latest()->paginate($paginationLimit); // Eager load relationships
-
-        return Inertia::render('Vino/Index', [
-            'vinos' => VinoResource::collection($paginated)
-        ]);
+    if (!empty($denominations)) {
+        $query->whereHas('denominacion', function ($q) use ($denominations) {
+            $q->whereIn('denominacion_id', $denominations);
+        });
     }
 
-    public function create()
-    {
-        return Inertia::render('Vino/Create');
+    if (!empty($grapeTypes)) {
+        $query->whereHas('uvas', function ($q) use ($grapeTypes) {
+            $q->whereIn('uva_id', $grapeTypes);
+        });
     }
 
-    public function store(StoreVinoRequest $request)
-    {
-        $validatedData = $request->validated();
+    // if (!empty($region)) {
+    //     $query->whereHas('bodega', function ($q) use ($region) {
+    //         $q->where('province', $region);
+    //     });
+    // }
 
-        try {
-            $this->handleImageUpload($request, $validatedData);
-
-            $vino = Vino::create($validatedData);
-
-            return Redirect::route('vino.index')->with('success', 'Vino created successfully.');
-        } catch (Exception $e) {
-            Log::error('Failed to create vino: ' . $e->getMessage(), ['exception' => $e]);
-            return Redirect::back()->with('error', 'Failed to create vino. ' . $e->getMessage());
-        }
+    // Apply sorting
+    if (in_array($sortField, ['price', 'name', 'created_at'])) {
+        $query->orderBy($sortField, $sortDirection);
+    } else {
+        $query->latest(); // Default sorting
     }
 
-    public function show(Vino $vino)
-    {
-        return Inertia::render('Vino/Show', [
-            'vino' => new VinoResource($vino)
-        ]);
-    }
+    // Paginate results
+    $paginated = $query->paginate($paginationLimit);
 
-    public function edit(Vino $vino)
-    {
-        return Inertia::render('Vino/Edit', [
-            'vino' => new VinoResource($vino)
-        ]);
-    }
+    // dd($query);
 
-    public function update(StoreVinoRequest $request, Vino $vino)
-    {
-        $validatedData = $request->validated();
-
-        try {
-            $this->handleImageUpload($request, $validatedData, $vino);
-
-            unset($validatedData['image'], $validatedData['uvas']); // Remove unnecessary fields
-            $vino->update($validatedData);
-
-            return Redirect::route('vino.index')->with('success', 'Vino updated successfully.');
-        } catch (Exception $e) {
-            Log::error('Failed to update vino: ' . $e->getMessage(), ['exception' => $e]);
-            return Redirect::back()->with('error', 'Failed to update vino.');
-        }
-    }
-
-    public function destroy(Vino $vino)
-    {
-        try {
-            if ($vino->public_id) {
-                $this->cloudinaryService->deleteImage($vino->public_id);
-            }
-            $vino->delete();
-
-            return Redirect::route('vino.index')->with('success', 'Vino deleted successfully.');
-        } catch (Exception $e) {
-            Log::error('Failed to delete vino: ' . $e->getMessage(), ['exception' => $e]);
-            return Redirect::back()->with('error', 'Failed to delete vino.');
-        }
-    }
-
-    /**
-     * Handle image upload and deletion.
-     *
-     * @param \Illuminate\Http\Request $request
-     * @param array $validatedData
-     * @param \App\Models\Vino|null $vino
-     */
-    private function handleImageUpload($request, &$validatedData, $vino = null)
-    {
-        if ($request->hasFile('image')) {
-            if ($vino && $vino->public_id) {
-                $this->cloudinaryService->deleteImage($vino->public_id);
-            }
-            $imageData = $this->cloudinaryService->uploadImage($request->file('image')->getRealPath());
-            $validatedData['image_url'] = $imageData['url'];
-            $validatedData['public_id'] = $imageData['public_id'];
-        } elseif ($request->has('image_url') && $request->input('image_url') === '') {
-            if ($vino && $vino->public_id) {
-                $this->cloudinaryService->deleteImage($vino->public_id);
-            }
-            $validatedData['image_url'] = null;
-            $validatedData['public_id'] = null;
-        }
-    }
+    return inertia('Public/Shop/Index', [
+        // 'vinos' => $paginated,
+        'vinos' => VinoResource::collection($paginated),
+        'queryParams' => $request->all(),
+    ]);
 }
-// ----------------------------------
+---
 
-Right now I have this vino resource:
-// ----------------------------------
-<?php
+This is an example of URL with the queery parameters
+---
+http://localhost:8000/shop?denominations[0]=1&denominations[1]=7&denominations[2]=5&grapeTypes[0]=1&grapeTypes[1]=19&grapeTypes[2]=2&sortDirection=asc&sortField=name&wineTypes[0]=1&wineTypes[1]=2
+---
 
-namespace App\Http\Resources;
+Please, review and check the method. I want to filter by uvas (grapeTypes)
 
-use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\JsonResource;
-use App\Http\Resources\BodegaResource;
-use App\Http\Resources\DenominacionResource;
-use App\Http\Resources\CategoriaResource;
-
-use function Laravel\Prompts\error;
-
-/**
- * Class VinoResource
- *
- * A resource class to transform a Vino model instance into an array for JSON responses.
- * This class includes relationships with Bodega, Denominacion, and Categoria models.
- */
-class VinoResource extends JsonResource
-{
-    // Disables wrapping the response in a data key
-    public static $wrap = false;
-
-    /**
-     * Transform the resource into an array.
-     *
-     * This method is responsible for converting the Vino model attributes and related models
-     * into a structured array that can be easily converted to JSON.
-     *
-     * @param Request $request The incoming HTTP request.
-     * @return array An associative array representing the Vino resource.
-     */
-    public function toArray(Request $request): array
-    {
-        // Initialize related resources if they exist, otherwise set to null
-        $bodega = $this->bodega ? new BodegaResource($this->bodega) : null;
-        $denominacion = $this->denominacion ? new DenominacionResource($this->denominacion) : null;
-        $categoria = $this->categoria ? new CategoriaResource($this->categoria) : null;
-
-        // Return an array representation of the Vino resource
-        return [
-            'id' => $this->id, // Unique identifier for the vino
-            'name' => $this->name, // Name of the vino
-            'price' => $this->price, // Price of the vino
-            'stock' => $this->stock, // Available stock quantity
-            'vintage_year' => $this->vintage_year, // Vintage year of the vino
-            'image_url' => $this->image_url, // URL to the image of the vino
-            'description' => $this->description, // Description of the vino
-            'visual' => $this->visual, // Visual characteristics of the vino
-            'aromas' => $this->aromas, // Aromas detected in the vino
-            'taste' => $this->taste, // Taste profile of the vino
-            'capacity' => $this->capacity, // Bottle capacity of the vino
-            'minimum_temperature' => $this->minimum_temperature, // Minimum serving temperature
-            'maximum_temperature' => $this->maximum_temperature, // Maximum serving temperature
-            'alcohol' => $this->alcohol, // Alcohol content of the vino
-            'food_pairing' => $this->food_pairing, // Suggested food pairings
-            'blocked' => $this->blocked, // Whether the vino is blocked or not
-            'bodega' => $bodega, // Full Bodega resource
-            'categoria' => $categoria, // Full Categoria resource
-            'denominacion' => $denominacion, // Full Denominacion resource
-            'bodega_name' => optional($bodega)->name, // Name of the bodega
-            'denominacion_name' => optional($denominacion)->name, // Name of the denominacion
-            'categoria_name' => optional($categoria)->name, // Name of the categoria
-            'bodega_id' => optional($bodega)->id, // ID of the bodega
-            'denominacion_id' => optional($denominacion)->id, // ID of the denominacion
-            'categoria_id' => optional($categoria)->id, // ID of the categoria
-            'created_at' => $this->created_at->format('Y-m-d H:i:s'), // Creation timestamp of the vino record
-        ];
-    }
-}
-// ----------------------------------
-
-I need to create a CRUD to manage the relationship between vinos and uvas tables.
-
-I need to be able to:
-- when I am creating a vino I need to be able to select the uva varieties that are used in the vino and the percentage of each uva variety used in the vino; add or delete a new uva variety and its percentage.
-- when I am editing a vino I need to be able to select the uva varieties that are used in the vino and the percentage of each uva variety used in the vino; add or delete a new uva variety and its percentage.
-- when I am viewing a vino I need to be able to see the uva varieties that are used in the vino and the percentage of each uva variety used in the vino
-- when I am deleting a vino I need to be able to delete the uva varieties that are used in the vino and the percentage of each uva variety used in the vino
-
-I need models, controllers, resources, requests, routes and react components to manage the relationship between vinos and uvas tables.
-
-Thanks, I forgot to mention that I need to show the vino uva relationshipo as a single component named GrapesSection with the following props:
-// ----------------------------------
-interface GrapesSectionProps {
-    data: Vino;
-    onChange: (field: keyof Vino, value: any) => void;
-    errors: Record<string, string>;
-}
-
-const GrapesSection: React.FC<GrapesSectionProps> = ({
-    data,
-    onChange,
-    errors,
-}) => {}
-// ----------------------------------
-That is how the GrapesSection component should be used in the app:
-// ----------------------------------
-<VarietiesSection
-    data={data}
-    onChange={handleFieldChange}
-    errors={errors}
-/>
-// ----------------------------------
-And this is the handleFieldChange function:
-// ----------------------------------
- /**
- * Handles changes to the form fields.
- *
- * @param {keyof Vino} field - The field name.
- * @param {any} value - The new value for the field.
- */
-const handleFieldChange = (field: keyof Vino, value: any) => {
-    setData(field as keyof Vino, value);
-};
-// ----------------------------------
-
-And als I forgot give you examples of vino data used in the app:
-- A vino with 0 uva varieties:
-// ----------------------------------
-{"id":1,"name":"Vino Tinto Joven","price":"8.50","stock":100,"vintage_year":2022,"image_url":"imagen1.jpg","description":"Vino tinto joven de la región.","visual":"Color rojo brillante.","aromas":"Aromas frutales.","taste":"Sabor fresco y ligero.","capacity":750,"minimum_temperature":"12.00","maximum_temperature":"18.00","alcohol":"13.50","food_pairing":"Carnes rojas, pastas.","blocked":0,"bodega":{"id":1,"name":"Bodega Pago de Jotrón","city":"Málaga","province":"Málaga","blocked":0,"created_at":"2025-01-01 14:07:31"},"categoria":{"id":1,"name":"Vino Tinto Joven","created_at":"2025-01-01 14:07:30"},"denominacion":{"id":5,"name":"DO Málaga","blocked":0,"created_at":"2025-01-01 14:07:30"},"bodega_name":"Bodega Pago de Jotrón","denominacion_name":"DO Málaga","categoria_name":"Vino Tinto Joven","bodega_id":1,"denominacion_id":5,"categoria_id":1,"uvas":[],"created_at":"2025-01-01 14:07:31"}
-// ----------------------------------
-- A vino with 1 uva varieties:
-// ----------------------------------
-{"id":1,"name":"Vino Tinto Joven","price":"8.50","stock":100,"vintage_year":2022,"image_url":"imagen1.jpg","description":"Vino tinto joven de la región.","visual":"Color rojo brillante.","aromas":"Aromas frutales.","taste":"Sabor fresco y ligero.","capacity":750,"minimum_temperature":"12.00","maximum_temperature":"18.00","alcohol":"13.50","food_pairing":"Carnes rojas, pastas.","blocked":0,"bodega":{"id":1,"name":"Bodega Pago de Jotrón","city":"Málaga","province":"Málaga","blocked":0,"created_at":"2025-01-01 14:07:31"},"categoria":{"id":1,"name":"Vino Tinto Joven","created_at":"2025-01-01 14:07:30"},"denominacion":{"id":5,"name":"DO Málaga","blocked":0,"created_at":"2025-01-01 14:07:30"},"bodega_name":"Bodega Pago de Jotrón","denominacion_name":"DO Málaga","categoria_name":"Vino Tinto Joven","bodega_id":1,"denominacion_id":5,"categoria_id":1,"uvas":[{"id":36,"name":"Tempranillo","percent":"100.00"}],"created_at":"2025-01-01 14:07:31"}
-// ----------------------------------
-- A vino with 2 uva varieties:
-// ----------------------------------
-{"id":1,"name":"Vino Tinto Joven","price":"8.50","stock":100,"vintage_year":2022,"image_url":"imagen1.jpg","description":"Vino tinto joven de la región.","visual":"Color rojo brillante.","aromas":"Aromas frutales.","taste":"Sabor fresco y ligero.","capacity":750,"minimum_temperature":"12.00","maximum_temperature":"18.00","alcohol":"13.50","food_pairing":"Carnes rojas, pastas.","blocked":0,"bodega":{"id":1,"name":"Bodega Pago de Jotrón","city":"Málaga","province":"Málaga","blocked":0,"created_at":"2025-01-01 14:07:31"},"categoria":{"id":1,"name":"Vino Tinto Joven","created_at":"2025-01-01 14:07:30"},"denominacion":{"id":5,"name":"DO Málaga","blocked":0,"created_at":"2025-01-01 14:07:30"},"bodega_name":"Bodega Pago de Jotrón","denominacion_name":"DO Málaga","categoria_name":"Vino Tinto Joven","bodega_id":1,"denominacion_id":5,"categoria_id":1,"uvas":[{"id":36,"name":"Tempranillo","percent":"30.00"},{"id":2,"name": "Cabernet Franc","percent":"70.00"}],"created_at":"2025-01-01 14:07:31"}
-// ----------------------------------
+http://localhost:8000/shop?denominations[0]=5&grapeTypes[0]=3&priceRange[0]=4&priceRange[1]=370&sortDirection=asc&sortField=name&wineTypes[0]=1&winery=1

@@ -8,6 +8,15 @@ import HeroSection from "../Layout/HeroSection";
 const Index = ({ auth }: PageProps) => {
     const { state, dispatch } = useCart();
 
+    const handleImageError = (
+        event: React.SyntheticEvent<HTMLImageElement>,
+    ) => {
+        const imgElement = event.currentTarget;
+        imgElement.onerror = null; // Prevent infinite loop
+        imgElement.src =
+            "https://res.cloudinary.com/dtw0se3wn/image/upload/w_1000,ar_1:1,c_fill,g_auto,e_art:hokusai/v1735228980/cld-sample-3.jpg"; // Set the placeholder image
+    };
+
     return (
         <>
             <Head title="The cart" />
@@ -56,6 +65,7 @@ const Index = ({ auth }: PageProps) => {
                                                 width={96}
                                                 height={96}
                                                 className="h-full w-full object-cover object-center"
+                                                onError={handleImageError}
                                             />
                                         </div>
                                         <div className="flex flex-1 flex-col">
