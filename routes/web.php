@@ -12,6 +12,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\VinoController;
 use App\Http\Controllers\UvaController;
 use App\Http\Controllers\VinouvaController;
+use App\Http\Controllers\CheckoutController;
 use Illuminate\Contracts\Console\Application;
 use Illuminate\Foundation\Application as FoundationApplication;
 use Illuminate\Support\Facades\Route;
@@ -87,6 +88,17 @@ Route::middleware('auth')->group(function () {
             Route::delete('/uvas/{vinoUva}', [VinoUvaController::class, 'destroy'])->name('vino.uvas.destroy');
         });
     });
+
+    Route::get('/checkout', function () {
+        return Inertia::render('Public/Checkout/Index');
+    })->name('checkout.index');
+
+    Route::post('/checkout/process', [CheckoutController::class, 'process'])
+        ->name('checkout.process');
+
+    Route::get('/checkout/success', function () {
+        return Inertia::render('Public/Checkout/Success');
+    })->name('checkout.success');
 });
 
 // API routes

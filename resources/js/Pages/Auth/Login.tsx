@@ -4,15 +4,17 @@ import InputLabel from "@/Components/InputLabel";
 import PrimaryButton from "@/Components/PrimaryButton";
 import TextInput from "@/Components/TextInput";
 import GuestLayout from "@/Layouts/GuestLayout";
-import { Head, Link, useForm } from "@inertiajs/react";
+import { Head, Link, useForm, router } from "@inertiajs/react";
 import { FormEventHandler } from "react";
 
 export default function Login({
     status,
     canResetPassword,
+    redirect,
 }: {
     status?: string;
     canResetPassword: boolean;
+    redirect?: string;
 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         email: "",
@@ -24,6 +26,11 @@ export default function Login({
         e.preventDefault();
 
         post(route("login"), {
+            onSuccess: () => {
+                if (redirect) {
+                    router.get(redirect);
+                }
+            },
             onFinish: () => reset("password"),
         });
     };

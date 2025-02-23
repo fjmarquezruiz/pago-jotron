@@ -1,12 +1,15 @@
 "use client";
 
+import { Button } from "@/Components/ui/button";
 import { useCart } from "@/contexts/cart-context";
+import { useToast } from "@/hooks/use-toast";
 import { PageProps } from "@/types";
-import { Head } from "@inertiajs/react";
+import { Head, router } from "@inertiajs/react";
 import HeroSection from "../Layout/HeroSection";
 
 const Index = ({ auth }: PageProps) => {
     const { state, dispatch } = useCart();
+    const { toast } = useToast();
 
     const handleImageError = (
         event: React.SyntheticEvent<HTMLImageElement>,
@@ -15,6 +18,14 @@ const Index = ({ auth }: PageProps) => {
         imgElement.onerror = null; // Prevent infinite loop
         imgElement.src =
             "https://res.cloudinary.com/dtw0se3wn/image/upload/w_1000,ar_1:1,c_fill,g_auto,e_art:hokusai/v1735228980/cld-sample-3.jpg"; // Set the placeholder image
+    };
+
+    const handleCheckout = () => {
+        if (!auth.user) {
+            router.get('login', { data: { redirect: 'checkout.index' }});
+        } else {
+            router.get(route('checkout.index'));
+        }
     };
 
     return (
@@ -93,6 +104,7 @@ const Index = ({ auth }: PageProps) => {
                                 ))}
                             </div>
                         </div>
+
                         <div className="mt-16 rounded-lg bg-gray-50 px-4 py-6 sm:p-6 lg:col-span-5 lg:mt-0 lg:p-8">
                             <h2 className="text-lg font-medium text-gray-900">
                                 Order summary
@@ -115,7 +127,15 @@ const Index = ({ auth }: PageProps) => {
                                     </p>
                                 </div>
                             </div>
-                            {/* Add checkout button */}
+                            <Button
+                                className="mt-6 w-full"
+                                size="lg"
+                                onClick={handleCheckout}
+                            >
+                                {!auth.user? "Login" : "Checkout"}  
+                            </Button>
+                            
+                            
                         </div>
                     </div>
                 )}
@@ -125,3 +145,5 @@ const Index = ({ auth }: PageProps) => {
 };
 
 export default Index;
+
+
