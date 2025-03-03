@@ -9,5 +9,6 @@
     ],
     "importOrderSeparation": true,
     "importOrderSortSpecifiers": true,
+    "tabWidth": 4,
     "tailwindStylesheet": "./resources/css/app.css"
 }

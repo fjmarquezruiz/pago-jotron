@@ -1,9 +1,12 @@
 "use client";
 
+import { CloudinaryImage } from "@/Components/CloudinaryImage";
 import { Button } from "@/Components/ui/button";
+import { CartActionTypes } from "@/constants";
 import { useCart } from "@/contexts/cart-context";
 import { useToast } from "@/hooks/use-toast";
 import { Vino } from "@/types/vino";
+import { IconArrowRight } from "@tabler/icons-react";
 import { useCallback } from "react";
 
 interface ProductGridProps {
@@ -17,11 +20,12 @@ export function ProductGrid({ products }: ProductGridProps) {
     const handleAddToCart = useCallback(
         (product: Vino) => {
             dispatch({
-                type: "ADD_ITEM",
+                type: CartActionTypes.ADD_ITEM,
                 item: {
                     id: product.id,
                     name: product.name,
                     price: product.price,
+                    description: product.description || "",
                     // quantity: 1,
                     imageUrl: product.image_url || "",
                     region: product.denominacion?.name || "",
@@ -35,60 +39,49 @@ export function ProductGrid({ products }: ProductGridProps) {
         [dispatch, toast],
     );
 
-    const handleImageError = (
-        event: React.SyntheticEvent<HTMLImageElement>,
-    ) => {
-        const imgElement = event.currentTarget;
-        imgElement.onerror = null; // Prevent infinite loop
-        imgElement.src =
-            "https://res.cloudinary.com/dtw0se3wn/image/upload/w_1000,ar_1:1,c_fill,g_auto,e_art:hokusai/v1735228980/cld-sample-3.jpg"; // Set the placeholder image
-    };
-
     return (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-x-4 gap-y-8 md:grid-cols-2 lg:grid-cols-3">
             {products.map((product) => (
-                <div key={product.id} className="group relative">
-                    <div className="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg">
-                        <img
+                <div key={product.id} className="relative flex flex-col gap-2">
+                    <div className="group relative aspect-square w-full overflow-hidden rounded bg-neutral-50">
+                        <CloudinaryImage
                             src={product.image_url || "/placeholder.svg"}
                             alt={product.name}
-                            width={300}
-                            height={400}
                             className="h-full w-full object-cover object-center"
-                            onError={handleImageError}
                         />
+                        <div className="absolute bottom-0 left-0 right-0 w-full p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                            <Button
+                                onClick={() => handleAddToCart(product)}
+                                // className="mt-4 w-full bg-green-600 hover:bg-green-700"
+                                className="w-full"
+                                variant="primary"
+                                size="sm"
+                            >
+                                Quick Add{" "}
+                                <IconArrowRight
+                                    stroke={1.5}
+                                    className="size-5"
+                                />
+                            </Button>
+                        </div>
                     </div>
-                    <div className="mt-4 flex justify-between">
-                        <div>
-                            <h3 className="text-sm font-medium text-gray-900">
-                                {product.name}
-                            </h3>
-                            <p className="mt-1 text-sm text-gray-500">
+                    <h3 className="font-lg-bold text-gray-900">
+                        {product.name}
+                    </h3>
+                    <div className="flex flex-col gap-1">
+                        <p className="font-base-bold text-gray-900">
+                            {parseFloat(product.price).toFixed(2)} &euro;
+                        </p>
+
+                        <div className="flex gap-2">
+                            <span className="font-xs-bold uppercase text-neutral-500">
                                 {product.denominacion?.name || "Unknown region"}
-                            </p>
-                            <p className="mt-1 text-sm text-gray-500">
+                            </span>
+                            <span className="font-xs-bold text-gray-500">
                                 {product.categoria?.name || "Unknown category"}
-                            </p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-sm font-medium text-gray-900">
-                                {product.price} &euro;
-                                {/* {product.price.toFixed(2)} € */}
-                            </p>
-                            {/* {product.originalPrice &&
-                                product.originalPrice > product.price && (
-                                    <p className="text-sm text-gray-500 line-through">
-                                        {product.originalPrice.toFixed(2)} €
-                                    </p>
-                                )} */}
+                            </span>
                         </div>
                     </div>
-                    <Button
-                        onClick={() => handleAddToCart(product)}
-                        className="mt-4 w-full bg-green-600 hover:bg-green-700"
-                    >
-                        Quick Add
-                    </Button>
                 </div>
             ))}
         </div>

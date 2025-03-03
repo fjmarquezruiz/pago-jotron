@@ -127,12 +127,12 @@ const Index = ({ auth, vinos, queryParams = {} }: PageProps<IndexProps>) => {
                 title="The best wines of Andalusia"
             />
 
-            <div className="container mx-auto px-4 py-8">
-                <div className="flex gap-8">
+            <main className="container mx-auto px-5 pb-32 pt-12">
+                <div className="mx-auto flex max-w-7xl gap-6">
                     <FilterSidebar onFilterChange={updateFilters} />
 
-                    <div className="flex-1">
-                        <div className="mb-6 flex items-center justify-between">
+                    <div className="flex flex-1 flex-col gap-12 pl-6">
+                        <div className="flex items-center justify-between">
                             <div className="text-sm text-gray-500">
                                 Showing {vinos.data.length} of{" "}
                                 {vinos.meta.total} results
@@ -170,7 +170,7 @@ const Index = ({ auth, vinos, queryParams = {} }: PageProps<IndexProps>) => {
                         )}
                     </div>
                 </div>
-            </div>
+            </main>
         </>
     );
 };

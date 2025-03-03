@@ -1,23 +1,13 @@
 import { PageProps } from "@/types";
 import { Head, Link } from "@inertiajs/react";
 import HeroSection from "./Layout/HeroSection";
+import { CloudinaryImage } from "@/Components/CloudinaryImage";
 
 export default function Welcome({
     auth,
     laravelVersion,
     phpVersion,
 }: PageProps<{ laravelVersion: string; phpVersion: string }>) {
-    const handleImageError = () => {
-        document
-            .getElementById("screenshot-container")
-            ?.classList.add("!hidden");
-        document.getElementById("docs-card")?.classList.add("!row-span-1");
-        document
-            .getElementById("docs-card-content")
-            ?.classList.add("!flex-row");
-        document.getElementById("background")?.classList.add("!hidden");
-    };
-
     console.log("welcome -> ", auth);
 
     return (
@@ -36,7 +26,7 @@ export default function Welcome({
                     <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
                         <Link href={route('shop')} className="group">
                             <div className="overflow-hidden rounded-lg">
-                                <img
+                                <CloudinaryImage
                                     src="/images/products/fortified.jpg"
                                     alt="Fortified Wines"
                                     className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-110"
@@ -46,7 +36,7 @@ export default function Welcome({
                         </Link>
                         <Link href={route('shop')} className="group">
                             <div className="overflow-hidden rounded-lg">
-                                <img
+                                <CloudinaryImage
                                     src="/images/products/sweet.jpg"
                                     alt="Sweet Natural"
                                     className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-110"
@@ -56,7 +46,7 @@ export default function Welcome({
                         </Link>
                         <Link href={route('shop')} className="group">
                             <div className="overflow-hidden rounded-lg">
-                                <img
+                                <CloudinaryImage
                                     src="/images/products/limited.jpg"
                                     alt="Limited Editions"
                                     className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-110"
@@ -66,7 +56,7 @@ export default function Welcome({
                         </Link>
                         <Link href={route('shop')} className="group">
                             <div className="overflow-hidden rounded-lg">
-                                <img
+                                <CloudinaryImage
                                     src="/images/products/events.jpg"
                                     alt="Events"
                                     className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-110"
@@ -100,20 +90,20 @@ export default function Welcome({
                                 </div>
                             </div>
                             <div className="grid gap-6">
-                                <img
+                                <CloudinaryImage
                                     src="/images/landscape.jpg"
                                     alt="Vineyard landscape"
-                                    className="rounded-lg"
+                                    className="rounded-lg object-cover"
                                 />
-                                <img
+                                <CloudinaryImage
                                     src="/images/winery.jpg"
                                     alt="Winery barrels"
-                                    className="rounded-lg"
+                                    className="rounded-lg object-cover"
                                 />
-                                <img
+                                <CloudinaryImage
                                     src="/images/tasting.jpg"
                                     alt="Wine tasting"
-                                    className="rounded-lg"
+                                    className="rounded-lg object-cover"
                                 />
                             </div>
                         </div>
@@ -125,10 +115,10 @@ export default function Welcome({
                     <h2 className="mb-12 text-center text-3xl font-bold">LATEST NEWS</h2>
                     <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
                         <article className="group">
-                            <img
+                            <CloudinaryImage
                                 src="/images/news/tradition.jpg"
                                 alt="Winemaking Tradition"
-                                className="mb-4 rounded-lg"
+                                className="mb-4 rounded-lg object-cover"
                             />
                             <h3 className="mb-2 text-xl font-semibold group-hover:text-[#FF2D20]">
                                 The Art of Winemaking: Tradition and Passion at Every Step
@@ -137,10 +127,10 @@ export default function Welcome({
                             <Link href="#" className="mt-4 inline-block text-[#FF2D20]">Continue reading</Link>
                         </article>
                         <article className="group">
-                            <img
+                            <CloudinaryImage
                                 src="/images/news/harvest.jpg"
                                 alt="Exploring Málaga"
-                                className="mb-4 rounded-lg"
+                                className="mb-4 rounded-lg object-cover"
                             />
                             <h3 className="mb-2 text-xl font-semibold group-hover:text-[#FF2D20]">
                                 Exploring the Diversity of Málaga Terroir
@@ -149,10 +139,10 @@ export default function Welcome({
                             <Link href="#" className="mt-4 inline-block text-[#FF2D20]">Continue reading</Link>
                         </article>
                         <article className="group">
-                            <img
+                            <CloudinaryImage
                                 src="/images/news/influence.jpg"
                                 alt="Mediterranean Influence"
-                                className="mb-4 rounded-lg"
+                                className="mb-4 rounded-lg object-cover"
                             />
                             <h3 className="mb-2 text-xl font-semibold group-hover:text-[#FF2D20]">
                                 Unveiling the Influence of Málaga's Terroir on Wine

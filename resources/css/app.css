@@ -61,6 +61,83 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    /* @apply bg-background text-foreground; */
+    @apply bg-white text-black;
+  }
+
+  .heading-7xl-regular {
+    @apply font-display text-7xl font-normal leading-none tracking-tight;
+  }
+
+  .heading-4xl-regular {
+    @apply font-display text-4xl font-normal leading-none tracking-tight;
+  }
+
+  .heading-3xl-bold {
+    @apply font-display text-3xl font-bold leading-none tracking-tight;
+  }
+
+  .heading-2xl-bold {
+    @apply font-display text-2xl font-bold leading-none tracking-tighter;
+  }
+
+  .heading-xl-bold {
+    @apply font-display text-xl font-bold tracking-tighter;
+  }
+
+  .font-lg-normal {
+    @apply font-sans text-lg font-normal leading-7;
+  }
+
+  .font-lg-medium {
+    @apply font-sans text-lg font-medium leading-7;
+  }
+
+  .font-lg-semibold {
+    @apply font-sans text-lg font-semibold leading-7;
+  }
+
+  .font-lg-bold {
+    @apply font-sans text-lg font-bold leading-7;
+  }
+
+  .font-base-normal {
+    @apply font-sans text-base font-normal leading-6;
+  }
+
+  .font-base-medium {
+    @apply font-sans text-base font-medium leading-6;
+  }
+
+  .font-base-semibold {
+    @apply font-sans text-base font-semibold leading-6;
+  }
+
+  .font-base-bold {
+    @apply font-sans text-base font-bold leading-6;
+  }
+
+  .font-sm-normal {
+    @apply font-sans text-sm font-normal leading-5;
+  }
+
+  .font-sm-semibold {
+    @apply font-sans text-sm font-semibold leading-5;
+  }
+
+  .font-sm-bold {
+    @apply font-sans text-sm font-bold leading-5;
+  }
+
+  .font-xs-normal {
+    @apply font-sans text-xs font-normal leading-3;
+  }
+
+  .font-xs-semibold {
+    @apply font-sans text-xs font-semibold leading-3;
+  }
+
+  .font-xs-bold {
+    @apply font-sans text-xs font-bold leading-3;
   }
 }

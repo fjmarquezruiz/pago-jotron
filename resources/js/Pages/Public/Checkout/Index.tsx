@@ -6,6 +6,7 @@ import { Head, router, useForm } from "@inertiajs/react";
 import { ChangeEvent, FormEventHandler } from "react";
 import HeroSection from "../Layout/HeroSection";
 import { Input } from "@/Components/ui/input";
+import { CART_STORAGE_KEY } from "@/constants";
 
 interface CheckoutFormData {
     name: string;
@@ -72,8 +73,11 @@ const Index = ({ auth }: PageProps) => {
                     title: "Order placed successfully",
                     description: "Thank you for your purchase!",
                 });
-                // Clear the cart after successful order
-                dispatch({ type: 'UPDATE_QUANTITY', itemId: 0, quantity: 0 });
+                // Clear the cart by removing all items
+                state.items.forEach(item => {
+                    dispatch({ type: 'REMOVE_ITEM', itemId: item.id });
+                });
+                localStorage.removeItem(CART_STORAGE_KEY);
             },
             onError: () => {
                 toast({

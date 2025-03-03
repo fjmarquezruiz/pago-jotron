@@ -27,8 +27,15 @@ export default function Login({
 
         post(route("login"), {
             onSuccess: () => {
-                if (redirect) {
-                    router.get(redirect);
+                const redirectPath = localStorage.getItem('redirect_after_login');
+                localStorage.removeItem('redirect_after_login');
+                
+                if (redirectPath === 'cart') {
+                    router.get(route('cart'));
+                } else if (redirectPath === 'checkout') {
+                    router.get(route('checkout.index'));
+                } else {
+                    router.get(route('dashboard'));
                 }
             },
             onFinish: () => reset("password"),

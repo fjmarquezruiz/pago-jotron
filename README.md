@@ -1,66 +1,138 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+### Project Documentation
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+#### Description
+This project is an ecommerce platform for a wine cellar. It is developed using Laravel 11 with Breeze and Inertia, utilizing React for the frontend. The system consists of two applications:
 
-## About Laravel
+1. **Public Frontend**: Where users can explore and purchase wines, book visits, and read the blog.
+2. **Dashboard**: An administration application to manage products, orders, users, and blog content.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+#### Technologies
+- **Backend**: Laravel 11
+- **Authentication**: Breeze with Inertia
+- **Frontend**: React with Vite
+- **Database**: MySQL
+- **Web Server**: Apache on Mac
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+#### Domain
+The application will run on `pagotron.com`.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+#### Key Features
+- Product management (wines, categories, wineries, denominations of origin).
+- Order and payment management.
+- Reservations for guided tours and tastings.
+- Blog with posts and categories.
+- Administration panel to manage content and users.
 
-## Learning Laravel
+#### Functional Requirements
+- Only individuals aged 18 or older (or the legal age in their country) can register and make purchases.
+- Age confirmation will be required via a checkbox during registration.
+- Registration with email and a strong password.
+- Ability to indicate wine, winery, and denomination of origin preferences during registration or later.
+- Users can modify or delete their profile at any time.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+#### User Types
+- **Anonymous User**: Can browse and add products to the cart.
+- **Customer**: Can make purchases, manage orders, and access promotions.
+- **Editor**: Manages the product catalog and blog content.
+- **Administrator**: Has all editor permissions and can also manage users, orders, products, and settings.
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+#### Cart and Orders
+- Anonymous users and customers can add products to the cart if stock is available.
+- Each wine's page will include recommendations based on purchase history or preferences.
+- Customers can modify, update, or delete their profile at any time.
+- Orders in the "In Process" status can be modified or canceled within the first 5 days.
+- Invoices can be downloaded for completed orders.
+- Payment methods: Credit card and PayPal.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+#### Order Statuses
+1. **Confirmed**: Order received in the system.
+2. **In Process**: Preparation in progress.
+3. **Prepared**: Ready for shipment.
+4. **Shipped**: In transit to the customer.
+5. **Delivered**: Order received by the customer.
+6. **Canceled**: Order canceled (by customer or administrator).
+7. **Blocked**: If an order remains in an intermediate state for more than 15 days, it is blocked for review.
 
-## Laravel Sponsors
+- Stock is automatically updated when an order reaches the "Prepared" status.
+- Orders without stock will not proceed until inventory is replenished.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+#### Product and Blog Management
+- Editors and administrators can add, edit, or delete products from the catalog.
+- Management of wineries, denominations of origin, and grape types by editors.
+- Creation and modification of blog posts by editors and administrators.
+- Blog posts can be associated with wines, wineries, or denominations of origin.
+- If a wine has no related articles, random selections will be displayed.
 
-### Premium Partners
+#### Administration and User Management
+- Administrators can manage users, modify their type, and restrict sales of certain products.
+- Creation and editing of informational pages about the winery (history, visits, contact, legal policies, etc.).
+- Filtering of wines during the purchase process (denomination of origin, grape type, etc.).
+- Password recovery and reset for users.
+- Visits and tastings can be added to the cart and managed as products.
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+#### Installation and Configuration
+1. Clone the repository:
+   ```sh
+   git clone https://github.com/fjmarquezruiz/pago-jotron.git
+   cd proyecto
+   ```
+2. Install dependencies:
+   ```sh
+   composer install
+   npm install
+   ```
+3. Configure the `.env` file and generate the application key:
+   ```sh
+   cp .env.example .env
+   php artisan key:generate
+   ```
+4. Set up the database in `.env` and run migrations:
+   ```sh
+   php artisan migrate --seed
+   ```
+5. Start the server:
+   ```sh
+   composer run dev
+   ```
 
-## Contributing
+#### Production Deployment
+- Server configuration in production.
+- Environment variable setup.
+- Use of tools like Laravel Forge or DigitalOcean.
+- HTTPS and SSL certificate configuration.
+- Optimization with `config:cache`, `route:cache`.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+#### APIs and Endpoints
+- API documentation with examples of JSON requests and responses.
+- Use of Laravel Sanctum for API authentication.
 
-## Code of Conduct
+#### Security
+- Policies and permissions in Laravel.
+- Protection against CSRF, XSS, and SQL Injection.
+- Authentication setup with Breeze/Inertia.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+#### Testing and QA
+- Unit and integration testing with PHPUnit.
+- Interface testing with Laravel Dusk.
 
-## Security Vulnerabilities
+#### Monitoring and Logs
+- Log configuration in Laravel (`storage/logs/laravel.log`).
+- Use of tools like Sentry or Bugsnag for error monitoring.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+#### Email and Notification Management
+- Configuration of SMTP services or Mailtrap.
+- Example of sending emails with Laravel Mailables.
 
-## License
+#### Project Structure
+- `app/` - Backend code in Laravel.
+- `resources/js/` - Frontend code in React.
+- `routes/web.php` - Application routes.
+- `database/migrations/` - Database migrations.
+- `public/` - Static files.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+#### Additional Notes
+- It is recommended to use Laravel Valet on Mac for local development.
+- Tests can be run with:
+   ```sh
+   php artisan test
+   ```

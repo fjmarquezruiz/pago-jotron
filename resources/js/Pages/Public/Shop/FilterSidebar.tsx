@@ -121,8 +121,8 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
     };
 
     return (
-        <div className="w-64 flex-shrink-0 pr-8">
-            <div className="sticky top-4">
+        <div className="w-80 flex-shrink-0">
+            <div className="sticky top-4 w-full rounded border border-neutral-900 p-6">
                 <div className="space-y-6">
                     <div>
                         <h3 className="mb-4 font-semibold">FILTERS</h3>
