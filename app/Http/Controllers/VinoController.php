@@ -187,4 +187,11 @@ class VinoController extends Controller
             throw $e; // Re-throw the exception for further handling
         }
     }
+
+    public function showPublic(Vino $vino)
+    {
+        return Inertia::render('Public/Shop/Detail', [
+            'vino' => new VinoResource($vino)
+        ]);
+    }
 }

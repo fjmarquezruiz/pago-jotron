@@ -4,6 +4,7 @@ export interface CartItem {
     id: number;
     name: string;
     price: number;
+    quantity: number;
     description: string;
     quantity: number;
     imageUrl: string;
@@ -17,6 +18,7 @@ export interface CartState {
 }
 
 export type CartAction =
-    | { type: CartActionTypes.ADD_ITEM; item: Omit<CartItem, "quantity"> }
+    // | { type: CartActionTypes.ADD_ITEM; item: Omit<CartItem, "quantity"> }
+    | { type: CartActionTypes.ADD_ITEM; item: CartItem }
     | { type: CartActionTypes.REMOVE_ITEM; itemId: number }
     | { type: CartActionTypes.UPDATE_QUANTITY; itemId: number; quantity: number };

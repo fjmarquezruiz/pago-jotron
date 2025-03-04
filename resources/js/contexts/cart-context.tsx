@@ -58,7 +58,13 @@ function cartReducer(state: CartState, action: CartAction): CartState {
                                   ? { ...item, quantity: item.quantity + 1 }
                                   : item,
                           )
-                        : [...state.items, { ...action.item, quantity: 1 }];
+                        : [
+                              ...state.items,
+                              {
+                                  ...action.item,
+                                  quantity: action.item.quantity,
+                              },
+                          ];
 
                 return {
                     ...state,

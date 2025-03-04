@@ -11,20 +11,31 @@ interface HeaderProps {
         user: User;
     };
     section?: string;
+    mode?: "light" | "dark";
 }
 
 interface MenuItemProps {
     label: string;
     link: string;
     active: boolean;
+    mode?: "light" | "dark";
 }
 
-const MenuItem = ({ label, link, active = false }: MenuItemProps) => {
+const MenuItem = ({
+    label,
+    link,
+    active = false,
+    mode = "light",
+}: MenuItemProps) => {
     return (
         <Link
             href={link}
             className={`inline-flex h-7 items-center rounded p-2 text-base font-medium uppercase leading-7 focus:bg-white/20 focus:outline-none ${
                 active
+                    ? "!bg-gray-200 text-gray-900 dark:!bg-gray-700 dark:text-gray-100"
+                    : ""
+            } ${mode === "dark" ? "text-black" : "text-white"} ${
+                mode === "dark" && active
                     ? "!bg-gray-200 text-gray-900 dark:!bg-gray-700 dark:text-gray-100"
                     : ""
             }`}
@@ -36,7 +47,7 @@ const MenuItem = ({ label, link, active = false }: MenuItemProps) => {
     );
 };
 
-const Header = ({ auth, section = "" }: HeaderProps) => {
+const Menu = ({ auth, section = "", mode = "light" }: HeaderProps) => {
     const [currentPath, setCurrentPath] = useState("/");
 
     useEffect(() => {
@@ -53,7 +64,11 @@ const Header = ({ auth, section = "" }: HeaderProps) => {
                     ) : (
                         <Link
                             href="/"
-                            className="inline-flex h-7 items-center justify-center rounded bg-white px-2.5 font-display text-lg font-bold uppercase leading-none tracking-tight text-black"
+                            className={`inline-flex h-7 items-center justify-center rounded px-2.5 font-display text-lg font-bold uppercase leading-none tracking-tight ${
+                                mode === "dark"
+                                    ? "bg-black text-white"
+                                    : "bg-white text-black"
+                            }`}
                         >
                             Bodega Pago de Jotrón
                         </Link>
@@ -64,33 +79,42 @@ const Header = ({ auth, section = "" }: HeaderProps) => {
                             <MenuItem
                                 label="The shop"
                                 link="/shop"
-                                active={currentPath === "/shop"}
+                                active={
+                                    currentPath === "/shop" ||
+                                    currentPath.includes("/detail")
+                                }
+                                mode={mode}
                             />
                             <MenuItem
                                 label="Events"
                                 link="/events"
                                 active={currentPath === "/events"}
+                                mode={mode}
                             />
                             <MenuItem
                                 label="The winery"
                                 link="/winery"
                                 active={currentPath === "/winery"}
+                                mode={mode}
                             />
                             <MenuItem
                                 label="Blog"
                                 link="/blog"
                                 active={currentPath === "/blog"}
+                                mode={mode}
                             />
                             <MenuItem
                                 label="Contact"
                                 link="/contact"
                                 active={currentPath === "/contact"}
+                                mode={mode}
                             />
                             {auth.user && (
                                 <MenuItem
                                     label="Dashboard"
                                     link={route("dashboard")}
                                     active={currentPath === "/dashboard"}
+                                    mode={mode}
                                 />
                             )}
                         </nav>
@@ -139,4 +163,4 @@ const Header = ({ auth, section = "" }: HeaderProps) => {
     );
 };
 
-export default Header;
+export default Menu;

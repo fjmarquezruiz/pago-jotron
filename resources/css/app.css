@@ -65,8 +65,16 @@
     @apply bg-white text-black;
   }
 
+  .heading-8xl-bold {
+    @apply font-display text-8xl font-bold leading-none -tracking-[4.8px];
+  }
+  
   .heading-7xl-regular {
-    @apply font-display text-7xl font-normal leading-none tracking-tight;
+    @apply font-display text-7xl font-normal leading-none -tracking-[3.75px];
+  }
+
+  .heading-6xl-bold {
+    @apply font-display text-6xl font-bold leading-none -tracking-[3px];
   }
 
   .heading-4xl-regular {

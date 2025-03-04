@@ -37,6 +37,8 @@ Route::get('/cart', function () {
     return Inertia::render('Public/Cart/Index');
 })->name('cart');
 
+Route::get('/detail/{vino}', [VinoController::class, 'showPublic'])->name('shop.detail');
+
 
 // Route::get('/dashboard', function () {
 //     return Inertia::render('Dashboard');
@@ -99,7 +101,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/checkout/success', function () {
         return Inertia::render('Public/Checkout/Success');
     })->name('checkout.success');
+
+    // Route::get('/detail/{id}', function () {
+    //     return Inertia::render('Public/Shop/Detail');
+    // })->name('shop.detail');
+
+    
 });
+
+
 
 // API routes
 Route::prefix('api')->group(function () {

@@ -6,6 +6,7 @@ import { CartActionTypes } from "@/constants";
 import { useCart } from "@/contexts/cart-context";
 import { useToast } from "@/hooks/use-toast";
 import { Vino } from "@/types/vino";
+import { Link } from "@inertiajs/react";
 import { IconArrowRight } from "@tabler/icons-react";
 import { useCallback } from "react";
 
@@ -26,7 +27,7 @@ export function ProductGrid({ products }: ProductGridProps) {
                     name: product.name,
                     price: product.price,
                     description: product.description || "",
-                    // quantity: 1,
+                    quantity: 1,
                     imageUrl: product.image_url || "",
                     region: product.denominacion?.name || "",
                 },
@@ -43,7 +44,12 @@ export function ProductGrid({ products }: ProductGridProps) {
         <div className="grid grid-cols-1 gap-x-4 gap-y-8 md:grid-cols-2 lg:grid-cols-3">
             {products.map((product) => (
                 <div key={product.id} className="relative flex flex-col gap-2">
-                    <div className="group relative aspect-square w-full overflow-hidden rounded bg-neutral-50">
+                    <Link
+                        href={route("shop.detail", {
+                            id: product.id,
+                        })}
+                        className="group relative aspect-square w-full overflow-hidden rounded bg-neutral-50"
+                    >
                         <CloudinaryImage
                             src={product.image_url || "/placeholder.svg"}
                             alt={product.name}
@@ -51,8 +57,10 @@ export function ProductGrid({ products }: ProductGridProps) {
                         />
                         <div className="absolute bottom-0 left-0 right-0 w-full p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                             <Button
-                                onClick={() => handleAddToCart(product)}
-                                // className="mt-4 w-full bg-green-600 hover:bg-green-700"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    handleAddToCart(product);
+                                }}
                                 className="w-full"
                                 variant="primary"
                                 size="sm"
@@ -64,10 +72,17 @@ export function ProductGrid({ products }: ProductGridProps) {
                                 />
                             </Button>
                         </div>
-                    </div>
-                    <h3 className="font-lg-bold text-gray-900">
-                        {product.name}
-                    </h3>
+                    </Link>
+                    <Link
+                        href={route("shop.detail", {
+                            id: product.id,
+                            wine: product,
+                        })}
+                    >
+                        <h3 className="font-lg-bold text-gray-900">
+                            {product.name}
+                        </h3>
+                    </Link>
                     <div className="flex flex-col gap-1">
                         <p className="font-base-bold text-gray-900">
                             {parseFloat(product.price).toFixed(2)} &euro;
