@@ -4,7 +4,8 @@ import { User } from "@/types";
 import { Link } from "@inertiajs/react";
 import { IconLogout, IconUser } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
-import { CartBadge } from "../Shop/CartBadge";
+import CartBadge from "../Shop/CartBadge";
+// import { CartBadge } from "../Shop/CartBadge";
 
 interface HeaderProps {
     auth: {
@@ -34,9 +35,9 @@ const MenuItem = ({
                 active
                     ? "!bg-gray-200 text-gray-900 dark:!bg-gray-700 dark:text-gray-100"
                     : ""
-            } ${mode === "dark" ? "text-black" : "text-white"} ${
+            } ${mode === "dark" ? "text-neutral-900 hover:bg-neutral-700/10" : "text-white"} ${
                 mode === "dark" && active
-                    ? "!bg-gray-200 text-gray-900 dark:!bg-gray-700 dark:text-gray-100"
+                    ? "!bg-gray-700/10 text-gray-900 dark:!bg-gray-700 dark:text-gray-100"
                     : ""
             }`}
         >
@@ -123,7 +124,7 @@ const Menu = ({ auth, section = "", mode = "light" }: HeaderProps) => {
                             <Link
                                 href={route("profile.edit")}
                                 as="button"
-                                className="inline-flex items-center gap-2 rounded border border-transparent bg-transparent p-2 text-sm font-medium leading-4 text-white transition duration-150 ease-in-out hover:bg-white/10 focus:bg-white/20 focus:outline-none dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300 dark:focus:bg-gray-700"
+                                className={`h-10 w-10 border border-transparent bg-transparent px-0 button ${mode === "dark" ? "button-ghost" : "button-ghost-dark"}`}
                                 aria-label={auth.user.name}
                                 title={auth.user.name}
                             >
@@ -133,7 +134,8 @@ const Menu = ({ auth, section = "", mode = "light" }: HeaderProps) => {
                         ) : (
                             <Link
                                 href={route("login")}
-                                className="inline-flex items-center gap-2 rounded border border-transparent bg-transparent p-2 text-sm font-medium leading-4 text-white transition duration-150 ease-in-out hover:bg-white/10 focus:bg-white/20 focus:outline-none dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300 dark:focus:bg-gray-700"
+                                // className="inline-flex items-center gap-2 rounded border border-transparent bg-transparent p-2 text-sm font-medium leading-4 text-white transition duration-150 ease-in-out hover:bg-white/10 focus:bg-white/20 focus:outline-none dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300 dark:focus:bg-gray-700"
+                                className={`h-10 w-10 border border-transparent bg-transparent px-0 button ${mode === "dark" ? "button-ghost" : "button-ghost-dark"}`}
                                 aria-label="Log in"
                                 title="Log in"
                             >
@@ -142,14 +144,14 @@ const Menu = ({ auth, section = "", mode = "light" }: HeaderProps) => {
                             </Link>
                         )}
 
-                        <CartBadge />
+                        <CartBadge mode={mode} />
 
                         {auth.user && (
                             <Link
                                 href={route("logout")}
                                 method="post"
                                 as="button"
-                                className="inline-flex items-center gap-2 rounded border border-transparent bg-transparent p-2 text-sm font-medium leading-4 text-white transition duration-150 ease-in-out hover:bg-white/10 focus:bg-white/20 focus:outline-none dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300 dark:focus:bg-gray-700"
+                                className={`h-10 w-10 border border-transparent bg-transparent px-0 button ${mode === "dark" ? "button-ghost" : "button-ghost-dark"}`}
                                 aria-label="Log out"
                                 title="Log out"
                             >

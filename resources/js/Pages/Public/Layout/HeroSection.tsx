@@ -1,5 +1,6 @@
 "use client";
 
+import { CLOUDINARY_BASE_URL } from "@/constants";
 import { User } from "@/types";
 import Menu from "./Menu";
 
@@ -62,7 +63,7 @@ const HeroSection = ({
                 <div className="absolute inset-0">
                     <picture>
                         <img
-                            src="https://res.cloudinary.com/dtw0se3wn/image/upload/v1735228979/samples/coffee.jpg"
+                            src={`${CLOUDINARY_BASE_URL}/v1735228979/samples/coffee.jpg`}
                             loading="lazy"
                             alt="Bodega Pago de Jotrón"
                             className="absolute h-full w-full object-cover"

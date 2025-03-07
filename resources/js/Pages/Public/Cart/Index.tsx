@@ -2,7 +2,7 @@
 
 import { CloudinaryImage } from "@/Components/CloudinaryImage";
 import { Button } from "@/Components/ui/button";
-import { CartActionTypes } from "@/constants";
+import { CartActionTypes, CLOUDINARY_BASE_URL } from "@/constants";
 import { useCart } from "@/contexts/cart-context";
 import { useToast } from "@/hooks/use-toast";
 import { PageProps } from "@/types";
@@ -19,8 +19,7 @@ const Index = ({ auth }: PageProps) => {
     ) => {
         const imgElement = event.currentTarget;
         imgElement.onerror = null; // Prevent infinite loop
-        imgElement.src =
-            "https://res.cloudinary.com/dtw0se3wn/image/upload/w_1000,ar_1:1,c_fill,g_auto,e_art:hokusai/v1735228980/cld-sample-3.jpg"; // Set the placeholder image
+        imgElement.src = `${CLOUDINARY_BASE_URL}/w_1000,ar_1:1,c_fill,g_auto,e_art:hokusai/v1735228980/cld-sample-3.jpg`;
     };
 
     const handleCheckout = () => {
@@ -85,7 +84,7 @@ const Index = ({ auth }: PageProps) => {
 
                                 <Link
                                     href="/shop"
-                                    className="button button-primary font-sm-semibold button-size-lg"
+                                    className="font-sm-semibold button button-size-lg button-primary"
                                 >
                                     Shop now
                                 </Link>
@@ -154,11 +153,20 @@ const Index = ({ auth }: PageProps) => {
                                                             </div>
                                                             <div className="flex flex-col gap-4 pt-2">
                                                                 <div className="flex flex-col gap-2">
-                                                                    <h3 className="font-lg-bold text-neutral-900">
-                                                                        {
-                                                                            item.name
-                                                                        }
-                                                                    </h3>
+                                                                    <Link
+                                                                        href={route(
+                                                                            "shop.detail",
+                                                                            {
+                                                                                id: item.id,
+                                                                            },
+                                                                        )}
+                                                                    >
+                                                                        <h3 className="font-lg-bold text-neutral-900">
+                                                                            {
+                                                                                item.name
+                                                                            }
+                                                                        </h3>
+                                                                    </Link>
                                                                     {item.description && (
                                                                         <p className="font-sm-normal text-neutral-800">
                                                                             {
@@ -195,6 +203,7 @@ const Index = ({ auth }: PageProps) => {
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon-md"
+                                                                className="!rounded-none"
                                                                 onClick={() =>
                                                                     handleUpdateQuantity(
                                                                         item.id,
@@ -208,12 +217,13 @@ const Index = ({ auth }: PageProps) => {
                                                                     className="size-5"
                                                                 />
                                                             </Button>
-                                                            <span className="font-base-normal min-w-13 flex-1 text-center text-neutral-900">
+                                                            <span className="font-base-normal min-w-13 flex-1 px-4 text-center text-neutral-900">
                                                                 {item.quantity}
                                                             </span>
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon-md"
+                                                                className="!rounded-none"
                                                                 onClick={() =>
                                                                     handleUpdateQuantity(
                                                                         item.id,

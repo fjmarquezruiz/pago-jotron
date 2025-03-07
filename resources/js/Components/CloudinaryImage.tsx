@@ -1,8 +1,10 @@
+import { CLOUDINARY_BASE_URL } from "@/constants";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { getCloudinaryUrl } from "@/lib/cloudinary";
 
-interface CloudinaryImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
+interface CloudinaryImageProps
+    extends React.ImgHTMLAttributes<HTMLImageElement> {
     fallbackImage?: string;
     transformations?: string;
 }
@@ -11,12 +13,14 @@ export function CloudinaryImage({
     src,
     alt,
     className,
-    fallbackImage = "https://res.cloudinary.com/dtw0se3wn/image/upload/w_1000,ar_1:1,c_fill,g_auto,e_art:hokusai/v1735228980/cld-sample-3.jpg",
+    fallbackImage = `${CLOUDINARY_BASE_URL}/w_1000,ar_1:1,c_fill,g_auto,e_art:hokusai/v1735228980/cld-sample-3.jpg`,
     transformations = "c_fill,g_auto",
     ...props
 }: CloudinaryImageProps) {
     const [imgSrc, setImgSrc] = useState(
-        src.startsWith('http') ? src : getCloudinaryUrl(`${transformations}/${src}`)
+        src.startsWith("http")
+            ? src
+            : getCloudinaryUrl(`${transformations}/${src}`),
     );
     const [isLoading, setIsLoading] = useState(true);
     const [hasError, setHasError] = useState(false);
@@ -53,7 +57,7 @@ export function CloudinaryImage({
                 className={cn(
                     "object-cover transition-opacity duration-300",
                     isLoading ? "opacity-0" : "opacity-100",
-                    hasError ? "grayscale" : ""
+                    hasError ? "grayscale" : "",
                 )}
                 onError={handleError}
                 onLoad={handleLoad}
@@ -61,4 +65,4 @@ export function CloudinaryImage({
             />
         </div>
     );
-} 
+}

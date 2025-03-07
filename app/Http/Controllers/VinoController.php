@@ -190,8 +190,32 @@ class VinoController extends Controller
 
     public function showPublic(Vino $vino)
     {
+        // Get related products from same winery or denomination (up to 10)
+        $relatedProducts = Vino::where('id', '!=', $vino->id)
+            ->where(function($query) use ($vino) {
+                $query->where('bodega_id', $vino->bodega_id)
+                      ->orWhere('denominacion_id', $vino->denominacion_id);
+            })
+            ->with(['denominacion', 'categoria', 'bodega'])
+            ->inRandomOrder()
+            ->take(10)
+            ->get();
+
+        // If we don't have 10 related products, add random products to fill the slots
+        if ($relatedProducts->count() < 10) {
+            $additionalProducts = Vino::where('id', '!=', $vino->id)
+                ->whereNotIn('id', $relatedProducts->pluck('id'))
+                ->with(['denominacion', 'categoria', 'bodega'])
+                ->inRandomOrder()
+                ->take(10 - $relatedProducts->count())
+                ->get();
+
+            $relatedProducts = $relatedProducts->concat($additionalProducts);
+        }
+
         return Inertia::render('Public/Shop/Detail', [
-            'vino' => new VinoResource($vino)
+            'vino' => new VinoResource($vino), // Current product
+            'relatedProducts' => VinoResource::collection($relatedProducts) // Related products
         ]);
     }
 }

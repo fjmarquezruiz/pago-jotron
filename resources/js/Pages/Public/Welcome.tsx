@@ -1,7 +1,7 @@
+import { CloudinaryImage } from "@/Components/CloudinaryImage";
 import { PageProps } from "@/types";
 import { Head, Link } from "@inertiajs/react";
 import HeroSection from "./Layout/HeroSection";
-import { CloudinaryImage } from "@/Components/CloudinaryImage";
 
 export default function Welcome({
     auth,
@@ -22,9 +22,11 @@ export default function Welcome({
             <main className="relative min-h-screen">
                 {/* Products Section */}
                 <section className="container mx-auto px-4 py-16">
-                    <h2 className="mb-8 text-center text-3xl font-bold">Our products</h2>
+                    <h2 className="mb-8 text-center text-3xl font-bold">
+                        Our products
+                    </h2>
                     <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
-                        <Link href={route('shop')} className="group">
+                        <Link href={route("shop")} className="group">
                             <div className="overflow-hidden rounded-lg">
                                 <CloudinaryImage
                                     src="/images/products/fortified.jpg"
@@ -32,9 +34,11 @@ export default function Welcome({
                                     className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-110"
                                 />
                             </div>
-                            <h3 className="mt-4 text-xl font-semibold">FORTIFIED +</h3>
+                            <h3 className="mt-4 text-xl font-semibold">
+                                FORTIFIED +
+                            </h3>
                         </Link>
-                        <Link href={route('shop')} className="group">
+                        <Link href={route("shop")} className="group">
                             <div className="overflow-hidden rounded-lg">
                                 <CloudinaryImage
                                     src="/images/products/sweet.jpg"
@@ -42,9 +46,11 @@ export default function Welcome({
                                     className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-110"
                                 />
                             </div>
-                            <h3 className="mt-4 text-xl font-semibold">SWEET NATURAL +</h3>
+                            <h3 className="mt-4 text-xl font-semibold">
+                                SWEET NATURAL +
+                            </h3>
                         </Link>
-                        <Link href={route('shop')} className="group">
+                        <Link href={route("shop")} className="group">
                             <div className="overflow-hidden rounded-lg">
                                 <CloudinaryImage
                                     src="/images/products/limited.jpg"
@@ -52,9 +58,11 @@ export default function Welcome({
                                     className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-110"
                                 />
                             </div>
-                            <h3 className="mt-4 text-xl font-semibold">LIMITED EDITIONS +</h3>
+                            <h3 className="mt-4 text-xl font-semibold">
+                                LIMITED EDITIONS +
+                            </h3>
                         </Link>
-                        <Link href={route('shop')} className="group">
+                        <Link href={route("shop")} className="group">
                             <div className="overflow-hidden rounded-lg">
                                 <CloudinaryImage
                                     src="/images/products/events.jpg"
@@ -62,7 +70,9 @@ export default function Welcome({
                                     className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-110"
                                 />
                             </div>
-                            <h3 className="mt-4 text-xl font-semibold">EVENTS +</h3>
+                            <h3 className="mt-4 text-xl font-semibold">
+                                EVENTS +
+                            </h3>
                         </Link>
                     </div>
                 </section>
@@ -72,20 +82,47 @@ export default function Welcome({
                     <div className="container mx-auto px-4">
                         <div className="grid grid-cols-1 gap-12 md:grid-cols-2">
                             <div>
-                                <h2 className="mb-6 text-3xl font-bold">Land and barrel</h2>
-                                <h3 className="mb-8 text-2xl">FROM THE GRAPE TO THE GLASS...</h3>
+                                <h2 className="mb-6 text-3xl font-bold">
+                                    Land and barrel
+                                </h2>
+                                <h3 className="mb-8 text-2xl">
+                                    FROM THE GRAPE TO THE GLASS...
+                                </h3>
                                 <div className="space-y-6">
                                     <div>
-                                        <h4 className="mb-2 text-xl font-semibold">From the Natural Park of Montes de Málaga</h4>
-                                        <p className="text-gray-600">Our vineyards are located in the heart of the Natural Park, where the unique climate and soil conditions create exceptional wines.</p>
+                                        <h4 className="mb-2 text-xl font-semibold">
+                                            From the Natural Park of Montes de
+                                            Málaga
+                                        </h4>
+                                        <p className="text-gray-600">
+                                            Our vineyards are located in the
+                                            heart of the Natural Park, where the
+                                            unique climate and soil conditions
+                                            create exceptional wines.
+                                        </p>
                                     </div>
                                     <div>
-                                        <h4 className="mb-2 text-xl font-semibold">Winemakers in the 21st Century</h4>
-                                        <p className="text-gray-600">We combine traditional winemaking methods with modern technology to create wines that reflect our heritage and innovation.</p>
+                                        <h4 className="mb-2 text-xl font-semibold">
+                                            Winemakers in the 21st Century
+                                        </h4>
+                                        <p className="text-gray-600">
+                                            We combine traditional winemaking
+                                            methods with modern technology to
+                                            create wines that reflect our
+                                            heritage and innovation.
+                                        </p>
                                     </div>
                                     <div>
-                                        <h4 className="mb-2 text-xl font-semibold">Wining with Over 100 Years of Tradition</h4>
-                                        <p className="text-gray-600">Our family has been crafting wines for over a century, passing down knowledge and passion through generations.</p>
+                                        <h4 className="mb-2 text-xl font-semibold">
+                                            Wining with Over 100 Years of
+                                            Tradition
+                                        </h4>
+                                        <p className="text-gray-600">
+                                            Our family has been crafting wines
+                                            for over a century, passing down
+                                            knowledge and passion through
+                                            generations.
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -112,7 +149,9 @@ export default function Welcome({
 
                 {/* Latest News Section */}
                 <section className="container mx-auto px-4 py-16">
-                    <h2 className="mb-12 text-center text-3xl font-bold">LATEST NEWS</h2>
+                    <h2 className="mb-12 text-center text-3xl font-bold">
+                        LATEST NEWS
+                    </h2>
                     <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
                         <article className="group">
                             <CloudinaryImage
@@ -121,10 +160,19 @@ export default function Welcome({
                                 className="mb-4 rounded-lg object-cover"
                             />
                             <h3 className="mb-2 text-xl font-semibold group-hover:text-[#FF2D20]">
-                                The Art of Winemaking: Tradition and Passion at Every Step
+                                The Art of Winemaking: Tradition and Passion at
+                                Every Step
                             </h3>
-                            <p className="text-gray-600">Discover how we maintain our century-old traditions while embracing modern techniques...</p>
-                            <Link href="#" className="mt-4 inline-block text-[#FF2D20]">Continue reading</Link>
+                            <p className="text-gray-600">
+                                Discover how we maintain our century-old
+                                traditions while embracing modern techniques...
+                            </p>
+                            <Link
+                                href="#"
+                                className="mt-4 inline-block text-[#FF2D20]"
+                            >
+                                Continue reading
+                            </Link>
                         </article>
                         <article className="group">
                             <CloudinaryImage
@@ -135,8 +183,16 @@ export default function Welcome({
                             <h3 className="mb-2 text-xl font-semibold group-hover:text-[#FF2D20]">
                                 Exploring the Diversity of Málaga Terroir
                             </h3>
-                            <p className="text-gray-600">Join us on a journey through the unique characteristics of our region...</p>
-                            <Link href="#" className="mt-4 inline-block text-[#FF2D20]">Continue reading</Link>
+                            <p className="text-gray-600">
+                                Join us on a journey through the unique
+                                characteristics of our region...
+                            </p>
+                            <Link
+                                href="#"
+                                className="mt-4 inline-block text-[#FF2D20]"
+                            >
+                                Continue reading
+                            </Link>
                         </article>
                         <article className="group">
                             <CloudinaryImage
@@ -145,18 +201,23 @@ export default function Welcome({
                                 className="mb-4 rounded-lg object-cover"
                             />
                             <h3 className="mb-2 text-xl font-semibold group-hover:text-[#FF2D20]">
-                                Unveiling the Influence of Málaga's Terroir on Wine
+                                Unveiling the Influence of Málaga's Terroir on
+                                Wine
                             </h3>
-                            <p className="text-gray-600">Learn how our Mediterranean climate shapes the character of our wines...</p>
-                            <Link href="#" className="mt-4 inline-block text-[#FF2D20]">Continue reading</Link>
+                            <p className="text-gray-600">
+                                Learn how our Mediterranean climate shapes the
+                                character of our wines...
+                            </p>
+                            <Link
+                                href="#"
+                                className="mt-4 inline-block text-[#FF2D20]"
+                            >
+                                Continue reading
+                            </Link>
                         </article>
                     </div>
                 </section>
             </main>
-
-            <footer className="py-16 text-center text-sm text-black dark:text-white/70">
-                Laravel v{laravelVersion} (PHP v{phpVersion})
-            </footer>
         </>
     );
 }

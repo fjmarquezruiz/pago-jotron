@@ -1,4 +1,9 @@
+// Constants for Cloudinary
+const CLOUDNAME = 'dtw0se3wn';
+export const CLOUDINARY_BASE_URL = `https://res.cloudinary.com/${CLOUDNAME}/image/upload`;
+
 // Constants for the shopping cart
+
 export const CART_STORAGE_KEY = 'shopping-cart'; 
 
 export const CART_EXPIRY_TIME = 60 * 60 * 1000; // 1 hour in milliseconds

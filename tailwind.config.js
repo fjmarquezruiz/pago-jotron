@@ -140,7 +140,7 @@ export default {
             addUtilities({
                 // Define a custom utility class
                 '.button': {
-                    '@apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded px-4 py-0 transition-colors focus-visible:outline-none focus-visible:ring-1 disabled:pointer-events-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0': {},
+                    '@apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded px-4 py-0 transition-colors focus-visible:outline-none focus-visible:ring-1 disabled:pointer-events-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0': {},
                 },
                 '.button-size-xs': {
                     '@apply h-8 uppercase px-3': {},
@@ -159,6 +159,12 @@ export default {
                 },
                 '.button-primary': {
                     '@apply bg-neutral-900 text-neutral-0 hover:bg-neutral-800': {},
+                },
+                '.button-ghost': {
+                    '@apply bg-transparent text-neutral-900 hover:text-neutral-800 focus:text-neutral-800 transition duration-150 ease-in-out hover:bg-neutral-700/10 focus:bg-neutral-700/20 focus:outline-none': {},
+                },
+                '.button-ghost-dark': {
+                    '@apply bg-transparent text-neutral-50 hover:text-neutral-100 focus:text-neutral-100 transition duration-150 ease-in-out hover:bg-white/10 focus:bg-white/20 focus:outline-none': {},
                 },
                 '.card-shadow': {
                     '@apply shadow-lg p-4 rounded-lg bg-white': {},
