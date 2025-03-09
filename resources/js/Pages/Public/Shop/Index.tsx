@@ -1,3 +1,10 @@
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/Components/ui/select";
 import { PageProps } from "@/types";
 import { Vino } from "@/types/vino";
 import { Head, router } from "@inertiajs/react";
@@ -58,6 +65,13 @@ const Index = ({ auth, vinos, queryParams = {} }: PageProps<IndexProps>) => {
     const [currentPage, setCurrentPage] = useState<number>(
         vinos.meta.current_page,
     );
+
+    const SORT_OPTIONS = [
+        { id: 1, label: "Name: A-Z", value: "name_asc" },
+        { id: 2, label: "Name: Z-A", value: "name_desc" },
+        { id: 3, label: "Price: Low to High", value: "price_asc" },
+        { id: 4, label: "Price: High to Low", value: "price_desc" },
+    ];
 
     // Debounce API calls (wait 300ms before making a request)
     const debouncedUpdateFilters = debounce((newFilters: QueryParams) => {
@@ -132,26 +146,40 @@ const Index = ({ auth, vinos, queryParams = {} }: PageProps<IndexProps>) => {
                     <FilterSidebar onFilterChange={updateFilters} />
 
                     <div className="flex flex-1 flex-col gap-12 pl-6">
-                        <div className="flex items-center justify-between">
-                            <div className="text-sm text-gray-500">
-                                Showing {vinos.data.length} of{" "}
-                                {vinos.meta.total} results
+                        <div className="grid grid-cols-4 items-center gap-6">
+                            <div className="font-sm-medium col-span-1 text-gray-500">
+                                Showing <strong>{vinos.data.length}</strong> of{" "}
+                                <strong>{vinos.meta.total}</strong> results
                             </div>
-                            <select
-                                className="rounded-md border p-2 text-sm"
-                                value={`${filters.sortField}_${filters.sortDirection}`}
-                                onChange={updateSortOrder}
+                            <Select
+                                value={
+                                    `${filters.sortField}_${filters.sortDirection}` ||
+                                    ""
+                                }
+                                onValueChange={(value: string) => {
+                                    const [sortField, sortDirection] =
+                                        value.split("_");
+                                    updateFilters({ sortField, sortDirection });
+                                }}
                             >
-                                <option value="">Order by</option>
-                                <option value="name_asc">Name: A-Z</option>
-                                <option value="name_desc">Name: Z-A</option>
-                                <option value="price_asc">
-                                    Price: Low to High
-                                </option>
-                                <option value="price_desc">
-                                    Price: High to Low
-                                </option>
-                            </select>
+                                <SelectTrigger className="col-start-4 w-full rounded border border-neutral-200 bg-white font-sans text-sm font-medium leading-5 text-neutral-900 shadow-none button-size-md">
+                                    <SelectValue
+                                        className="font-sans text-sm font-medium leading-6 text-neutral-900"
+                                        placeholder="Order by"
+                                    />
+                                </SelectTrigger>
+                                <SelectContent className="rounded bg-white !px-0 !py-0">
+                                    {SORT_OPTIONS.map((type) => (
+                                        <SelectItem
+                                            key={type.id}
+                                            value={type.value}
+                                            className="h-10 px-4 font-sans text-sm font-normal leading-6 text-neutral-900 hover:bg-neutral-100"
+                                        >
+                                            {type.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
 
                         {vinos.data.length > 0 ? (

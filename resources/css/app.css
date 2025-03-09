@@ -129,6 +129,10 @@
     @apply font-sans text-sm font-normal leading-5;
   }
 
+  .font-sm-medium {
+    @apply font-sans text-sm font-medium leading-5;
+  }
+
   .font-sm-semibold {
     @apply font-sans text-sm font-semibold leading-5;
   }

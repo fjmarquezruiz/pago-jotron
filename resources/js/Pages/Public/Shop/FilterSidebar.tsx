@@ -2,6 +2,7 @@
 "use client";
 
 import { Button } from "@/Components/ui/button";
+import { Input } from "@/Components/ui/input";
 import {
     Select,
     SelectContent,
@@ -12,14 +13,15 @@ import {
 import { Slider } from "@/Components/ui/slider";
 import { VinoOption } from "@/types/vino";
 import { useEffect, useState } from "react";
-import ToggleList from "./ToogleList";
+import FilterToogleList from "./FilterToogleList";
 
 interface FilterSidebarProps {
     onFilterChange: (filters: any) => void;
 }
 
 const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
-    const [priceRange, setPriceRange] = useState([4, 370]);
+    const PRICE_RANGE = [0, 100];
+    const [priceRange, setPriceRange] = useState(PRICE_RANGE);
     const [selectedWineTypes, setSelectedWineTypes] = useState<string[]>([]);
     const [selectedDenominations, setSelectedDenominations] = useState<
         string[]
@@ -121,87 +123,146 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
     };
 
     return (
-        <div className="w-80 flex-shrink-0">
-            <div className="sticky top-4 w-full rounded border border-neutral-900 p-6">
-                <div className="space-y-6">
-                    <div>
-                        <h3 className="mb-4 font-semibold">FILTERS</h3>
-                        <Button
-                            variant="ghost"
-                            className="text-sm text-primary"
-                            onClick={() => {
-                                setSelectedWineTypes([]);
-                                setSelectedDenominations([]);
-                                setSelectedGrapeTypes([]);
-                                setSelectedWinery(null);
-                            }}
-                        >
-                            Clear all
-                        </Button>
-                    </div>
+        <div className="sticky top-4 flex w-80 flex-shrink-0 flex-col gap-6 rounded border border-neutral-200 p-6">
+            <div className="flex items-baseline justify-between">
+                <h3 className="heading-2xl-bold">FILTERS</h3>
+                <Button
+                    variant="link"
+                    size="link-sm"
+                    onClick={() => {
+                        setSelectedWineTypes([]);
+                        setSelectedDenominations([]);
+                        setSelectedGrapeTypes([]);
+                        setSelectedWinery(null);
+                    }}
+                >
+                    Clear all
+                </Button>
+            </div>
 
-                    <ToggleList
-                        title="Wine Type"
-                        items={categorias}
-                        selectedItems={selectedWineTypes}
-                        onItemChange={handleWineTypeChange}
+            {/* Winery */}
+            <div className="flex flex-col gap-6">
+                <div className="flex items-baseline justify-between">
+                    <h4 className="font-lg-bold">Winery</h4>
+                    <Button
+                        variant="link"
+                        size="link-sm"
+                        onClick={() => {
+                            setSelectedWinery(null);
+                        }}
+                    >
+                        Clear
+                    </Button>
+                </div>
+                <Select
+                    value={selectedWinery || ""}
+                    onValueChange={setSelectedWinery}
+                >
+                    <SelectTrigger className="w-full rounded border border-neutral-200 bg-white font-sans text-sm font-medium leading-5 text-neutral-900 shadow-none button-size-md">
+                        <SelectValue
+                            className="font-sans text-sm font-medium leading-6 text-neutral-900"
+                            placeholder="Select a winery"
+                        />
+                    </SelectTrigger>
+                    <SelectContent className="rounded bg-white !px-0 !py-0">
+                        {bodegas.map((type) => (
+                            <SelectItem
+                                key={type.id}
+                                value={type.id.toString()}
+                                className="h-10 px-4 font-sans text-sm font-normal leading-6 text-neutral-900 hover:bg-neutral-100"
+                            >
+                                {type.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <hr className="border-neutral-200" />
+
+            {/* Price Range */}
+            <div className="flex flex-col gap-6">
+                <div className="flex items-baseline justify-between">
+                    <h4 className="font-lg-bold">Price</h4>
+                    {/* <Button
+                        variant="link"
+                        size="link-sm"
+                        onClick={() => {
+                            setSelectedWinery(null);
+                        }}
+                    >
+                        Clear
+                    </Button> */}
+                </div>
+                <div className="flex flex-col gap-6">
+                    <Slider
+                        defaultValue={PRICE_RANGE}
+                        max={PRICE_RANGE[1]}
+                        min={PRICE_RANGE[0]}
+                        step={1}
+                        value={priceRange}
+                        onValueChange={setPriceRange}
                     />
-
-                    <div>
-                        <h4 className="mb-3 font-medium">Price Range</h4>
-                        <div className="px-2">
-                            <Slider
-                                defaultValue={[4, 370]}
-                                max={370}
-                                min={4}
-                                step={1}
-                                value={priceRange}
-                                onValueChange={setPriceRange}
-                            />
-                            <div className="mt-2 flex items-center justify-between text-sm">
-                                <span>{priceRange[0]}€</span>
-                                <span>{priceRange[1]}€</span>
-                            </div>
-                        </div>
+                    <div className="flex items-center gap-4">
+                        <Input
+                            type="number"
+                            value={priceRange[0]}
+                            onChange={(e) =>
+                                setPriceRange([
+                                    Number(e.target.value),
+                                    priceRange[1],
+                                ])
+                            }
+                            min={PRICE_RANGE[0]}
+                        />
+                        <Input
+                            type="number"
+                            value={priceRange[1]}
+                            onChange={(e) =>
+                                setPriceRange([
+                                    priceRange[0],
+                                    Number(e.target.value),
+                                ])
+                            }
+                            max={PRICE_RANGE[1]}
+                        />
                     </div>
-
-                    <div>
-                        <h4 className="mb-3 font-medium">Winery</h4>
-                        <Select
-                            value={selectedWinery || ""}
-                            onValueChange={setSelectedWinery}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a winery" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {bodegas.map((type) => (
-                                    <SelectItem
-                                        key={type.id}
-                                        value={type.id.toString()}
-                                    >
-                                        {type.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <ToggleList
-                        title="Denomination of Origin"
-                        items={denominaciones}
-                        selectedItems={selectedDenominations}
-                        onItemChange={handleDenominationChange}
-                    />
-
-                    <ToggleList
-                        title="Grape Type"
-                        items={uvas}
-                        selectedItems={selectedGrapeTypes}
-                        onItemChange={handleGrapeTypeChange}
-                    />
+                    {/* <div className="mt-2 flex items-center justify-between text-sm">
+                        <span>{priceRange[0]}€</span>
+                        <span>{priceRange[1]}€</span>
+                    </div> */}
                 </div>
             </div>
+            <hr className="border-neutral-200" />
+
+            {/* Denomination of Origin */}
+            <FilterToogleList
+                title="Denomination of Origin"
+                items={denominaciones}
+                selectedItems={selectedDenominations}
+                onItemChange={handleDenominationChange}
+                reset={() => setSelectedDenominations([])}
+            />
+            <hr className="border-neutral-200" />
+
+            {/* Wine type */}
+            <FilterToogleList
+                title="Wine Type"
+                items={categorias}
+                selectedItems={selectedWineTypes}
+                onItemChange={handleWineTypeChange}
+                reset={() => setSelectedWineTypes([])}
+            />
+            <hr className="border-neutral-200" />
+
+            {/* Grape Type */}
+            <FilterToogleList
+                title="Grape Type"
+                items={uvas}
+                selectedItems={selectedGrapeTypes}
+                onItemChange={handleGrapeTypeChange}
+                reset={() => setSelectedGrapeTypes([])}
+            />
+            <hr className="border-neutral-200" />
         </div>
     );
 };

@@ -152,7 +152,7 @@ export default {
                      '@apply h-10 uppercase px-4': {},
                 },
                 '.button-size-lg': {
-                    '@apply h-12 uppercase px-5': {},
+                    '@apply h-12 uppercase px-5 gap-2': {},
                 },
                 '.button-size-xl': {
                     '@apply h-14 uppercase px-6': {},

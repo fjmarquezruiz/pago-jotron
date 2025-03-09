@@ -17,7 +17,7 @@ const buttonVariants = cva("button", {
             secondary:
                 "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
             ghost: "button-ghost",
-            link: "text-primary underline-offset-4 hover:underline",
+            link: "text-neutral-900 underline-offset-4 hover:underline",
         },
         size: {
             default: "h-9 px-4 py-2",
@@ -28,6 +28,7 @@ const buttonVariants = cva("button", {
             icon: "h-9 w-9",
             "icon-md": "h-10 w-10",
             "icon-lg": "h-12 w-12",
+            "link-sm": "!px-0 font-sm-semibold",
         },
     },
     defaultVariants: {
