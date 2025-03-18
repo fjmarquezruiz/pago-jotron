@@ -68,7 +68,7 @@ const Index = ({ auth }: PageProps) => {
                 section="The cart"
                 title="The cart best wines of Andalusia"
             />
-            <main className="container mx-auto px-5 pb-32 pt-12">
+            <div className="container mx-auto px-5 pb-32 pt-12">
                 <div className="mx-auto flex max-w-7xl gap-6 lg:grid lg:grid-cols-12 lg:gap-6">
                     {state.items.length === 0 ? (
                         <div className="col-span-12 flex flex-col gap-12">
@@ -312,7 +312,7 @@ const Index = ({ auth }: PageProps) => {
                         </>
                     )}
                 </div>
-            </main>
+            </div>
         </>
     );
 };

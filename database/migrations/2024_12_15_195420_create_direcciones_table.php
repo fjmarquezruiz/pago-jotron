@@ -16,8 +16,8 @@ return new class extends Migration
      * - street_name: A string representing the name of the street, with a maximum length of 100 characters.
      * - street_number: A string representing the street number, with a maximum length of 10 characters.
      * - postal_code: A string representing the postal code, with a maximum length of 10 characters.
-     * - locality: A string representing the locality, with a maximum length of 100 characters.
-     * - province: A string representing the province, with a maximum length of 100 characters.
+     * - city: A string representing the city, with a maximum length of 100 characters.
+     * - state: A string representing the state, with a maximum length of 100 characters.
      * - country: A string representing the country, with a maximum length of 100 characters.
      * - address_type: An enum representing the type of address, with possible values 'Shipping', 'Billing', and a default value of 'Shipping'.
      * - created_at: A timestamp indicating when the record was created.
@@ -32,8 +32,8 @@ return new class extends Migration
             $table->string('street_name', 100)->comment('Name of the street');
             $table->string('street_number', 10)->comment('Street number');
             $table->string('postal_code', 10)->comment('Postal code');
-            $table->string('locality', 100)->comment('Locality');
-            $table->string('province', 100)->comment('Province');
+            $table->string('city', 100)->comment('City');
+            $table->string('state', 100)->comment('State');
             $table->string('country', 100)->comment('Country');
             $table->enum('address_type', ['Shipping', 'Billing'])->default('Shipping')->comment('Type of address');
             // Add a new boolean column 'is_billing' with a default value of TRUE

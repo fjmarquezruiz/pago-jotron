@@ -77,12 +77,24 @@
     @apply font-display text-6xl font-bold leading-none -tracking-[3px];
   }
 
+  .heading-5xl-regular {
+    @apply font-display text-5xl font-normal leading-none -tracking-[1.2px];
+  }
+  
+  .heading-5xl-bold {
+    @apply font-display text-5xl font-bold leading-none -tracking-[1.2px];
+  }
+ 
   .heading-4xl-regular {
     @apply font-display text-4xl font-normal leading-none tracking-tight;
   }
 
   .heading-3xl-bold {
-    @apply font-display text-3xl font-bold leading-none tracking-tight;
+    @apply font-display text-3xl font-bold leading-none -tracking-[1.8px];
+  }
+
+  .heading-2xl-medium {
+    @apply font-display text-2xl font-medium leading-none tracking-tighter;
   }
 
   .heading-2xl-bold {
@@ -94,19 +106,19 @@
   }
 
   .font-lg-normal {
-    @apply font-sans text-lg font-normal leading-7;
+    @apply font-sans text-lg font-normal leading-7 -tracking-[0.5px];
   }
 
   .font-lg-medium {
-    @apply font-sans text-lg font-medium leading-7;
+    @apply font-sans text-lg font-medium leading-7 -tracking-[0.5px];
   }
 
   .font-lg-semibold {
-    @apply font-sans text-lg font-semibold leading-7;
+    @apply font-sans text-lg font-semibold leading-7 -tracking-[0.5px];
   }
 
   .font-lg-bold {
-    @apply font-sans text-lg font-bold leading-7;
+    @apply font-sans text-lg font-bold leading-7 -tracking-[0.5px];
   }
 
   .font-base-normal {
@@ -115,6 +127,10 @@
 
   .font-base-medium {
     @apply font-sans text-base font-medium leading-6;
+  }
+  
+  .font-base-medium-i {
+    @apply !font-sans !text-base !font-medium !leading-6;
   }
 
   .font-base-semibold {

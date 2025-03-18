@@ -1,223 +1,166 @@
-import { CloudinaryImage } from "@/Components/CloudinaryImage";
 import { PageProps } from "@/types";
-import { Head, Link } from "@inertiajs/react";
+import { Vino } from "@/types/vino";
+import { Head } from "@inertiajs/react";
+import { useEffect, useState } from "react";
+import Banner from "./Home/Banner";
+import HistoryBoxes from "./Home/HistoryBoxes";
+import ProductSlider from "./Home/ProductsSlider";
+import RelatedNews from "./Home/RelatedNews";
+import WinesSlider from "./Home/WinesSlider";
 import HeroSection from "./Layout/HeroSection";
+
+const PRODUCTS_SLIDER = {
+    data: [
+        {
+            id: 1,
+            name: "Our selection",
+            image: "/v1742150149/bg-our-selection_xklmwt.png",
+        },
+        {
+            id: 2,
+            name: "Fortified",
+            image: "/v1742150149/bg-fortified.png",
+        },
+        {
+            id: 3,
+            name: "Red wines",
+            image: "/v1742150446/bg-red-wines_dkxasj.png",
+        },
+        {
+            id: 4,
+            name: "White wines",
+            image: "/v1742150148/bg-white-wines_collev.png",
+        },
+        {
+            id: 5,
+            name: "Sweets",
+            image: "/v1742150149/bg-sweets.png",
+        },
+        {
+            id: 6,
+            name: "Events",
+            image: "/v1742150148/bg-events_hqzdbo.png",
+        },
+    ],
+};
+
+const LAST_NEWS = {
+    data: [
+        {
+            id: 1,
+            title: "The art of winemaking: tradition and passion in every glass",
+            image: "/v1742150149/bg-our-selection_xklmwt.png",
+            date: "01.11.2024",
+            category: "History",
+        },
+        {
+            id: 2,
+            title: "Exploring the diversity of Malaga wines",
+            image: "/v1742150149/bg-fortified.png",
+            date: "02.11.2024",
+            category: "Wines",
+        },
+        {
+            id: 3,
+            title: "Unveiling the influence of Malaga's terroir on wine",
+            image: "/v1742150446/bg-red-wines_dkxasj.png",
+            date: "03.11.2024",
+            category: "Category",
+        },
+    ],
+};
 
 export default function Welcome({
     auth,
-    laravelVersion,
-    phpVersion,
 }: PageProps<{ laravelVersion: string; phpVersion: string }>) {
-    console.log("welcome -> ", auth);
+    // console.log("welcome -> ", auth);
+    // State variables to store the list of relatedWines
+    const [relatedWines, setRelatedWines] = useState<Vino[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [fetchError, setFetchError] = useState<string | null>(null);
+
+    // useEffect hook to fetch data when the component mounts
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                // Fetch data for relatedWines concurrently
+                const [relatedWinesResponse] = await Promise.all([
+                    fetch("/api/vinos/related/1"),
+                ]);
+
+                // Check if the responses are successful
+                if (!relatedWinesResponse.ok) {
+                    throw new Error(
+                        `Error fetching relatedWines: ${relatedWinesResponse.statusText}`,
+                    );
+                }
+
+                // Parse the JSON data from the responses
+                const relatedWinesData = await relatedWinesResponse.json();
+
+                // Ensure the data contains the expected array structure
+                if (!Array.isArray(relatedWinesData.data)) {
+                    throw new Error("RelatedWines data is not an array");
+                }
+
+                // Update the state with the fetched data
+                setRelatedWines(relatedWinesData.data);
+            } catch (err) {
+                // Handle any errors that occur during fetching
+                console.error("Error fetching data:", err);
+                setFetchError("Failed to load data. Please try again later.");
+            } finally {
+                // Set loading state to false after fetching is complete
+                setLoading(false);
+            }
+        };
+
+        // Call the fetchData function
+        fetchData();
+    }, []); // Empty dependency array ensures this effect runs only once on mount
+
+    console.log(relatedWines);
 
     return (
         <>
             <Head title="Store Welcome" />
             <HeroSection
                 auth={auth}
-                section="HOME"
-                title="History and future from the heart of the Natural Park of Montes de Málaga"
+                section="Home"
+                title="History and future"
+                text="from the heart of the Natural Park of Montes de Málaga"
             />
 
-            <main className="relative min-h-screen">
-                {/* Products Section */}
-                <section className="container mx-auto px-4 py-16">
-                    <h2 className="mb-8 text-center text-3xl font-bold">
-                        Our products
-                    </h2>
-                    <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
-                        <Link href={route("shop")} className="group">
-                            <div className="overflow-hidden rounded-lg">
-                                <CloudinaryImage
-                                    src="/images/products/fortified.jpg"
-                                    alt="Fortified Wines"
-                                    className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-110"
-                                />
-                            </div>
-                            <h3 className="mt-4 text-xl font-semibold">
-                                FORTIFIED +
-                            </h3>
-                        </Link>
-                        <Link href={route("shop")} className="group">
-                            <div className="overflow-hidden rounded-lg">
-                                <CloudinaryImage
-                                    src="/images/products/sweet.jpg"
-                                    alt="Sweet Natural"
-                                    className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-110"
-                                />
-                            </div>
-                            <h3 className="mt-4 text-xl font-semibold">
-                                SWEET NATURAL +
-                            </h3>
-                        </Link>
-                        <Link href={route("shop")} className="group">
-                            <div className="overflow-hidden rounded-lg">
-                                <CloudinaryImage
-                                    src="/images/products/limited.jpg"
-                                    alt="Limited Editions"
-                                    className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-110"
-                                />
-                            </div>
-                            <h3 className="mt-4 text-xl font-semibold">
-                                LIMITED EDITIONS +
-                            </h3>
-                        </Link>
-                        <Link href={route("shop")} className="group">
-                            <div className="overflow-hidden rounded-lg">
-                                <CloudinaryImage
-                                    src="/images/products/events.jpg"
-                                    alt="Events"
-                                    className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-110"
-                                />
-                            </div>
-                            <h3 className="mt-4 text-xl font-semibold">
-                                EVENTS +
-                            </h3>
-                        </Link>
-                    </div>
-                </section>
+            {/* Products Section */}
+            <ProductSlider products={PRODUCTS_SLIDER} />
 
-                {/* Story Section */}
-                <section className="bg-gray-50 py-16">
-                    <div className="container mx-auto px-4">
-                        <div className="grid grid-cols-1 gap-12 md:grid-cols-2">
-                            <div>
-                                <h2 className="mb-6 text-3xl font-bold">
-                                    Land and barrel
-                                </h2>
-                                <h3 className="mb-8 text-2xl">
-                                    FROM THE GRAPE TO THE GLASS...
-                                </h3>
-                                <div className="space-y-6">
-                                    <div>
-                                        <h4 className="mb-2 text-xl font-semibold">
-                                            From the Natural Park of Montes de
-                                            Málaga
-                                        </h4>
-                                        <p className="text-gray-600">
-                                            Our vineyards are located in the
-                                            heart of the Natural Park, where the
-                                            unique climate and soil conditions
-                                            create exceptional wines.
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <h4 className="mb-2 text-xl font-semibold">
-                                            Winemakers in the 21st Century
-                                        </h4>
-                                        <p className="text-gray-600">
-                                            We combine traditional winemaking
-                                            methods with modern technology to
-                                            create wines that reflect our
-                                            heritage and innovation.
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <h4 className="mb-2 text-xl font-semibold">
-                                            Wining with Over 100 Years of
-                                            Tradition
-                                        </h4>
-                                        <p className="text-gray-600">
-                                            Our family has been crafting wines
-                                            for over a century, passing down
-                                            knowledge and passion through
-                                            generations.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="grid gap-6">
-                                <CloudinaryImage
-                                    src="/images/landscape.jpg"
-                                    alt="Vineyard landscape"
-                                    className="rounded-lg object-cover"
-                                />
-                                <CloudinaryImage
-                                    src="/images/winery.jpg"
-                                    alt="Winery barrels"
-                                    className="rounded-lg object-cover"
-                                />
-                                <CloudinaryImage
-                                    src="/images/tasting.jpg"
-                                    alt="Wine tasting"
-                                    className="rounded-lg object-cover"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </section>
+            {/* Best sellers Section */}
+            <WinesSlider
+                title="Best sellers"
+                products={{ data: relatedWines }}
+            />
+            <Banner
+                text="Created by"
+                accentText="the elements"
+                image="/v1742237991/bg-banner-02_yl5y0s.png"
+            />
 
-                {/* Latest News Section */}
-                <section className="container mx-auto px-4 py-16">
-                    <h2 className="mb-12 text-center text-3xl font-bold">
-                        LATEST NEWS
-                    </h2>
-                    <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-                        <article className="group">
-                            <CloudinaryImage
-                                src="/images/news/tradition.jpg"
-                                alt="Winemaking Tradition"
-                                className="mb-4 rounded-lg object-cover"
-                            />
-                            <h3 className="mb-2 text-xl font-semibold group-hover:text-[#FF2D20]">
-                                The Art of Winemaking: Tradition and Passion at
-                                Every Step
-                            </h3>
-                            <p className="text-gray-600">
-                                Discover how we maintain our century-old
-                                traditions while embracing modern techniques...
-                            </p>
-                            <Link
-                                href="#"
-                                className="mt-4 inline-block text-[#FF2D20]"
-                            >
-                                Continue reading
-                            </Link>
-                        </article>
-                        <article className="group">
-                            <CloudinaryImage
-                                src="/images/news/harvest.jpg"
-                                alt="Exploring Málaga"
-                                className="mb-4 rounded-lg object-cover"
-                            />
-                            <h3 className="mb-2 text-xl font-semibold group-hover:text-[#FF2D20]">
-                                Exploring the Diversity of Málaga Terroir
-                            </h3>
-                            <p className="text-gray-600">
-                                Join us on a journey through the unique
-                                characteristics of our region...
-                            </p>
-                            <Link
-                                href="#"
-                                className="mt-4 inline-block text-[#FF2D20]"
-                            >
-                                Continue reading
-                            </Link>
-                        </article>
-                        <article className="group">
-                            <CloudinaryImage
-                                src="/images/news/influence.jpg"
-                                alt="Mediterranean Influence"
-                                className="mb-4 rounded-lg object-cover"
-                            />
-                            <h3 className="mb-2 text-xl font-semibold group-hover:text-[#FF2D20]">
-                                Unveiling the Influence of Málaga's Terroir on
-                                Wine
-                            </h3>
-                            <p className="text-gray-600">
-                                Learn how our Mediterranean climate shapes the
-                                character of our wines...
-                            </p>
-                            <Link
-                                href="#"
-                                className="mt-4 inline-block text-[#FF2D20]"
-                            >
-                                Continue reading
-                            </Link>
-                        </article>
-                    </div>
-                </section>
-            </main>
+            {/* From our shop Section */}
+            <WinesSlider
+                title="From our shop"
+                products={{ data: relatedWines }}
+            />
+            <Banner
+                text="Land and barrell"
+                accentText="FROM THE GRAPE TO THE GLASS..."
+                image="/v1742237995/bg-banner-01_ophgvi.png"
+            />
+
+            {/* History boxes */}
+            <HistoryBoxes />
+
+            {/* Latest News Section */}
+            <RelatedNews news={LAST_NEWS} />
         </>
     );
 }

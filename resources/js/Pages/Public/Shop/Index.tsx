@@ -138,7 +138,8 @@ const Index = ({ auth, vinos, queryParams = {} }: PageProps<IndexProps>) => {
             <HeroSection
                 auth={auth}
                 section="The shop"
-                title="The best wines of Andalusia"
+                title="The shop"
+                text="The best wines of Andalusia"
             />
 
             <main className="container mx-auto px-5 pb-32 pt-12">

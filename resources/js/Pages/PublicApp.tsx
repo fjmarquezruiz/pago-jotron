@@ -21,7 +21,7 @@ const PublicApp = ({ children }: PropsWithChildren) => {
                 <main className="public-content">{children}</main>
                 <footer className="public-footer">Public Footer</footer>
             </div> */}
-            <main className="bg-whitetext-gray-900 flex min-h-screen flex-col items-center dark:bg-gray-900 dark:text-white/5">
+            <main className="flex min-h-screen flex-col items-center bg-white text-neutral-900 dark:bg-gray-900 dark:text-white/5">
                 {children}
                 <footer className="py-16 text-center text-sm text-black dark:text-white/70">
                     ESTE ES EL FOOTER

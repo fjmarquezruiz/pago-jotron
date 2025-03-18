@@ -12,7 +12,7 @@ return new class extends Migration
      * This migration creates a new table named 'bodegas' with the following columns:
      * - id: Auto-incrementing primary key.
      * - name: A unique string representing the name of the warehouse, with a maximum length of 100 characters.
-     * - city: A nullable string representing the locality of the warehouse, with a maximum length of 100 characters.
+     * - city: A nullable string representing the city of the warehouse, with a maximum length of 100 characters.
      * - province: A nullable string representing the province of the warehouse, with a maximum length of 100 characters.
      * - blocked: A boolean indicating whether the warehouse is blocked, with a default value of false.
      * - created_at: A timestamp indicating when the record was created.
@@ -23,7 +23,7 @@ return new class extends Migration
         Schema::create('bodegas', function (Blueprint $table) {
             $table->id();
             $table->string('name', 100)->unique()->comment('Unique name of the warehouse');
-            $table->string('city', 100)->nullable()->comment('Locality of the warehouse');
+            $table->string('city', 100)->nullable()->comment('City of the warehouse');
             $table->string('province', 100)->nullable()->comment('Province of the warehouse');
             $table->boolean('blocked')->default(false)->comment('Indicates if the warehouse is blocked');
             $table->timestamps();

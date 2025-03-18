@@ -28,22 +28,25 @@ const MenuItem = ({
     active = false,
     mode = "light",
 }: MenuItemProps) => {
+    const isLight = mode === "light";
+
     return (
         <Link
             href={link}
-            className={`inline-flex h-7 items-center rounded p-2 text-base font-medium uppercase leading-7 focus:bg-white/20 focus:outline-none ${
-                active
-                    ? "!bg-gray-200 text-gray-900 dark:!bg-gray-700 dark:text-gray-100"
-                    : ""
-            } ${mode === "dark" ? "text-neutral-900 hover:bg-neutral-700/10" : "text-white"} ${
-                mode === "dark" && active
-                    ? "!bg-gray-700/10 text-gray-900 dark:!bg-gray-700 dark:text-gray-100"
-                    : ""
-            }`}
+            className={`${isLight ? "text-white" : "text-neutral-900"} ${active && isLight ? "border-white" : ""} ${active && !isLight ? "border-neutral-900" : ""} font-sm-semibold border-b border-transparent uppercase hover:border-white`}
+            // className={`inline-flex h-7 items-center rounded p-2 text-base font-medium uppercase leading-7 focus:bg-white/20 focus:outline-none ${
+            //     active
+            //         ? "!bg-gray-200 text-gray-900 dark:!bg-gray-700 dark:text-gray-100"
+            //         : ""
+            // } ${mode === "dark" ? "text-neutral-900 hover:bg-neutral-700/10" : "text-white"} ${
+            //     mode === "dark" && active
+            //         ? "!bg-gray-700/10 text-gray-900 dark:!bg-gray-700 dark:text-gray-100"
+            //         : ""
+            // }`}
         >
-            <span className="inline-flex border-b border-transparent hover:border-white focus:border-transparent hover:focus:border-transparent">
-                {label}
-            </span>
+            {/* <span className="inline-flex border-b border-transparent hover:border-white focus:border-transparent hover:focus:border-transparent active:border-white group-active:border-white"> */}
+            {label}
+            {/* </span> */}
         </Link>
     );
 };
@@ -60,23 +63,19 @@ const Menu = ({ auth, section = "", mode = "light" }: HeaderProps) => {
         <header className="relative z-10">
             <div className="container mx-auto px-4 text-white">
                 <div className="flex h-[72px] items-center justify-between py-3">
-                    {section.toLowerCase() === "home" ? (
-                        <div></div>
-                    ) : (
-                        <Link
-                            href="/"
-                            className={`inline-flex h-7 items-center justify-center rounded px-2.5 font-display text-lg font-bold uppercase leading-none tracking-tight ${
-                                mode === "dark"
-                                    ? "bg-black text-white"
-                                    : "bg-white text-black"
-                            }`}
-                        >
-                            Bodega Pago de Jotrón
-                        </Link>
-                    )}
+                    <Link
+                        href="/"
+                        className={`inline-flex h-[30px] items-center justify-center rounded-sm px-2 font-display text-[22px] font-bold uppercase leading-none tracking-tighter ${
+                            mode === "dark"
+                                ? "bg-black text-white"
+                                : "bg-white text-black"
+                        }`}
+                    >
+                        Bodega Pago de Jotrón
+                    </Link>
 
-                    <div className="flex items-center gap-4">
-                        <nav className="hidden items-center gap-6 md:flex">
+                    <div className="flex items-center gap-0">
+                        <nav className="mr-6 hidden items-center gap-6 md:flex">
                             <MenuItem
                                 label="The shop"
                                 link="/shop"
@@ -124,7 +123,7 @@ const Menu = ({ auth, section = "", mode = "light" }: HeaderProps) => {
                             <Link
                                 href={route("profile.edit")}
                                 as="button"
-                                className={`h-10 w-10 border border-transparent bg-transparent px-0 button ${mode === "dark" ? "button-ghost" : "button-ghost-dark"}`}
+                                className={`font-sm-semibold h-10 button button-size-md ${mode === "dark" ? "button-ghost" : "button-ghost-dark"}`}
                                 aria-label={auth.user.name}
                                 title={auth.user.name}
                             >

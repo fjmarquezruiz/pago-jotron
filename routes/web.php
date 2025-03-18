@@ -13,6 +13,7 @@ use App\Http\Controllers\VinoController;
 use App\Http\Controllers\UvaController;
 use App\Http\Controllers\VinouvaController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\DireccionController;
 use Illuminate\Contracts\Console\Application;
 use Illuminate\Foundation\Application as FoundationApplication;
 use Illuminate\Support\Facades\Route;
@@ -89,6 +90,10 @@ Route::middleware('auth')->group(function () {
             Route::put('/uvas/{vinoUva}', [VinoUvaController::class, 'update'])->name('vino.uvas.update');
             Route::delete('/uvas/{vinoUva}', [VinoUvaController::class, 'destroy'])->name('vino.uvas.destroy');
         });
+
+        Route::resource('direccion', DireccionController::class);
+        Route::get('/users/{userId}/direcciones', [DireccionController::class, 'getAllDirectionsForUser']);
+        Route::get('/users/{userId}/shipping-direction', [DireccionController::class, 'getMainShippingDirectionForUser']);
     });
 
     Route::get('/checkout', function () {
@@ -106,7 +111,7 @@ Route::middleware('auth')->group(function () {
     //     return Inertia::render('Public/Shop/Detail');
     // })->name('shop.detail');
 
-    
+
 });
 
 
@@ -117,6 +122,7 @@ Route::prefix('api')->group(function () {
     Route::get('/denominaciones', [DenominacionController::class, 'all']);
     Route::get('/categorias', [CategoriaController::class, 'all']);
     Route::get('/uvas', [UvaController::class, 'all']);
+    Route::get('/vinos/related/{vino}', [VinoController::class, 'relatedWines']);
 });
 
 require __DIR__ . '/auth.php';

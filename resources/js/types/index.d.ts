@@ -100,6 +100,21 @@ interface UvaOption {
     percent: number;
 }
 
+
+export interface Direccion {
+    id: number;
+    phone: string;
+    street_type: string;
+    street_name: string;
+    street_number: string;
+    postal_code: string;
+    city: string;
+    state: string;
+    country: string;
+    address_type: string;
+    is_billing: boolean;
+}
+
 // Define the structure of the GenericSectionProps
 export interface GenericSectionProps<T> {
     data: T; // Use a generic type T

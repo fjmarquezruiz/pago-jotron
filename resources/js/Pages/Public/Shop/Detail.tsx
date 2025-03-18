@@ -126,6 +126,7 @@ const Detail = ({ auth, vino, relatedProducts }: PageProps<DetailProps>) => {
                 auth={auth}
                 section="Detail"
                 title={vino.name}
+                text={vino.name}
                 mode="dark"
             />
 

@@ -7,6 +7,7 @@ use App\Http\Resources\VinoResource;
 use App\Models\Vino;
 use App\Models\Vinouva;
 use App\Services\CloudinaryService;
+use BcMath\Number;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -192,9 +193,9 @@ class VinoController extends Controller
     {
         // Get related products from same winery or denomination (up to 10)
         $relatedProducts = Vino::where('id', '!=', $vino->id)
-            ->where(function($query) use ($vino) {
+            ->where(function ($query) use ($vino) {
                 $query->where('bodega_id', $vino->bodega_id)
-                      ->orWhere('denominacion_id', $vino->denominacion_id);
+                    ->orWhere('denominacion_id', $vino->denominacion_id);
             })
             ->with(['denominacion', 'categoria', 'bodega'])
             ->inRandomOrder()
@@ -217,5 +218,34 @@ class VinoController extends Controller
             'vino' => new VinoResource($vino), // Current product
             'relatedProducts' => VinoResource::collection($relatedProducts) // Related products
         ]);
+    }
+
+
+    public function relatedWines(Int $vinoId)
+    {
+        // Get related products from same winery or denomination (up to 10)
+        $relatedProducts = Vino::where('id', '!=', $vinoId)
+            // ->where(function ($query) use ($vino) {
+            //     $query->where('bodega_id', $vino->bodega_id)
+            //         ->orWhere('denominacion_id', $vino->denominacion_id);
+            // })
+            ->with(['denominacion', 'categoria', 'bodega'])
+            ->inRandomOrder()
+            ->take(10)
+            ->get();
+
+        // If we don't have 10 related products, add random products to fill the slots
+        if ($relatedProducts->count() < 10) {
+            $additionalProducts = Vino::where('id', '!=', $vinoId)
+                ->whereNotIn('id', $relatedProducts->pluck('id'))
+                ->with(['denominacion', 'categoria', 'bodega'])
+                ->inRandomOrder()
+                ->take(10 - $relatedProducts->count())
+                ->get();
+
+            $relatedProducts = $relatedProducts->concat($additionalProducts);
+        }
+
+        return VinoResource::collection($relatedProducts)->response();
     }
 }

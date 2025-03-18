@@ -18,8 +18,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $street_name
  * @property string $street_number
  * @property string $postal_code
- * @property string $locality
- * @property string $province
+ * @property string $city
+ * @property string $state
  * @property string $country
  * @property string $address_type
  * @property \Illuminate\Support\Carbon $created_at
@@ -33,10 +33,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Direccion whereCountry($value)
  * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Direccion whereCreatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Direccion whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Direccion whereLocality($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Direccion whereCity($value)
  * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Direccion wherePhone($value)
  * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Direccion wherePostalCode($value)
- * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Direccion whereProvince($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Direccion whereState($value)
  * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Direccion whereStreetName($value)
  * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Direccion whereStreetNumber($value)
  * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Direccion whereStreetType($value)
@@ -69,8 +69,8 @@ class Direccion extends Model
         'street_name',
         'street_number',
         'postal_code',
-        'locality',
-        'province',
+        'city',
+        'state',
         'country',
         'address_type',
     ];
