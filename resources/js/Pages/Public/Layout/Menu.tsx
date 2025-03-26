@@ -1,5 +1,6 @@
 "use client";
 
+import Logo from "@/Components/Logo";
 import { User } from "@/types";
 import { Link } from "@inertiajs/react";
 import { IconLogout, IconUser } from "@tabler/icons-react";
@@ -63,15 +64,8 @@ const Menu = ({ auth, section = "", mode = "light" }: HeaderProps) => {
         <header className="relative z-10">
             <div className="container mx-auto px-4 text-white">
                 <div className="flex h-[72px] items-center justify-between py-3">
-                    <Link
-                        href="/"
-                        className={`inline-flex h-[30px] items-center justify-center rounded-sm px-2 font-display text-[22px] font-bold uppercase leading-none tracking-tighter ${
-                            mode === "dark"
-                                ? "bg-black text-white"
-                                : "bg-white text-black"
-                        }`}
-                    >
-                        Bodega Pago de Jotrón
+                    <Link href="/">
+                        <Logo mode={mode} />
                     </Link>
 
                     <div className="flex items-center gap-0">

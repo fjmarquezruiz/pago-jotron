@@ -6,7 +6,7 @@ import "../../css/styles.css";
 const PublicApp = ({ children }: PropsWithChildren) => {
     return (
         <CartProvider>
-            <link rel="preconnect" href="https://fonts.googleaºpis.com"></link>
+            <link rel="preconnect" href="https://fonts.googleapis.com"></link>
             <link
                 rel="preconnect"
                 href="https://fonts.gstatic.com"

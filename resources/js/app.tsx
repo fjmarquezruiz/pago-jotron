@@ -45,7 +45,11 @@ createInertiaApp({
             import.meta.glob("./Pages/**/*.tsx"),
         );
 
-        if (name.startsWith("Dashboard")) {
+        if (
+            name.startsWith("Dashboard") ||
+            name.startsWith("Auth/Login") ||
+            name.startsWith("Public/AgeVerification")
+        ) {
             const { default: DashboardApp } = await import(
                 "./Pages/DashboardApp"
             );

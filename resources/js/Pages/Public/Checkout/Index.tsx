@@ -1,6 +1,8 @@
+import InputError from "@/Components/InputError";
 import { Button } from "@/Components/ui/button";
 import { Checkbox } from "@/Components/ui/checkbox";
 import { Input } from "@/Components/ui/input";
+import { Label } from "@/Components/ui/label";
 import { useCart } from "@/contexts/cart-context";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -267,12 +269,13 @@ const Index = ({ auth }: PageProps) => {
         readOnly = false,
     }: FormFieldProps) => (
         <div className={cn("flex flex-col gap-1.5", className)}>
-            <label
+            {/* <label
                 htmlFor={name}
                 className="font-sm-medium block text-neutral-900"
             >
                 {label}
-            </label>
+            </label> */}
+            <Label htmlFor={name}>{label}</Label>
             <Input
                 id={name}
                 name={name}
@@ -284,7 +287,8 @@ const Index = ({ auth }: PageProps) => {
                 readOnly={readOnly}
             />
             {errors[name] && (
-                <p className="font-sm-regular text-red-600">{errors[name]}</p>
+                <InputError message={errors[name]} />
+                // <p className="font-sm-regular text-red-600">{errors[name]}</p>
             )}
         </div>
     );

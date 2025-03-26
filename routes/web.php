@@ -19,19 +19,27 @@ use Illuminate\Foundation\Application as FoundationApplication;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('Public/Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => FoundationApplication::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
-})->name('/');
-// Route::redirect('/', '/dashboard');
+Route::middleware(['age.verified'])->group(function () {
+    Route::get('/', function () {
+        return Inertia::render('Public/Home/Index', [
+            'canLogin' => Route::has('login'),
+            'canRegister' => Route::has('register'),
+            'laravelVersion' => FoundationApplication::VERSION,
+            'phpVersion' => PHP_VERSION,
+        ]);
+    })->name('/');
+});
 
-// Route::get('/shop', function () {
-//     return Inertia::render('Public/Shop/Index');
-// })->name('shop');
+Route::get('/age-verification', function () {
+    return Inertia::render('Public/AgeVerification/Index');
+})->name('age.verification');
+
+Route::post('/age-verification', function (\Illuminate\Http\Request $request) {
+    $request->session()->put('ageVerified', true);
+    return redirect()->route('/');
+})->name('age.verification.process');
+
+
 Route::get('/shop', [ShopController::class, 'index'])->name('shop');
 
 Route::get('/cart', function () {
@@ -40,10 +48,6 @@ Route::get('/cart', function () {
 
 Route::get('/detail/{vino}', [VinoController::class, 'showPublic'])->name('shop.detail');
 
-
-// Route::get('/dashboard', function () {
-//     return Inertia::render('Dashboard');
-// })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     // Profile routes

@@ -158,18 +158,14 @@ const FilterSidebar = ({ onFilterChange }: FilterSidebarProps) => {
                     value={selectedWinery || ""}
                     onValueChange={setSelectedWinery}
                 >
-                    <SelectTrigger className="w-full rounded border border-neutral-200 bg-white font-sans text-sm font-medium leading-5 text-neutral-900 shadow-none button-size-md">
-                        <SelectValue
-                            className="font-sans text-sm font-medium leading-6 text-neutral-900"
-                            placeholder="Select a winery"
-                        />
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select a winery" />
                     </SelectTrigger>
-                    <SelectContent className="rounded bg-white !px-0 !py-0">
+                    <SelectContent>
                         {bodegas.map((type) => (
                             <SelectItem
                                 key={type.id}
                                 value={type.id.toString()}
-                                className="h-10 px-4 font-sans text-sm font-normal leading-6 text-neutral-900 hover:bg-neutral-100"
                             >
                                 {type.name}
                             </SelectItem>

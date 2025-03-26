@@ -1,6 +1,6 @@
 "use client";
 
-import { CLOUDINARY_BASE_URL } from "@/constants";
+import { APP_NAME, CLOUDINARY_BASE_URL } from "@/constants";
 import { User } from "@/types";
 import Menu from "./Menu";
 
@@ -37,7 +37,7 @@ const HeroSection = ({
                         <img
                             src={background}
                             loading="lazy"
-                            alt="Bodega Pago de Jotrón"
+                            alt={APP_NAME}
                             className="absolute h-full w-full object-cover"
                         />
                         <figcaption className="sr-only">

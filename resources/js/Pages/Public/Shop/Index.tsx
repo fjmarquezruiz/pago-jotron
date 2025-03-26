@@ -163,18 +163,14 @@ const Index = ({ auth, vinos, queryParams = {} }: PageProps<IndexProps>) => {
                                     updateFilters({ sortField, sortDirection });
                                 }}
                             >
-                                <SelectTrigger className="col-start-4 w-full rounded border border-neutral-200 bg-white font-sans text-sm font-medium leading-5 text-neutral-900 shadow-none button-size-md">
-                                    <SelectValue
-                                        className="font-sans text-sm font-medium leading-6 text-neutral-900"
-                                        placeholder="Order by"
-                                    />
+                                <SelectTrigger className="col-start-4">
+                                    <SelectValue placeholder="Order by" />
                                 </SelectTrigger>
-                                <SelectContent className="rounded bg-white !px-0 !py-0">
+                                <SelectContent>
                                     {SORT_OPTIONS.map((type) => (
                                         <SelectItem
                                             key={type.id}
                                             value={type.value}
-                                            className="h-10 px-4 font-sans text-sm font-normal leading-6 text-neutral-900 hover:bg-neutral-100"
                                         >
                                             {type.label}
                                         </SelectItem>
