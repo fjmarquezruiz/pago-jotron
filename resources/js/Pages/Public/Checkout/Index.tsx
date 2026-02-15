@@ -117,7 +117,7 @@ const Index = ({ auth }: PageProps) => {
         const fetchAllData = async () => {
             await Promise.all([
                 fetchData(
-                    `/users/${auth.user.id}/direcciones`,
+                    `/user/direcciones`,
                     setAddresses,
                     false,
                 ),

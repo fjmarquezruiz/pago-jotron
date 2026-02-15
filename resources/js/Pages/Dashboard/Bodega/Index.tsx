@@ -60,7 +60,13 @@ export default function Index({
                                 city
                             </th>
                             <th scope="col" className={tableTHClasses}>
+                                denomination
+                            </th>
+                            <th scope="col" className={tableTHClasses}>
                                 province
+                            </th>
+                            <th scope="col" className={tableTHClasses}>
+                                wines
                             </th>
                             <th
                                 scope="col"
@@ -89,6 +95,7 @@ export default function Index({
                                             <Badge
                                                 label="Blocked"
                                                 status="error"
+                                                className="ml-2"
                                             />
                                         ) : (
                                             <></>
@@ -99,9 +106,37 @@ export default function Index({
                                         {bodega.city ? bodega.city : "N/A"}
                                     </td>
                                     <td className={tableTDClasses}>
+                                        <div className="flex flex-wrap gap-1">
+                                            {bodega.denominaciones &&
+                                                bodega.denominaciones.length > 0 ? (
+                                                bodega.denominaciones.map(
+                                                    (denominacion) => (
+                                                        <Link
+                                                            key={denominacion.id}
+                                                            href={route(
+                                                                "denominacion.show",
+                                                                denominacion.id,
+                                                            )}
+                                                            className="rounded bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 transition-colors hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
+                                                        >
+                                                            {denominacion.name}
+                                                        </Link>
+                                                    ),
+                                                )
+                                            ) : (
+                                                <span className="text-gray-400">
+                                                    N/A
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className={tableTDClasses}>
                                         {bodega.province
                                             ? bodega.province
                                             : "N/A"}
+                                    </td>
+                                    <td className={tableTDClasses}>
+                                        {bodega.vinos_count ?? 0}
                                     </td>
                                     <td
                                         className={`${tableTDClasses} text-right`}
@@ -186,7 +221,7 @@ export default function Index({
             {/* Pagination controls */}
             <Pagination
                 links={bodegas.meta.links}
-                // queryParams={filteredQueryParams} // Uncomment if needed
+            // queryParams={filteredQueryParams} // Uncomment if needed
             />
         </AuthenticatedLayout>
     );

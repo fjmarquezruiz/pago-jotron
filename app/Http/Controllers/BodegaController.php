@@ -22,7 +22,7 @@ class BodegaController extends Controller
      */
     public function index()
     {
-        $paginated = Bodega::latest()->paginate();
+        $paginated = Bodega::with('denominaciones')->withCount('vinos')->latest()->paginate();
 
         return Inertia::render('Dashboard/Bodega/Index', [
             'bodegas' => BodegaResource::collection($paginated)
@@ -56,7 +56,8 @@ class BodegaController extends Controller
             $this->handleBodegaDenominaciones($bodega, $denominacionData);
 
             return Redirect::route('bodega.index')->with('success', 'Bodega created successfully.');
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             Log::error('Failed to create bodega: ' . $e->getMessage(), ['exception' => $e]);
             return Redirect::back()->with('error', 'Failed to create bodega. ' . $e->getMessage());
         }
@@ -71,7 +72,9 @@ class BodegaController extends Controller
     public function show(Bodega $bodega)
     {
         return Inertia::render('Dashboard/Bodega/Show', [
-            'bodega' => new BodegaResource($bodega)
+            'bodega' => new BodegaResource($bodega->load(['vinos', 'denominaciones' => function ($query) {
+            $query->withCount('vinos');
+        }]))
         ]);
     }
 
@@ -84,7 +87,7 @@ class BodegaController extends Controller
     public function edit(Bodega $bodega)
     {
         return Inertia::render('Dashboard/Bodega/Edit', [
-            'bodega' => new BodegaResource($bodega)
+            'bodega' => new BodegaResource($bodega->load('denominaciones'))
         ]);
     }
 
@@ -117,7 +120,8 @@ class BodegaController extends Controller
             DB::commit();
 
             return Redirect::route('bodega.index')->with('success', 'Bodega updated successfully.');
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             DB::rollBack();
             Log::error('Failed to update bodega: ' . $e->getMessage(), ['exception' => $e]);
             return Redirect::back()->with('error', 'Failed to update bodega.');
@@ -136,7 +140,8 @@ class BodegaController extends Controller
             $bodega->delete();
 
             return Redirect::route('bodega.index')->with('success', 'Bodega deleted successfully.');
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             Log::error('Failed to delete bodega: ' . $e->getMessage(), ['exception' => $e]);
             return Redirect::back()->with('error', 'Failed to delete bodega.');
         }
@@ -183,7 +188,8 @@ class BodegaController extends Controller
 
             // Commit the transaction
             DB::commit();
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             // Rollback the transaction if something went wrong
             DB::rollBack();
             Log::error('Failed to create save bodega_denominaciones: ' . $e->getMessage(), ['exception' => $e]);

@@ -73,6 +73,7 @@ class Direccion extends Model
         'state',
         'country',
         'address_type',
+        'user_id',
     ];
 
     /**

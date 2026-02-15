@@ -189,8 +189,13 @@ const Index = ({ auth, vinos, queryParams = {} }: PageProps<IndexProps>) => {
                                 />
                             </>
                         ) : (
-                            <div className="mt-10 text-center text-gray-500">
-                                No products found matching your filters.
+                            <div className="flex w-full flex-col gap-6 rounded border border-neutral-200 bg-neutral-50 px-20 py-12 text-left">
+                                <h3 className="heading-5xl-regular text-neutral-900">
+                                    Sorry, we couldn't find any products
+                                </h3>
+                                <p className="font-xl-regular text-neutral-700">
+                                    Try a different combination of the filters.
+                                </p>
                             </div>
                         )}
                     </div>

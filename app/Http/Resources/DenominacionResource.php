@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Http\Resources\BodegaResource;
 
 class DenominacionResource extends JsonResource
 {
@@ -20,6 +21,9 @@ class DenominacionResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'blocked' => $this->blocked,
+            'bodegas' => BodegaResource::collection($this->whenLoaded('bodegas')),
+            'bodegas_count' => $this->bodegas_count,
+            'vinos_count' => $this->vinos_count,
             'created_at' => $this->created_at->format('Y-m-d H:i:s'),
         ];
     }

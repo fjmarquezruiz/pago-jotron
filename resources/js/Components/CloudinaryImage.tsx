@@ -20,6 +20,11 @@ export function CloudinaryImage({
     const getFormattedSrc = (url: string) => {
         if (!url) return fallbackImage;
 
+        // Si es una URL absoluta (http/https), devolverla tal cual
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            return url;
+        }
+
         if (url.startsWith(CLOUDINARY_BASE_URL)) {
             // Extraer la parte después de "/upload/"
             const path = url.replace(CLOUDINARY_BASE_URL, "");
@@ -36,6 +41,11 @@ export function CloudinaryImage({
 
     const generateSrcSet = () => {
         if (!src || hasError) return "";
+
+        // Si es una URL absoluta, no generamos srcset de Cloudinary
+        if (src.startsWith("http://") || src.startsWith("https://")) {
+            return "";
+        }
 
         const SIZES = [320, 480, 800, 1200];
 

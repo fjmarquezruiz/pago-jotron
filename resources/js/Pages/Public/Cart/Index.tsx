@@ -66,7 +66,8 @@ const Index = ({ auth }: PageProps) => {
             <HeroSection
                 auth={auth}
                 section="The cart"
-                title="The cart best wines of Andalusia"
+                title="The cart"
+                text="The cart best wines of Andalusia"
             />
             <div className="container mx-auto px-5 pb-32 pt-12">
                 <div className="mx-auto flex max-w-7xl gap-6 lg:grid lg:grid-cols-12 lg:gap-6">
@@ -169,9 +170,12 @@ const Index = ({ auth }: PageProps) => {
                                                                     </Link>
                                                                     {item.description && (
                                                                         <p className="font-sm-normal text-neutral-800">
-                                                                            {
-                                                                                item.description
-                                                                            }
+                                                                            {item
+                                                                                .description
+                                                                                .length >
+                                                                            125
+                                                                                ? `${item.description.slice(0, 125)}...`
+                                                                                : item.description}
                                                                         </p>
                                                                     )}
                                                                 </div>
@@ -187,7 +191,7 @@ const Index = ({ auth }: PageProps) => {
                                                         className={`min-w-28 px-3 text-right ${TableCellClasses}`}
                                                     >
                                                         <p className="font-base-bold pt-2 text-neutral-900">
-                                                            {parseFloat(
+                                                            {Number(
                                                                 item.price,
                                                             ).toFixed(2)}{" "}
                                                             &euro;{" "}

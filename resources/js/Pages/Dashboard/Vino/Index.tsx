@@ -64,6 +64,9 @@ const Index = ({ vinos }: { vinos: PaginatedData<Vino> }) => {
                             <th scope="col" className={tableTHClasses}>
                                 winery
                             </th>
+                            <th scope="col" className={tableTHClasses}>
+                                denomination
+                            </th>
                             <th
                                 scope="col"
                                 className={`${tableTHClasses} text-right`}
@@ -103,8 +106,37 @@ const Index = ({ vinos }: { vinos: PaginatedData<Vino> }) => {
                                     )}
                                 </td>
                                 <td className={tableTDClasses}>
-                                    {/* Display winery name or "N/A" if not available */}
-                                    {vino.bodega ? vino.bodega.name : "N/A"}
+                                    {/* Display winery name as a link or "N/A" if not available */}
+                                    {vino.bodega ? (
+                                        <Link
+                                            href={route(
+                                                "bodega.show",
+                                                vino.bodega.id,
+                                            )}
+                                            className="font-bold text-amber-700 hover:underline dark:text-amber-500"
+                                        >
+                                            {vino.bodega.name}
+                                        </Link>
+                                    ) : (
+                                        "N/A"
+                                    )}
+                                </td>
+                                <td className={tableTDClasses}>
+                                    {vino.denominacion ? (
+                                        <Link
+                                            href={route(
+                                                "denominacion.show",
+                                                vino.denominacion.id,
+                                            )}
+                                            className="text-gray-600 hover:underline dark:text-gray-400"
+                                        >
+                                            {vino.denominacion.name}
+                                        </Link>
+                                    ) : (
+                                        <span className="italic text-gray-400">
+                                            Sin D.O.
+                                        </span>
+                                    )}
                                 </td>
                                 <td className={`${tableTDClasses} text-right`}>
                                     {vino.stock}
@@ -179,7 +211,7 @@ const Index = ({ vinos }: { vinos: PaginatedData<Vino> }) => {
             {/* Pagination controls */}
             <Pagination
                 links={vinos.meta.links}
-                // queryParams={filteredQueryParams} // Uncomment if needed
+            // queryParams={filteredQueryParams} // Uncomment if needed
             />
         </AuthenticatedLayout>
     );

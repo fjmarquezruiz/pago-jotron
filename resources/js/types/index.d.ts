@@ -46,6 +46,8 @@ export type Bodega = {
     province_id: number;
     blocked: boolean;
     denominaciones: Denominacion[];
+    vinos?: import('./vino').Vino[];
+    vinos_count?: number;
     created_at: string;
 }
 
@@ -63,6 +65,10 @@ export type Denominacion = {
     id: number;
     name: string;
     blocked: boolean;
+    bodegas?: Bodega[];
+    bodegas_count?: number;
+    vinos_count?: number;
+    created_at?: string;
 }
 
 export type Categoria = {
@@ -74,6 +80,8 @@ export type Categoria = {
 export interface Uva {
     id: number;
     name: string;
+    vinos?: import('./vino').Vino[];
+    vinos_count?: number;
     created_at: string;
     updated_at: string;
     pivot: {

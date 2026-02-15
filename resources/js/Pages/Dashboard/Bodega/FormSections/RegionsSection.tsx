@@ -4,7 +4,8 @@ import InputLabel from "@/Components/InputLabel";
 import InputError from "@/Components/InputError";
 import SecondaryButton from "@/Components/SecondaryButton";
 import Toast from "@/Components/Forms/Toast";
-import { IconTrash } from "@tabler/icons-react";
+import { Link } from "@inertiajs/react";
+import { IconTrash, IconMap } from "@tabler/icons-react";
 import { dangerButton, primaryButton } from "@/styles";
 
 /**
@@ -21,32 +22,48 @@ import { dangerButton, primaryButton } from "@/styles";
  */
 const RegionsSection = ({
     data, // Object containing the current state of the bodega data
-    onChange = () => {}, // Callback function to update the bodega data
+    onChange = () => { }, // Callback function to update the bodega data
     errors = {}, // Object containing any validation errors
     preview = false, // Boolean indicating whether the component should render in preview mode
 }: BodegaSectionProps) => {
-    const LABEL = "Origin denominations";
+    const LABEL = "Denominations";
 
     // If in preview mode, render a simplified view of the denominaciones
     if (preview) {
         return (
-            <div className="flex flex-col gap-1.5">
-                <p className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <div className="flex flex-col gap-6">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200">
                     {LABEL}
-                </p>
+                </h3>
                 {data.denominaciones?.length === 0 ? (
-                    <p className="mt-1.5 block w-full text-lg font-semibold">
-                        No origin denominations added.
+                    <p className="text-sm text-gray-500">
+                        No hay denominaciones registradas para esta bodega actualmente.
                     </p>
                 ) : (
-                    data.denominaciones?.map((denominacion) => (
-                        <p
-                            key={denominacion.id}
-                            className="mt-1.5 block w-full text-lg font-semibold"
-                        >
-                            {denominacion.name}
-                        </p>
-                    ))
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {data.denominaciones?.map((denominacion) => (
+                            <Link
+                                key={denominacion.id}
+                                href={route(
+                                    "denominacion.show",
+                                    denominacion.id,
+                                )}
+                                className="group flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-4 transition-all hover:border-amber-500 hover:shadow-md dark:border-gray-700 dark:bg-gray-900 dark:hover:border-amber-500"
+                            >
+                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-amber-600 group-hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-500 dark:group-hover:bg-amber-900/30">
+                                    <IconMap className="size-6" />
+                                </div>
+                                <div className="flex-1">
+                                    <h4 className="font-bold text-gray-800 dark:text-gray-200 group-hover:text-amber-700 dark:group-hover:text-amber-500">
+                                        {denominacion.name}
+                                    </h4>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        {denominacion.vinos_count ?? 0} vinos registrados
+                                    </p>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
                 )}
             </div>
         );
@@ -74,13 +91,13 @@ const RegionsSection = ({
         transformedDenominaciones.length > 0
             ? transformedDenominaciones
             : [
-                  {
-                      id: 0,
-                      name: "",
-                      blocked: false,
-                      created_at: new Date().toISOString(),
-                  },
-              ],
+                {
+                    id: 0,
+                    name: "",
+                    blocked: false,
+                    created_at: new Date().toISOString(),
+                },
+            ],
     );
 
     // Fetch denominaciones from the server on component mount
@@ -90,15 +107,15 @@ const RegionsSection = ({
                 const response = await fetch("/api/denominaciones");
                 if (!response.ok) {
                     throw new Error(
-                        `Error fetching origin denominations: ${response.statusText}`,
+                        `Error fetching denominations: ${response.statusText}`,
                     );
                 }
                 const denominacionesDataFetch = await response.json();
                 setDenominaciones(denominacionesDataFetch.data);
             } catch (err) {
-                console.error("Error fetching origin denominations:", err);
+                console.error("Error fetching denominations:", err);
                 setFetchError(
-                    "Failed to load origin denominations. Please try again later.",
+                    "Failed to load denominations. Please try again later.",
                 );
             } finally {
                 setLoading(false);
@@ -120,7 +137,7 @@ const RegionsSection = ({
     }, [regions]);
 
     // Update effectively saveDisabled.
-    useEffect(() => {}, [saveDisabled]);
+    useEffect(() => { }, [saveDisabled]);
 
     // Function to add a new denominacion
     const handleAddRow = () => {
@@ -149,7 +166,7 @@ const RegionsSection = ({
             onChange("denominaciones", []);
             setToastMessage("Action performed successfully!"); // Show toast message
         } else {
-            console.error("Invalid origin denominations data");
+            console.error("Invalid denominations data");
         }
     };
 
@@ -224,13 +241,12 @@ const RegionsSection = ({
                                         .text,
                                 );
                             }}
-                            className={`col-span-2 block w-full resize-none rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 sm:col-span-4 ${
-                                errors.denominaciones ? "border-red-500" : "" // Add red border if there's an error
-                            } dark:border-gray-700 dark:bg-gray-800 dark:text-gray-50`}
+                            className={`col-span-2 block w-full resize-none rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 sm:col-span-4 ${errors.denominaciones ? "border-red-500" : "" // Add red border if there's an error
+                                } dark:border-gray-700 dark:bg-gray-800 dark:text-gray-50`}
                             aria-label={`grape-${index}`}
                         >
                             <option value={0}>
-                                Select origin denomination
+                                Select denomination
                             </option>
                             {denominaciones.map((denominacion) => (
                                 <option

@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Http\Resources\VinoResource;
 
 class BodegaResource extends JsonResource
 {
@@ -25,15 +26,15 @@ class BodegaResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $denominaciones = $this->denominaciones;
-
         return [
             'id' => $this->id,
             'name' => $this->name,
             'city' => $this->city,
             'province' => $this->province,
             'blocked' => $this->blocked,
-            'denominaciones' => $denominaciones,
+            'denominaciones' => DenominacionResource::collection($this->whenLoaded('denominaciones')),
+            'vinos' => VinoResource::collection($this->whenLoaded('vinos')),
+            'vinos_count' => $this->vinos_count,
             'created_at' => $this->created_at->format('Y-m-d H:i:s'),
         ];
     }

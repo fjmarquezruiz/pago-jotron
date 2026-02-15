@@ -21,7 +21,7 @@ class UvaController extends Controller
     {
         // Retrieve paginated list of UVAs with a configurable pagination limit
         $paginationLimit = config('settings.pagination_limit', 15); // Configurable pagination limit
-        $paginated = Uva::latest()->paginate($paginationLimit);
+        $paginated = Uva::withCount('vinos')->latest()->paginate($paginationLimit);
 
         // Render the Inertia.js component with the paginated UVAs
         return Inertia::render('Dashboard/Uva/Index', [
@@ -56,7 +56,8 @@ class UvaController extends Controller
 
             // Redirect to the UVA index page with a success message
             return Redirect::route('uva.index')->with('success', 'Uva created successfully.');
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             // Log the error and redirect back with an error message
             Log::error('Failed to create uva: ' . $e->getMessage(), ['exception' => $e]);
             return Redirect::back()->with('error', 'Failed to create uva. ' . $e->getMessage());
@@ -73,7 +74,7 @@ class UvaController extends Controller
     {
         // Render the Inertia.js component to show the details of a specific UVA
         return Inertia::render('Dashboard/Uva/Show', [
-            'uva' => new UvaResource($uva)
+            'uva' => new UvaResource($uva->load(['vinos.bodega', 'vinos.denominacion', 'vinos.categoria']))
         ]);
     }
 
@@ -108,7 +109,8 @@ class UvaController extends Controller
 
             // Redirect to the UVA index page with a success message
             return Redirect::route('uva.index')->with('success', 'Uva updated successfully.');
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             // Log the error and redirect back with an error message
             Log::error('Failed to update uva: ' . $e->getMessage(), ['exception' => $e]);
             return Redirect::back()->with('error', 'Failed to update uva.');
@@ -130,7 +132,8 @@ class UvaController extends Controller
 
             // Redirect to the UVA index page with a success message
             return Redirect::route('uva.index')->with('success', 'Uva deleted successfully.');
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             // Log the error and redirect back with an error message
             Log::error('Failed to delete uva: ' . $e->getMessage(), ['exception' => $e]);
             return Redirect::back()->with('error', 'Failed to delete uva.');

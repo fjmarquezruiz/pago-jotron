@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { VinoOption, VinoSectionProps } from "@/types/vino";
 import SelectField from "@/Components/Forms/SelectField";
 import PreviewField from "@/Components/Forms/PreviewField";
+import { Link } from "@inertiajs/react";
 
 /**
  * A component that renders the details section for a wine.
@@ -12,7 +13,7 @@ import PreviewField from "@/Components/Forms/PreviewField";
  */
 const DetailsSection = ({
     data, // Object containing the current state of the wine data
-    onChange = () => {}, // Callback function to update the wine data
+    onChange = () => { }, // Callback function to update the wine data
     errors = {}, // Object containing any validation errors
     disabled = false, // Boolean indicating whether the input fields should be disabled
     preview = false, // Boolean indicating whether the component should render in preview mode
@@ -22,10 +23,41 @@ const DetailsSection = ({
         return (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {/* Preview field for the winery name */}
-                <PreviewField label="Winery" data={data.bodega?.name} />
+                <PreviewField
+                    label="Winery"
+                    data={
+                        data.bodega ? (
+                            <Link
+                                href={route("bodega.show", data.bodega.id)}
+                                className="text-amber-700 hover:underline dark:text-amber-500"
+                            >
+                                {data.bodega.name}
+                            </Link>
+                        ) : (
+                            "No data available"
+                        )
+                    }
+                />
 
                 {/* Preview field for the origin name */}
-                <PreviewField label="Origin" data={data.denominacion?.name} />
+                <PreviewField
+                    label="Denomination"
+                    data={
+                        data.denominacion ? (
+                            <Link
+                                href={route(
+                                    "denominacion.show",
+                                    data.denominacion.id,
+                                )}
+                                className="text-amber-700 hover:underline dark:text-amber-500"
+                            >
+                                {data.denominacion.name}
+                            </Link>
+                        ) : (
+                            "No data available"
+                        )
+                    }
+                />
             </div>
         );
     }

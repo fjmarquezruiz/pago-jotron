@@ -26,7 +26,7 @@ class VinoController extends Controller
     public function index()
     {
         $paginationLimit = config('settings.pagination_limit', 15); // Configurable pagination limit
-        $paginated = Vino::with('uvas')->latest()->paginate($paginationLimit); // Eager load relationships
+        $paginated = Vino::with(['uvas', 'bodega', 'denominacion', 'categoria'])->latest()->paginate($paginationLimit); // Eager load relationships
 
         return Inertia::render('Dashboard/Vino/Index', [
             'vinos' => VinoResource::collection($paginated)
@@ -59,7 +59,8 @@ class VinoController extends Controller
             $this->handleVinoUvas($vino, $uvaData);
 
             return Redirect::route('vino.index')->with('success', 'Vino created successfully.');
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             Log::error('Failed to create vino: ' . $e->getMessage(), ['exception' => $e]);
             return Redirect::back()->with('error', 'Failed to create vino. ' . $e->getMessage());
         }
@@ -68,14 +69,14 @@ class VinoController extends Controller
     public function show(Vino $vino)
     {
         return Inertia::render('Dashboard/Vino/Show', [
-            'vino' => new VinoResource($vino)
+            'vino' => new VinoResource($vino->load(['uvas', 'bodega', 'denominacion', 'categoria']))
         ]);
     }
 
     public function edit(Vino $vino)
     {
         return Inertia::render('Dashboard/Vino/Edit', [
-            'vino' => new VinoResource($vino)
+            'vino' => new VinoResource($vino->load(['uvas', 'bodega', 'denominacion', 'categoria']))
         ]);
     }
 
@@ -93,7 +94,8 @@ class VinoController extends Controller
             $vino->update($validatedData);
 
             return Redirect::route('vino.index')->with('success', 'Vino updated successfully.');
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             Log::error('Failed to update vino: ' . $e->getMessage(), ['exception' => $e]);
             return Redirect::back()->with('error', 'Failed to update vino.');
         }
@@ -108,7 +110,8 @@ class VinoController extends Controller
             $vino->delete();
 
             return Redirect::route('vino.index')->with('success', 'Vino deleted successfully.');
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             Log::error('Failed to delete vino: ' . $e->getMessage(), ['exception' => $e]);
             return Redirect::back()->with('error', 'Failed to delete vino.');
         }
@@ -124,7 +127,8 @@ class VinoController extends Controller
             $vino->update(['blocked' => $validatedData['blocked']]);
 
             return Redirect::route('vino.index')->with('success', 'Vino blocked status updated successfully.');
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             Log::error('Failed to update vino blocked status: ' . $e->getMessage(), ['exception' => $e]);
             return Redirect::back()->with('error', 'Failed to update vino blocked status.');
         }
@@ -146,7 +150,8 @@ class VinoController extends Controller
             $imageData = $this->cloudinaryService->uploadImage($request->file('image')->getRealPath());
             $validatedData['image_url'] = $imageData['url'];
             $validatedData['public_id'] = $imageData['public_id'];
-        } elseif ($request->has('image_url') && $request->input('image_url') === '') {
+        }
+        elseif ($request->has('image_url') && $request->input('image_url') === '') {
             if ($vino && $vino->public_id) {
                 $this->cloudinaryService->deleteImage($vino->public_id);
             }
@@ -181,7 +186,8 @@ class VinoController extends Controller
 
             // Commit the transaction
             DB::commit();
-        } catch (\Exception $e) {
+        }
+        catch (\Exception $e) {
             // Rollback the transaction if something went wrong
             DB::rollBack();
             Log::error('Failed to create save vino_uvas: ' . $e->getMessage(), ['exception' => $e]);
@@ -194,9 +200,9 @@ class VinoController extends Controller
         // Get related products from same winery or denomination (up to 10)
         $relatedProducts = Vino::where('id', '!=', $vino->id)
             ->where(function ($query) use ($vino) {
-                $query->where('bodega_id', $vino->bodega_id)
-                    ->orWhere('denominacion_id', $vino->denominacion_id);
-            })
+            $query->where('bodega_id', $vino->bodega_id)
+                ->orWhere('denominacion_id', $vino->denominacion_id);
+        })
             ->with(['denominacion', 'categoria', 'bodega'])
             ->inRandomOrder()
             ->take(10)
@@ -221,7 +227,7 @@ class VinoController extends Controller
     }
 
 
-    public function relatedWines(Int $vinoId)
+    public function relatedWines(int $vinoId)
     {
         // Get related products from same winery or denomination (up to 10)
         $relatedProducts = Vino::where('id', '!=', $vinoId)

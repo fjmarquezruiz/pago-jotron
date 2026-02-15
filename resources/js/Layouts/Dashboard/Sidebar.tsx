@@ -1,6 +1,7 @@
 import DividerFields from "@/Components/Forms/DividerFields";
 import NavLinkIcon from "@/Components/NavLinkIcon";
 import { can } from "@/helpers";
+import { User, PageProps } from "@/types";
 import { Link, usePage } from "@inertiajs/react";
 import {
     IconBarrel,
@@ -28,7 +29,7 @@ const menuItems = [
     { icon: IconBarrel, label: "Wineries", routeName: "bodega.index" },
     {
         icon: IconMap,
-        label: "Origin denominations",
+        label: "Denominations",
         routeName: "denominacion.index",
     },
     { icon: IconGlassFull, label: "Grapes", routeName: "uva.index" },
@@ -84,7 +85,7 @@ export default function Sidebar({
     toggleSidebar,
     currentPath,
 }: SidebarProps) {
-    const user = usePage().props.auth.user;
+    const user = usePage<PageProps>().props.auth.user;
     return (
         <>
             {isMobile && isOpen && (
@@ -96,15 +97,13 @@ export default function Sidebar({
             )}
 
             <aside
-                className={`border-r border-gray-200 bg-white text-gray-900 transition-all duration-300 ease-in-out dark:border-gray-700 dark:bg-gray-800 dark:text-white ${
-                    isOpen ? "w-72" : isMobile ? "w-0" : "w-20"
-                } ${
-                    isMobile
+                className={`border-r border-gray-200 bg-white text-gray-900 transition-all duration-300 ease-in-out dark:border-gray-700 dark:bg-gray-800 dark:text-white ${isOpen ? "w-72" : isMobile ? "w-0" : "w-20"
+                    } ${isMobile
                         ? isOpen
                             ? "fixed inset-y-0 left-0 z-30"
                             : "fixed inset-y-0 -left-72 z-30"
                         : ""
-                }`}
+                    }`}
             >
                 <div className="flex h-16 flex-shrink-0 items-center justify-between overflow-hidden border-b border-gray-200 p-4 dark:border-gray-700 sm:px-6">
                     <h1
@@ -124,9 +123,8 @@ export default function Sidebar({
                     )}
                 </div>
                 <nav
-                    className={`flex flex-1 flex-col gap-6 py-4 ${isOpen ? "overflow-y-auto" : "overflow-hidden"} ${
-                        isOpen ? (isMobile ? "px-4" : "px-6") : "px-4"
-                    }`}
+                    className={`flex flex-1 flex-col gap-6 py-4 ${isOpen ? "overflow-y-auto" : "overflow-hidden"} ${isOpen ? (isMobile ? "px-4" : "px-6") : "px-4"
+                        }`}
                 >
                     <ul className="flex flex-col gap-1">
                         {menuItems.map((item, index) => (

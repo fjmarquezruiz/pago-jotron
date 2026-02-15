@@ -12,16 +12,17 @@ interface NewsCard {
 }
 
 interface ProductsSliderProps {
+    title?: string;
     news: { data: NewsCard[] };
 }
 
-const RelatedNews = ({ news }: ProductsSliderProps) => {
+const RelatedNews = ({ title = "Last news", news }: ProductsSliderProps) => {
     return (
         <div className="w-full bg-neutral-50">
             <section className="container mx-auto max-w-7xl px-5 py-16 xl:px-0">
                 <div className="flex flex-col gap-12">
                     <div className="flex items-baseline justify-between">
-                        <h2 className="heading-3xl-bold">Last news</h2>
+                        <h2 className="heading-3xl-bold">{title}</h2>
                         <Link
                             href={route("shop")}
                             className="font-sm-semibold text-neutral-600 hover:underline"

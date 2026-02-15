@@ -19,7 +19,7 @@ class DenominacionController extends Controller
      */
     public function index()
     {
-        $paginated = Denominacion::latest()->paginate();
+        $paginated = Denominacion::withCount(['bodegas', 'vinos'])->latest()->paginate();
 
         return Inertia::render('Dashboard/Denominacion/Index', [
             'denominaciones' => DenominacionResource::collection($paginated)
@@ -45,7 +45,8 @@ class DenominacionController extends Controller
             Denominacion::create($validatedData);
 
             return Redirect::route('denominacion.index')->with('success', 'Origin denomination created successfully.');
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             Log::error('Failed to create origin denomination: ' . $e->getMessage(), ['exception' => $e]);
             return Redirect::back()->with('error', 'Failed to create origin denomination. ' . $e->getMessage());
         }
@@ -57,7 +58,7 @@ class DenominacionController extends Controller
     public function show(Denominacion $denominacion)
     {
         return Inertia::render('Dashboard/Denominacion/Show', [
-            'denominacion' => new DenominacionResource($denominacion)
+            'denominacion' => new DenominacionResource($denominacion->load('bodegas'))
         ]);
     }
 
@@ -84,7 +85,8 @@ class DenominacionController extends Controller
 
             // Redirect to the Denominacion index page with a success message
             return Redirect::route('denominacion.index')->with('success', 'Origin denomination updated successfully.');
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             // Log the error and redirect back with an error message
             Log::error('Failed to update origin denomination: ' . $e->getMessage(), ['exception' => $e]);
             return Redirect::back()->with('error', 'Failed to update origin denomination.');
@@ -102,7 +104,8 @@ class DenominacionController extends Controller
 
             // Redirect to the Denominacion index page with a success message
             return Redirect::route('denominacion.index')->with('success', 'Origin denomination deleted successfully.');
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             // Log the error and redirect back with an error message
             Log::error('Failed to delete origin denomination: ' . $e->getMessage(), ['exception' => $e]);
             return Redirect::back()->with('error', 'Failed to delete origin denomination.');

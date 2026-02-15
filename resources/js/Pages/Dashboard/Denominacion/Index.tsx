@@ -30,20 +30,20 @@ export default function Index({
             header={
                 <>
                     <h2 className="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">
-                        Origin denominations
+                        Denominations
                     </h2>
                     <Link
                         href={route("denominacion.create")}
                         className={primaryButton}
-                        aria-label="Create new origin denomination"
-                        title="Create new origin denomination"
+                        aria-label="Create new denomination"
+                        title="Create new denomination"
                     >
-                        Create new origin denomination
+                        Create new denomination
                     </Link>
                 </>
             }
         >
-            <Head title="Origin denominations" />
+            <Head title="Denominations" />
 
             {/* <pre>{typeof denominaciones}</pre>
             <pre>{JSON.stringify(denominaciones, undefined, 2)}</pre> */}
@@ -66,6 +66,12 @@ export default function Index({
                             </th>
                             <th scope="col" className={tableTHClasses}>
                                 name
+                            </th>
+                            <th scope="col" className={tableTHClasses}>
+                                wineries
+                            </th>
+                            <th scope="col" className={tableTHClasses}>
+                                total wines
                             </th>
 
                             <th
@@ -91,8 +97,8 @@ export default function Index({
                                                     denominacion.id,
                                                 )}
                                                 className="hover:underline"
-                                                aria-label={`View origin denomination ${denominacion.name}`}
-                                                title={`View origin denomination ${denominacion.name}`}
+                                                aria-label={`View denomination ${denominacion.name}`}
+                                                title={`View denomination ${denominacion.name}`}
                                             >
                                                 {denominacion.name}
                                             </Link>{" "}
@@ -100,10 +106,17 @@ export default function Index({
                                                 <Badge
                                                     label="Blocked"
                                                     status="error"
+                                                    className="ml-2"
                                                 />
                                             ) : (
                                                 <></>
                                             )}
+                                        </td>
+                                        <td className={tableTDClasses}>
+                                            {denominacion.bodegas_count ?? 0}
+                                        </td>
+                                        <td className={tableTDClasses}>
+                                            {denominacion.vinos_count ?? 0}
                                         </td>
 
                                         <td
@@ -117,8 +130,8 @@ export default function Index({
                                                         denominacion.id,
                                                     )}
                                                     className={`${tableButtonClasses}`}
-                                                    aria-label={`View origin denomination ${denominacion.name}`}
-                                                    title={`View origin denomination ${denominacion.name}`}
+                                                    aria-label={`View denomination ${denominacion.name}`}
+                                                    title={`View denomination ${denominacion.name}`}
                                                 >
                                                     <IconEye
                                                         stroke={1.5}
@@ -132,8 +145,8 @@ export default function Index({
                                                         denominacion.id,
                                                     )}
                                                     className={`${tableButtonClasses}`}
-                                                    aria-label={`Edit origin denomination ${denominacion.name}`}
-                                                    title={`Edit origin denomination ${denominacion.name}`}
+                                                    aria-label={`Edit denomination ${denominacion.name}`}
+                                                    title={`Edit denomination ${denominacion.name}`}
                                                 >
                                                     <IconEdit
                                                         stroke={1.5}
@@ -148,8 +161,8 @@ export default function Index({
                                                     )}
                                                     method="delete"
                                                     className={`${tableButtonClasses}`}
-                                                    aria-label={`Delete origin denomination ${denominacion.name}`}
-                                                    title={`Delete origin denomination ${denominacion.name}`}
+                                                    aria-label={`Delete denomination ${denominacion.name}`}
+                                                    title={`Delete denomination ${denominacion.name}`}
                                                 >
                                                     <IconTrash
                                                         stroke={1.5}
@@ -169,8 +182,8 @@ export default function Index({
             {/* Pagination controls */}
             <Pagination
                 links={denominaciones.meta.links}
-                // queryParams={filteredQueryParams} // Uncomment if needed
+            // queryParams={filteredQueryParams} // Uncomment if needed
             />
-        </AuthenticatedLayout>
+        </AuthenticatedLayout >
     );
 }

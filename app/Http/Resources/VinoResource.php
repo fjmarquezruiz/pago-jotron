@@ -30,43 +30,41 @@ class VinoResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        // Initialize related resources if they exist, otherwise set to null
-        $bodega = $this->bodega ? new BodegaResource($this->bodega) : null;
-        $denominacion = $this->denominacion ? new DenominacionResource($this->denominacion) : null;
-        $categoria = $this->categoria ? new CategoriaResource($this->categoria) : null;
-
-        // Include uvas relationship
-        $uvas = $this->uvas;
-
         // Return an array representation of the Vino resource
         return [
-            'id' => $this->id, // Unique identifier for the vino
-            'name' => $this->name, // Name of the vino
-            'price' => $this->price, // Price of the vino
-            'stock' => $this->stock, // Available stock quantity
-            'vintage_year' => $this->vintage_year, // Vintage year of the vino
-            'image_url' => $this->image_url, // URL to the image of the vino
-            'description' => $this->description, // Description of the vino
-            'visual' => $this->visual, // Visual characteristics of the vino
-            'aromas' => $this->aromas, // Aromas detected in the vino
-            'taste' => $this->taste, // Taste profile of the vino
-            'capacity' => $this->capacity, // Bottle capacity of the vino
-            'minimum_temperature' => $this->minimum_temperature, // Minimum serving temperature
-            'maximum_temperature' => $this->maximum_temperature, // Maximum serving temperature
-            'alcohol' => $this->alcohol, // Alcohol content of the vino
-            'food_pairing' => $this->food_pairing, // Suggested food pairings
-            'blocked' => $this->blocked, // Whether the vino is blocked or not
-            'bodega' => $bodega, // Full Bodega resource
-            'categoria' => $categoria, // Full Categoria resource
-            'denominacion' => $denominacion, // Full Denominacion resource
-            'bodega_name' => optional($bodega)->name, // Name of the bodega
-            'denominacion_name' => optional($denominacion)->name, // Name of the denominacion
-            'categoria_name' => optional($categoria)->name, // Name of the categoria
-            'bodega_id' => optional($bodega)->id, // ID of the bodega
-            'denominacion_id' => optional($denominacion)->id, // ID of the denominacion
-            'categoria_id' => optional($categoria)->id, // ID of the categoria
-            'uvas' => $uvas, // Include the uvas relationship
-            'created_at' => $this->created_at->format('Y-m-d H:i:s'), // Creation timestamp of the vino record
+            'id' => $this->id,
+            'name' => $this->name,
+            'price' => $this->price,
+            'stock' => $this->stock,
+            'vintage_year' => $this->vintage_year,
+            'image_url' => $this->image_url,
+            'description' => $this->description,
+            'visual' => $this->visual,
+            'aromas' => $this->aromas,
+            'taste' => $this->taste,
+            'capacity' => $this->capacity,
+            'minimum_temperature' => $this->minimum_temperature,
+            'maximum_temperature' => $this->maximum_temperature,
+            'alcohol' => $this->alcohol,
+            'food_pairing' => $this->food_pairing,
+            'blocked' => $this->blocked,
+
+            // Relationships - Use whenLoaded to prevent N+1 and recursion
+            'bodega' => new BodegaResource($this->whenLoaded('bodega')),
+            'categoria' => new CategoriaResource($this->whenLoaded('categoria')),
+            'denominacion' => new DenominacionResource($this->whenLoaded('denominacion')),
+            'uvas' => UvaResource::collection($this->whenLoaded('uvas')),
+
+            // Legacy name/id fields for convenience
+            'bodega_name' => $this->bodega ? $this->bodega->name : null,
+            'denominacion_name' => $this->denominacion ? $this->denominacion->name : null,
+            'categoria_name' => $this->categoria ? $this->categoria->name : null,
+            'bodega_id' => $this->bodega_id,
+            'denominacion_id' => $this->denominacion_id,
+            'categoria_id' => $this->categoria_id,
+
+            'pivot' => $this->pivot,
+            'created_at' => $this->created_at->format('Y-m-d H:i:s'),
         ];
     }
 }

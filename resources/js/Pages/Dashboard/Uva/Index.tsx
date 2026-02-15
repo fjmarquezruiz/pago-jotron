@@ -66,6 +66,9 @@ export default function Index({
                             <th scope="col" className={tableTHClasses}>
                                 name
                             </th>
+                            <th scope="col" className={tableTHClasses}>
+                                wines
+                            </th>
 
                             <th
                                 scope="col"
@@ -89,6 +92,9 @@ export default function Index({
                                         >
                                             {uva.name}
                                         </Link>
+                                    </td>
+                                    <td className={tableTDClasses}>
+                                        {uva.vinos_count ?? 0}
                                     </td>
 
                                     <td
@@ -147,7 +153,7 @@ export default function Index({
             {/* Pagination controls */}
             <Pagination
                 links={uvas.meta.links}
-                // queryParams={filteredQueryParams} // Uncomment if needed
+            // queryParams={filteredQueryParams} // Uncomment if needed
             />
         </AuthenticatedLayout>
     );

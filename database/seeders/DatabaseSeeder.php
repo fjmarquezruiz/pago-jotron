@@ -69,7 +69,7 @@ class DatabaseSeeder extends Seeder
             'last_name' => 'Admin User',
             'date_of_birth' => $eighteenYearsAgo,
             'email' => 'admin@example.com',
-            'password' => '$2y$12$itWKfFj16snyc5fa5xwtsucW4ySUDNLdDMjD2zSb.uNSMhLzBs3p2',
+            'password' => \Illuminate\Support\Facades\Hash::make('1234'),
         ])->assignRole(RolesEnum::Admin);
 
         User::factory()->create([
@@ -96,7 +96,18 @@ class DatabaseSeeder extends Seeder
             'password' => '$2y$12$ESTL568UFvhLmbwkUHw0YuQqpoM.TRpXrm0c9wOY4hmcfO75/wa/q',
         ])->assignRole(RolesEnum::User);
 
-        // // Create features fake data
+        // Create features fake data
         Feature::factory(100)->create();
+
+        // Seed domain data
+        $this->call([
+            DireccionSeeder::class ,
+            CategoriaSeeder::class ,
+            DenominacionSeeder::class ,
+            BodegaSeeder::class ,
+            UvaSeeder::class ,
+            VinoSeeder::class ,
+            OrderSeeder::class ,
+        ]);
     }
 }

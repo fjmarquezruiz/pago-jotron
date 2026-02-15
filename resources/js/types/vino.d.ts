@@ -26,6 +26,11 @@ export type Vino = {
     denominacion?: Denominacion;
     categoria?: Categoria;
     uvas?: Uva[];
+    pivot?: {
+        uva_id: number;
+        vino_id: number;
+        percent: number;
+    };
     created_at: string;
     updated_at: string;
 }

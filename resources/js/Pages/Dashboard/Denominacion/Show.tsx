@@ -43,6 +43,43 @@ const Show = ({ denominacion }: { denominacion: Denominacion }) => {
                         <BasicInfoSection data={denominacion} preview={true} />
                         <DividerFields />
 
+                        {/* Wineries Section */}
+                        <section className="flex flex-col gap-6">
+                            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200">
+                                Wineries in this area
+                            </h3>
+                            {denominacion.bodegas &&
+                                denominacion.bodegas.length > 0 ? (
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                    {denominacion.bodegas.map((bodega) => (
+                                        <Link
+                                            key={bodega.id}
+                                            href={route(
+                                                "bodega.show",
+                                                bodega.id,
+                                            )}
+                                            className="group flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-4 transition-all hover:border-amber-500 hover:shadow-md dark:border-gray-700 dark:bg-gray-900 dark:hover:border-amber-500"
+                                        >
+                                            <div className="flex-1">
+                                                <h4 className="font-bold text-gray-800 dark:text-gray-200 group-hover:text-amber-700 dark:group-hover:text-amber-500">
+                                                    {bodega.name}
+                                                </h4>
+                                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                                    {bodega.city},{" "}
+                                                    {bodega.province}
+                                                </p>
+                                            </div>
+                                        </Link>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-gray-500">
+                                    No wineries registered in this area yet.
+                                </p>
+                            )}
+                        </section>
+                        <DividerFields />
+
                         {/* Action Buttons */}
                         <div className="flex items-center gap-4">
                             <Link

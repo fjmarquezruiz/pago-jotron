@@ -10,14 +10,41 @@ import { Vino } from "@/types/vino";
 import { Head, Link } from "@inertiajs/react";
 import { IconMinus, IconPlus } from "@tabler/icons-react";
 import { useState } from "react";
+import RelatedNews from "../Home/RelatedNews";
+import WinesSlider from "../Home/WinesSlider";
 import HeroSection from "../Layout/HeroSection";
-import { RelatedProductsSlider } from "./RelatedProductsSlider";
 
 interface DetailProps extends PageProps {
     vino?: Vino;
     id: number;
     relatedProducts: Vino[];
 }
+
+const LAST_NEWS = {
+    data: [
+        {
+            id: 1,
+            title: "The art of winemaking: tradition and passion in every glass",
+            image: "/v1742150149/bg-our-selection_xklmwt.png",
+            date: "01.11.2024",
+            category: "History",
+        },
+        {
+            id: 2,
+            title: "Exploring the diversity of Malaga wines",
+            image: "/v1742150149/bg-fortified.png",
+            date: "02.11.2024",
+            category: "Wines",
+        },
+        {
+            id: 3,
+            title: "Unveiling the influence of Malaga's terroir on wine",
+            image: "/v1742150446/bg-red-wines_dkxasj.png",
+            date: "03.11.2024",
+            category: "Category",
+        },
+    ],
+};
 
 const Detail = ({ auth, vino, relatedProducts }: PageProps<DetailProps>) => {
     const [quantity, setQuantity] = useState(1);
@@ -161,7 +188,7 @@ const Detail = ({ auth, vino, relatedProducts }: PageProps<DetailProps>) => {
                             </div>
                             <div className="flex flex-col gap-0 text-right">
                                 <p className="heading-6xl-bold whitespace-nowrap text-neutral-900">
-                                    {parseFloat(vino.price).toFixed(2)} &euro;
+                                    {Number(vino.price).toFixed(2)} &euro;
                                 </p>
                                 <p className="text-xs-semibold text-neutral-400">
                                     IVA included
@@ -260,14 +287,14 @@ const Detail = ({ auth, vino, relatedProducts }: PageProps<DetailProps>) => {
                             {vinoTastingNotes.map((note) => (
                                 <div
                                     key={note.label}
-                                    className="grid-span-1 flex flex-col items-center gap-6 text-center"
+                                    className="grid-span-1 flex flex-col items-start gap-6 text-left"
                                 >
                                     <CloudinaryImage
                                         src={
                                             note.image_url || "/placeholder.svg"
                                         }
                                         alt={note.label}
-                                        className="h-[72px] w-[72px] object-contain"
+                                        className="h-[60px] w-[60px] object-contain"
                                     />
                                     <h4 className="heading-xl-bold text-neutral-900">
                                         {note.label}
@@ -283,7 +310,10 @@ const Detail = ({ auth, vino, relatedProducts }: PageProps<DetailProps>) => {
             )}
 
             {/* Related Products Section */}
-            <RelatedProductsSlider products={relatedProducts} />
+            <WinesSlider title="Related products" products={relatedProducts} />
+
+            {/* Latest News Section */}
+            <RelatedNews title="Related news" news={LAST_NEWS} />
         </>
     );
 };

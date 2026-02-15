@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Http\Resources\VinoResource;
 
 /**
  * Class UvaResource
@@ -31,6 +32,9 @@ class UvaResource extends JsonResource
         return [
             'id' => $this->id, // Unique identifier for the uva
             'name' => $this->name, // Name of the uva
+            'vinos' => VinoResource::collection($this->whenLoaded('vinos')),
+            'vinos_count' => $this->vinos_count,
+            'pivot' => $this->pivot,
             'created_at' => $this->created_at->format('Y-m-d H:i:s'), // Creation timestamp of the uva record
             'updated_at' => $this->updated_at->format('Y-m-d H:i:s'), // Update timestamp of the uva record
         ];

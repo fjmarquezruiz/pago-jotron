@@ -2,7 +2,7 @@
 export interface PreviewFieldProps {
     label: string; // The label text for the preview field
     type?: string | number; // Optional type of the data (default: "string")
-    data?: string | number; // The data to be displayed in the preview field
+    data?: React.ReactNode; // The data to be displayed in the preview field
     className?: string; // Optional additional class names for customization
 }
 

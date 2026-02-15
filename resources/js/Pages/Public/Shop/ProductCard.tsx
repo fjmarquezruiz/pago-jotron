@@ -48,7 +48,7 @@ const ProductCard = ({
             </Link>
             <div className="flex flex-col gap-1">
                 <p className="font-base-bold text-gray-900">
-                    {parseFloat(product.price).toFixed(2)} &euro;
+                    {Number(product.price).toFixed(2)} &euro;
                 </p>
 
                 <div className="flex gap-2">

@@ -16,7 +16,7 @@ class DireccionController extends Controller
      */
     public function index()
     {
-        //
+        return DireccionResource::collection(auth()->user()->direcciones);
     }
 
     /**
@@ -24,7 +24,7 @@ class DireccionController extends Controller
      */
     public function create()
     {
-        //
+    //
     }
 
     /**
@@ -34,7 +34,6 @@ class DireccionController extends Controller
     {
         // Validate the request data
         $validatedData = $request->validate([
-            'user_id' => 'required|exists:users,id',
             'address' => 'required|string|max:255',
             'city' => 'required|string|max:255',
             'state' => 'required|string|max:255',
@@ -43,8 +42,8 @@ class DireccionController extends Controller
             'address_type' => 'required|in:Shipping,Billing',
         ]);
 
-        // Create a new direccion
-        $direccion = Direccion::create($validatedData);
+        // Create a new direccion linked to the authenticated user
+        $direccion = $request->user()->direcciones()->create($validatedData);
 
         // Return the created direccion as a resource
         return new DireccionResource($direccion);
@@ -55,6 +54,8 @@ class DireccionController extends Controller
      */
     public function show(Direccion $direccion)
     {
+        $this->authorize('view', $direccion);
+
         // Return the specified direccion as a resource
         return new DireccionResource($direccion);
     }
@@ -64,7 +65,8 @@ class DireccionController extends Controller
      */
     public function edit(Direccion $direccion)
     {
-        //
+        $this->authorize('update', $direccion);
+    //
     }
 
     /**
@@ -72,6 +74,8 @@ class DireccionController extends Controller
      */
     public function update(Request $request, Direccion $direccion)
     {
+        $this->authorize('update', $direccion);
+
         // Validate the request data
         $validatedData = $request->validate([
             'address' => 'nullable|string|max:255',
@@ -94,6 +98,8 @@ class DireccionController extends Controller
      */
     public function destroy(Direccion $direccion)
     {
+        $this->authorize('delete', $direccion);
+
         // Delete the specified direccion
         $direccion->delete();
 
@@ -102,19 +108,13 @@ class DireccionController extends Controller
     }
 
     /**
-     * Get all directions for a specific user.
+     * Get all directions for the authenticated user.
      *
-     * @param  int  $userId
      * @return JsonResponse
      */
-    public function getAllDirectionsForUser(int $userId): JsonResponse
+    public function getAllDirectionsForUser(): JsonResponse
     {
-        // Find the user by ID
-        $user = User::find($userId);
-
-        if (!$user) {
-            return response()->json(['message' => 'User not found'], 404);
-        }
+        $user = auth()->user();
 
         // Retrieve all directions for the user
         $direccionesData = $user->direcciones;
@@ -124,19 +124,13 @@ class DireccionController extends Controller
     }
 
     /**
-     * Get the main shipping direction for a specific user.
+     * Get the main shipping direction for the authenticated user.
      *
-     * @param  int  $userId
      * @return JsonResponse
      */
-    public function getMainShippingDirectionForUser(int $userId): JsonResponse
+    public function getMainShippingDirectionForUser(): JsonResponse
     {
-        // Find the user by ID
-        $user = User::find($userId);
-
-        if (!$user) {
-            return response()->json(['message' => 'User not found'], 404);
-        }
+        $user = auth()->user();
 
         // Retrieve the main shipping direction for the user
         $mainShippingDirection = $user->direcciones()->where('address_type', 'Shipping')->first();

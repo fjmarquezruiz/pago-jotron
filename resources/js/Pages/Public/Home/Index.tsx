@@ -72,54 +72,9 @@ const LAST_NEWS = {
 
 const Index = ({
     auth,
-}: PageProps<{ laravelVersion: string; phpVersion: string }>) => {
+    featuredWines,
+}: PageProps<{ laravelVersion: string; phpVersion: string; featuredWines: { data: Vino[] } }>) => {
     // console.log("welcome -> ", auth);
-    // State variables to store the list of relatedWines
-    const [relatedWines, setRelatedWines] = useState<Vino[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [fetchError, setFetchError] = useState<string | null>(null);
-
-    // useEffect hook to fetch data when the component mounts
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                // Fetch data for relatedWines concurrently
-                const [relatedWinesResponse] = await Promise.all([
-                    fetch("/api/vinos/related/1"),
-                ]);
-
-                // Check if the responses are successful
-                if (!relatedWinesResponse.ok) {
-                    throw new Error(
-                        `Error fetching relatedWines: ${relatedWinesResponse.statusText}`,
-                    );
-                }
-
-                // Parse the JSON data from the responses
-                const relatedWinesData = await relatedWinesResponse.json();
-
-                // Ensure the data contains the expected array structure
-                if (!Array.isArray(relatedWinesData.data)) {
-                    throw new Error("RelatedWines data is not an array");
-                }
-
-                // Update the state with the fetched data
-                setRelatedWines(relatedWinesData.data);
-            } catch (err) {
-                // Handle any errors that occur during fetching
-                console.error("Error fetching data:", err);
-                setFetchError("Failed to load data. Please try again later.");
-            } finally {
-                // Set loading state to false after fetching is complete
-                setLoading(false);
-            }
-        };
-
-        // Call the fetchData function
-        fetchData();
-    }, []); // Empty dependency array ensures this effect runs only once on mount
-
-    console.log(relatedWines);
 
     return (
         <>
@@ -137,7 +92,7 @@ const Index = ({
             {/* Best sellers Section */}
             <WinesSlider
                 title="Best sellers"
-                products={{ data: relatedWines }}
+                products={featuredWines}
             />
             <Banner
                 text="Created by"
@@ -148,7 +103,7 @@ const Index = ({
             {/* From our shop Section */}
             <WinesSlider
                 title="From our shop"
-                products={{ data: relatedWines }}
+                products={featuredWines}
             />
             <Banner
                 text="Land and barrell"

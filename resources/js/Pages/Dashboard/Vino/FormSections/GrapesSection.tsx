@@ -7,6 +7,7 @@ import SecondaryButton from "@/Components/SecondaryButton";
 import Toast from "@/Components/Forms/Toast";
 import { IconTrash } from "@tabler/icons-react";
 import { dangerButton, primaryButton } from "@/styles";
+import { Link } from "@inertiajs/react";
 
 /**
  * GrapesSection Component
@@ -15,7 +16,7 @@ import { dangerButton, primaryButton } from "@/styles";
  */
 const GrapesSection = ({
     data, // Object containing the current state of the wine data
-    onChange = () => {}, // Callback function to update the wine data
+    onChange = () => { }, // Callback function to update the wine data
     errors = {}, // Object containing any validation errors
     preview = false, // Boolean indicating whether the component should render in preview mode
 }: VinoSectionProps) => {
@@ -38,7 +39,13 @@ const GrapesSection = ({
                             key={uva.id}
                             className="mt-1.5 block w-full text-lg font-semibold"
                         >
-                            {uva.pivot.percent} % - {uva.name}
+                            {uva.pivot.percent} % -{" "}
+                            <Link
+                                href={route("uva.show", uva.id)}
+                                className="text-amber-700 hover:underline dark:text-amber-500"
+                            >
+                                {uva.name}
+                            </Link>
                         </p>
                     ))
                 )}
@@ -72,18 +79,18 @@ const GrapesSection = ({
         transformedUvas.length > 0
             ? transformedUvas
             : [
-                  {
-                      id: 0,
-                      name: "",
-                      created_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString(),
-                      pivot: {
-                          vino_id: data.id,
-                          percent: 0,
-                          name: data.name,
-                      },
-                  },
-              ],
+                {
+                    id: 0,
+                    name: "",
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    pivot: {
+                        vino_id: data.id,
+                        percent: 0,
+                        name: data.name,
+                    },
+                },
+            ],
     );
 
     // Fetch grape varieties from the server on component mount
@@ -149,7 +156,7 @@ const GrapesSection = ({
     }, [grapes, totalPercent]);
 
     // Update effectively saveDisabled.
-    useEffect(() => {}, [saveDisabled]);
+    useEffect(() => { }, [saveDisabled]);
 
     // Function to add a new grape variety
     const handleAddRow = () => {
@@ -258,9 +265,8 @@ const GrapesSection = ({
                                 e.target.options[e.target.selectedIndex].text,
                             );
                         }}
-                        className={`col-span-2 block w-full resize-none rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 sm:col-span-4 ${
-                            errors.uvas ? "border-red-500" : "" // Add red border if there's an error
-                        } dark:border-gray-700 dark:bg-gray-800 dark:text-gray-50`}
+                        className={`col-span-2 block w-full resize-none rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 sm:col-span-4 ${errors.uvas ? "border-red-500" : "" // Add red border if there's an error
+                            } dark:border-gray-700 dark:bg-gray-800 dark:text-gray-50`}
                         aria-label={`grape-${index}`}
                     >
                         <option value={0}>Select Grape Variety</option>
@@ -278,9 +284,8 @@ const GrapesSection = ({
                         onChange={(e) =>
                             handleRowChange(index, "percent", e.target.value)
                         }
-                        className={`col-span-1 block resize-none rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 sm:col-span-2 md:col-span-1 ${
-                            errors.uvas ? "border-red-500" : "" // Add red border if there's an error
-                        } dark:border-gray-700 dark:bg-gray-800 dark:text-gray-50`}
+                        className={`col-span-1 block resize-none rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 sm:col-span-2 md:col-span-1 ${errors.uvas ? "border-red-500" : "" // Add red border if there's an error
+                            } dark:border-gray-700 dark:bg-gray-800 dark:text-gray-50`}
                     />
                     <button
                         type="button"
