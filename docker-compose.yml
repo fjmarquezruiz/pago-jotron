@@ -1,0 +1,19 @@
+services:
+    db:
+        image: mysql:8.4
+        restart: unless-stopped
+        environment:
+            MYSQL_DATABASE: jotron
+            MYSQL_USER: jotron
+            MYSQL_PASSWORD: jotron_password
+            MYSQL_ROOT_PASSWORD: root_password
+        ports:
+            - '3306:3306'
+        healthcheck:
+            test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-ujotron', '-pjotron_password']
+            interval: 5s
+            retries: 20
+        volumes:
+            - db_data:/var/lib/mysql
+volumes:
+    db_data:
