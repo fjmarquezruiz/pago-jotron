@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, date, datetime, int, mysqlEnum, mysqlTable, varchar } from 'drizzle-orm/mysql-core';
+import { boolean, date, datetime, int, mysqlEnum, mysqlTable, text, varchar, decimal } from 'drizzle-orm/mysql-core';
 
 /** Usuarios de la tienda: clientes, editores y administradores (RF1, RF2). */
 export const users = mysqlTable('users', {
@@ -31,4 +31,60 @@ export const addresses = mysqlTable('addresses', {
     country: varchar('country', { length: 100 }).notNull().default('España'),
     addressType: mysqlEnum('address_type', ['Envío', 'Facturación']).notNull().default('Envío'),
     isActive: boolean('is_active').notNull().default(true),
+});
+
+/** Bodegas que elaboran los productos (RF4). Columnas MVP2 opcionales. */
+export const wineries = mysqlTable('wineries', {
+    id: int('winery_id').autoincrement().primaryKey(),
+    name: varchar('name', { length: 100 }).notNull().unique(),
+    description: text('description'),
+    address: varchar('address', { length: 255 }),
+    city: varchar('city', { length: 100 }),
+    province: varchar('province', { length: 100 }),
+    country: varchar('country', { length: 100 }).notNull().default('España'),
+    phone: varchar('phone', { length: 20 }),
+    email: varchar('email', { length: 100 }),
+    website: varchar('website', { length: 255 }),
+    isBlocked: boolean('is_blocked').notNull().default(false),
+});
+
+/** Denominaciones de origen y otras garantías de calidad de los productos (RF4, RF5). */
+export const guaranteesOfOrigin = mysqlTable('guarantee_of_origin', {
+    id: int('guarantee_of_origin_id').autoincrement().primaryKey(),
+    name: varchar('name', { length: 100 }).notNull().unique(),
+    classification: mysqlEnum('classification', ['DO', 'DOP', 'DOCa', 'IGP', 'VT']).notNull().default('DO'),
+    region: varchar('region', { length: 100 }),
+    regulatoryCouncil: varchar('regulatory_council', { length: 150 }),
+    foundedYear: int('founded_year'),
+    website: varchar('website', { length: 255 }),
+    description: text('description'),
+    isBlocked: boolean('is_blocked').notNull().default(false),
+});
+
+/** Familias de producto para los filtros; fijan el IVA (RF4, RF5). */
+export const typologies = mysqlTable('typology', {
+    id: int('typology_id').autoincrement().primaryKey(),
+    name: varchar('name', { length: 50 }).notNull().unique(),
+    productType: mysqlEnum('product_type', ['Vino', 'Pasas']).notNull().default('Vino'),
+    filterOrder: int('filter_order').notNull().default(0),
+    taxRate: decimal('tax_rate', { precision: 5, scale: 2 }).notNull().default('21.00'), // IVA en %: 21 vino, 10 pasas. Lo heredan sus productos
+});
+
+/** Estilos concretos del vino: Fino, Manzanilla, Tinto roble... (RF4, RF5). */
+export const categories = mysqlTable('category', {
+    id: int('category_id').autoincrement().primaryKey(),
+    name: varchar('name', { length: 100 }).notNull().unique(),
+});
+
+/** Uvas utilizadas en la elaboración de vinos (RF4, RF5). */
+export const grapes = mysqlTable('grape', {
+    id: int('grape_id').autoincrement().primaryKey(),
+    name: varchar('name', { length: 100 }).notNull().unique(),
+    color: mysqlEnum('color', ['Tinta', 'Blanca', 'Rosada']).notNull(), // Color de la piel; filtro de la lista de uvas
+});
+
+/** Etiquetas de cata de los vinos: Afrutado, Salino... (RF4). */
+export const tastingTags = mysqlTable('tasting_tag', {
+    id: int('tasting_tag_id').autoincrement().primaryKey(),
+    name: varchar('name', { length: 50 }).notNull().unique(),
 });

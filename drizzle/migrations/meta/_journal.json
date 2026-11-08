@@ -8,6 +8,13 @@
       "when": 1794159461482,
       "tag": "0000_parallel_nomad",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1794161209249,
+      "tag": "0001_handy_magma",
+      "breakpoints": true
     }
   ]
 }
