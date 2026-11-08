@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, date, datetime, int, mysqlEnum, mysqlTable, text, varchar, decimal, unique, check } from 'drizzle-orm/mysql-core';
+import { boolean, date, datetime, int, mysqlEnum, mysqlTable, text, varchar, decimal, unique, check, primaryKey } from 'drizzle-orm/mysql-core';
 
 /** Usuarios de la tienda: clientes, editores y administradores (RF1, RF2). */
 export const users = mysqlTable('users', {
@@ -146,4 +146,30 @@ export const productSteps = mysqlTable('product_steps', {
     description: text('description'),
 }, (t) => ({
     uqPosition: unique('uq_step_position').on(t.productId, t.position),
+}));
+
+/** Relación muchos a muchos entre productos y categorías (RF4). */
+export const productCategories = mysqlTable('product_categories', {
+    productId: int('product_id').notNull().references(() => products.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
+    categoryId: int('category_id').notNull().references(() => categories.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
+}, (t) => ({
+    pkProductCategory: primaryKey({ columns: [t.productId, t.categoryId] }),
+}));
+
+/** Relación muchos a muchos entre productos y uvas (RF4). */
+export const productGrapes = mysqlTable('product_grapes', {
+    productId: int('product_id').notNull().references(() => products.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
+    grapeId: int('grape_id').notNull().references(() => grapes.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
+    percentage: decimal('percentage', { precision: 5, scale: 2 }),
+}, (t) => ({
+    pkProductGrape: primaryKey({ columns: [t.productId, t.grapeId] }),
+    ckPercentage: check('ck_grape_percentage', sql`${t.percentage} > 0 AND ${t.percentage} <= 100`),
+}));
+
+/** Relación muchos a muchos entre productos y etiquetas de cata (RF4). */
+export const productTastingTags = mysqlTable('product_tasting_tags', {
+    productId: int('product_id').notNull().references(() => products.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
+    tastingTagId: int('tasting_tag_id').notNull().references(() => tastingTags.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
+}, (t) => ({
+    pkProductTastingTag: primaryKey({ columns: [t.productId, t.tastingTagId] }),
 }));
