@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, date, datetime, int, mysqlEnum, mysqlTable, text, varchar, decimal } from 'drizzle-orm/mysql-core';
+import { boolean, date, datetime, int, mysqlEnum, mysqlTable, text, varchar, decimal, unique, check } from 'drizzle-orm/mysql-core';
 
 /** Usuarios de la tienda: clientes, editores y administradores (RF1, RF2). */
 export const users = mysqlTable('users', {
@@ -88,3 +88,62 @@ export const tastingTags = mysqlTable('tasting_tag', {
     id: int('tasting_tag_id').autoincrement().primaryKey(),
     name: varchar('name', { length: 50 }).notNull().unique(),
 });
+
+/** Vinos y pasas del catálogo: ficha común a todas sus presentaciones (RF4). */
+export const products = mysqlTable('products', {
+    id: int('product_id').autoincrement().primaryKey(),
+    name: varchar('name', { length: 100 }).notNull(),
+    wineryId: int('winery_id').notNull().references(() => wineries.id, { onUpdate: 'cascade' }),
+    guaranteeOfOriginId: int('guarantee_of_origin_id').notNull().references(() => guaranteesOfOrigin.id, { onUpdate: 'cascade' }),
+    typologyId: int('typology_id').notNull().references(() => typologies.id, { onUpdate: 'cascade' }),
+    vintage: int('vintage'),
+    image: varchar('image', { length: 255 }),
+    description: text('description'),
+    visualNote: text('visual_note'),
+    aromaNote: text('aroma_note'),
+    palateNote: text('palate_note'),
+    minTemperature: decimal('min_temperature', { precision: 5, scale: 2 }),
+    maxTemperature: decimal('max_temperature', { precision: 5, scale: 2 }),
+    alcoholContent: decimal('alcohol_content', { precision: 5, scale: 2 }),
+    agingTime: varchar('aging_time', { length: 100 }),
+    agingMethod: text('aging_method'),
+    production: varchar('production', { length: 50 }),
+    vineyardAltitude: int('vineyard_altitude'),
+    soilType: varchar('soil_type', { length: 100 }),
+    yield: int('yield'),
+    foodPairing: text('food_pairing'),
+    isBlocked: boolean('is_blocked').notNull().default(false),
+    createdAt: datetime('created_at', { mode: 'string' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (t) => ({
+    ckTemp: check('ck_product_temp', sql`${t.minTemperature} <= ${t.maxTemperature}`),
+    ckAltitude: check('ck_product_altitude', sql`${t.vineyardAltitude} >= 0`),
+    ckYield: check('ck_product_yield', sql`${t.yield} > 0`),
+}));
+
+/** Variantes de producto: botella, media botella, caja, racimo... (RF4). */
+export const productVariants = mysqlTable('product_variants', {
+    id: int('variant_id').autoincrement().primaryKey(),
+    productId: int('product_id').notNull().references(() => products.id, { onUpdate: 'cascade' }),
+    format: varchar('format', { length: 50 }).notNull(), // Botella, Media botella, Mágnum, Caja, Racimo
+    capacity: int('capacity').notNull(), // En mililitros o gramos según capacityUnit
+    capacityUnit: mysqlEnum('capacity_unit', ['ml', 'g']).notNull().default('ml'),
+    price: decimal('price', { precision: 10, scale: 2 }).notNull(),
+    stock: int('stock').notNull().default(0),
+    isBlocked: boolean('is_blocked').notNull().default(false),
+}, (t) => ({
+    uqFormat: unique('uq_variant_format').on(t.productId, t.format, t.capacity),
+    ckCapacity: check('ck_variant_capacity', sql`${t.capacity} > 0`),
+    ckPrice: check('ck_variant_price', sql`${t.price} >= 0`),
+    ckStock: check('ck_variant_stock', sql`${t.stock} >= 0`),
+}));
+
+/** Pasos para la elaboración del producto (RF4). */
+export const productSteps = mysqlTable('product_steps', {
+    id: int('step_id').autoincrement().primaryKey(),
+    productId: int('product_id').notNull().references(() => products.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
+    position: int('position').notNull(),
+    title: varchar('title', { length: 100 }).notNull(),
+    description: text('description'),
+}, (t) => ({
+    uqPosition: unique('uq_step_position').on(t.productId, t.position),
+}));
