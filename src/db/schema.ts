@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, date, datetime, int, mysqlEnum, mysqlTable, text, varchar, decimal, unique, check, primaryKey, foreignKey } from 'drizzle-orm/mysql-core';
+import { boolean, date, datetime, int, mysqlEnum, mysqlTable, text, varchar, decimal, unique, check, primaryKey, foreignKey, tinyint } from 'drizzle-orm/mysql-core';
 
 /** Usuarios de la tienda: clientes, editores y administradores (RF1, RF2). */
 export const users = mysqlTable('users', {
@@ -181,4 +181,108 @@ export const productTastingTags = mysqlTable('product_tasting_tags', {
         .onUpdate('cascade').onDelete('cascade'),
     fkTag: foreignKey({ name: 'fk_ptt_tasting_tag', columns: [t.tastingTagId], foreignColumns: [tastingTags.id] })
         .onUpdate('cascade').onDelete('cascade'),
+}));
+
+/** Tablas para pedidos y facturas */
+
+/** Estados de los pedidos: Pendiente, Enviado, Entregado, Cancelado (RF8). */
+export const orderStatuses = mysqlTable('order_statuses', {
+    id: int('status_id').autoincrement().primaryKey(),
+    name: varchar('name', { length: 50 }).notNull().unique(),
+});
+
+/** Motivos de cancelación de un pedido, por cliente o administrador (RF8). */
+export const cancellationTypes = mysqlTable('cancellation_types', {
+    id: int('cancellation_type_id').autoincrement().primaryKey(),
+    description: text('description').notNull(),
+});
+
+/** Modalidades de envío con coste y plazo; las bloqueadas no se ofrecen en el checkout (RF8). */
+export const shippingTypes = mysqlTable('shipping_types', {
+    id: int('shipping_type_id').autoincrement().primaryKey(),
+    name: varchar('name', { length: 50 }).notNull().unique(),
+    cost: decimal('cost', { precision: 10, scale: 2 }).notNull().default('0.00'),
+    minDeliveryDays: tinyint('min_delivery_days', { unsigned: true }),
+    maxDeliveryDays: tinyint('max_delivery_days', { unsigned: true }),
+    isBlocked: boolean('is_blocked').notNull().default(false),
+}, (t) => ({
+    ckCost: check('ck_shipping_cost', sql`${t.cost} >= 0`),
+    ckDeliveryDays: check('ck_shipping_days', sql`${t.minDeliveryDays} IS NULL OR ${t.maxDeliveryDays} IS NULL OR ${t.minDeliveryDays} <= ${t.maxDeliveryDays}`),
+}));
+
+/** Pedidos de los clientes: direcciones, envío, pago, total y estado (RF7, RF8). */
+export const orders = mysqlTable('orders', {
+    id: int('order_id').autoincrement().primaryKey(),
+    userId: int('user_id').notNull().references(() => users.id, { onUpdate: 'cascade' }),
+    shippingAddressId: int('shipping_address_id'),
+    billingAddressId: int('billing_address_id'),
+    paymentMethod: mysqlEnum('payment_method', ['Tarjeta', 'PayPal', 'Transferencia']).notNull(),
+    shippingTypeId: int('shipping_type_id').notNull(),
+    shippingCost: decimal('shipping_cost', { precision: 10, scale: 2 }).notNull().default('0.00'),
+    total: decimal('total', { precision: 10, scale: 2 }).notNull(),
+    statusId: int('status_id').notNull(),
+    statusUpdatedAt: datetime('status_updated_at', { mode: 'string' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+    cancelledBy: mysqlEnum('cancelled_by', ['Cliente', 'Administrador']),
+    cancellationTypeId: int('cancellation_type_id'),
+    createdAt: datetime('created_at', { mode: 'string' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+    shippingDate: date('shipping_date', { mode: 'string' }),
+}, (t) => ({
+    fkShippingAddress: foreignKey({ name: 'fk_order_shipping_address', columns: [t.shippingAddressId], foreignColumns: [addresses.id] }).onUpdate('cascade'),
+    fkBillingAddress: foreignKey({ name: 'fk_order_billing_address', columns: [t.billingAddressId], foreignColumns: [addresses.id] }).onUpdate('cascade'),
+    fkShippingType: foreignKey({ name: 'fk_order_shipping_type', columns: [t.shippingTypeId], foreignColumns: [shippingTypes.id] }).onUpdate('cascade'),
+    fkStatus: foreignKey({ name: 'fk_order_status', columns: [t.statusId], foreignColumns: [orderStatuses.id] }).onUpdate('cascade'),
+    fkCancellationType: foreignKey({ name: 'fk_order_cancellation_type', columns: [t.cancellationTypeId], foreignColumns: [cancellationTypes.id] }).onUpdate('cascade').onDelete('set null'),
+    ckTotal: check('ck_order_total', sql`${t.total} >= 0 AND ${t.shippingCost} >= 0`),
+}));
+
+/** Líneas de pedido: presentación y cantidad, con precio e IVA fijados al comprar (RF8). */
+export const orderProducts = mysqlTable('order_products', {
+    orderId: int('order_id').notNull(),
+    variantId: int('variant_id').notNull(),
+    quantity: int('quantity', { unsigned: true }).notNull().default(1),
+    unitPrice: decimal('unit_price', { precision: 10, scale: 2 }).notNull(),
+    taxRate: decimal('tax_rate', { precision: 5, scale: 2 }).notNull(), // IVA aplicado en el momento de la compra
+}, (t) => ({
+    pk: primaryKey({ columns: [t.orderId, t.variantId] }),
+    fkOrder: foreignKey({ name: 'fk_orderproduct_order', columns: [t.orderId], foreignColumns: [orders.id] }).onDelete('cascade').onUpdate('cascade'),
+    fkVariant: foreignKey({ name: 'fk_orderproduct_variant', columns: [t.variantId], foreignColumns: [productVariants.id] }).onUpdate('cascade'),
+    ckQuantity: check('ck_orderproduct_quantity', sql`${t.quantity} > 0`),
+}));
+
+/** Facturas de los pedidos (RF8). */
+export const invoices = mysqlTable('invoices', {
+    id: int('invoice_id').autoincrement().primaryKey(),
+    orderId: int('order_id').notNull().unique(),
+    number: varchar('number', { length: 50 }).notNull().unique(),
+    issueDate: datetime('issue_date', { mode: 'string' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+    taxBase: decimal('tax_base', { precision: 10, scale: 2 }).notNull(),
+    taxAmount: decimal('tax_amount', { precision: 10, scale: 2 }).notNull(),
+    total: decimal('total', { precision: 10, scale: 2 }).notNull(),
+}, (t) => ({
+    fkOrder: foreignKey({ name: 'fk_invoice_order', columns: [t.orderId], foreignColumns: [orders.id] }).onUpdate('cascade'),
+    ckTotal: check('ck_invoice_total', sql`${t.total} = ${t.taxBase} + ${t.taxAmount}`),
+}));
+
+/** Carrito guardado del cliente: se recupera en cualquier dispositivo (RF6). */
+export const cartProducts = mysqlTable('cart_products', {
+    userId: int('user_id').notNull(),
+    variantId: int('variant_id').notNull(),
+    quantity: int('quantity', { unsigned: true }).notNull().default(1),
+    addedAt: datetime('added_at', { mode: 'string' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.variantId] }),
+    fkUser: foreignKey({ name: 'fk_cartproduct_user', columns: [t.userId], foreignColumns: [users.id] }).onDelete('cascade').onUpdate('cascade'),
+    fkVariant: foreignKey({ name: 'fk_cartproduct_variant', columns: [t.variantId], foreignColumns: [productVariants.id] }).onDelete('cascade').onUpdate('cascade'),
+    ckQuantity: check('ck_cartproduct_quantity', sql`${t.quantity} > 0`),
+}));
+
+/** Auditoría de acciones de los usuarios y administradores (RF12). */
+export const auditLogs = mysqlTable('audit_logs', {
+    id: int('audit_log_id').autoincrement().primaryKey(),
+    userId: int('user_id'),
+    action: text('action').notNull(),
+    loggedAt: datetime('logged_at', { mode: 'string' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+    details: text('details'),
+}, (t) => ({
+    fkUser: foreignKey({ name: 'fk_auditlog_user', columns: [t.userId], foreignColumns: [users.id] }).onUpdate('cascade').onDelete('set null'),
 }));
