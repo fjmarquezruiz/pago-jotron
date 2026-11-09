@@ -5,7 +5,7 @@ import * as schema from './schema';
 const globalForDb = globalThis as unknown as { pool?: mysql.Pool };
 
 /** Pool de conexiones a MySQL, compartido entre recargas en desarrollo. */
-const pool =
+export const pool =
     globalForDb.pool ??
     mysql.createPool({ uri: process.env.DATABASE_URL, connectionLimit: 5 });
 if (process.env.NODE_ENV !== 'production') globalForDb.pool = pool;
