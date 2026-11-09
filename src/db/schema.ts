@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, date, datetime, int, mysqlEnum, mysqlTable, text, varchar, decimal, unique, check, primaryKey } from 'drizzle-orm/mysql-core';
+import { boolean, date, datetime, int, mysqlEnum, mysqlTable, text, varchar, decimal, unique, check, primaryKey, foreignKey } from 'drizzle-orm/mysql-core';
 
 /** Usuarios de la tienda: clientes, editores y administradores (RF1, RF2). */
 export const users = mysqlTable('users', {
@@ -49,7 +49,7 @@ export const wineries = mysqlTable('wineries', {
 });
 
 /** Denominaciones de origen y otras garantías de calidad de los productos (RF4, RF5). */
-export const guaranteesOfOrigin = mysqlTable('guarantee_of_origin', {
+export const guaranteesOfOrigin = mysqlTable('guarantees_of_origin', {
     id: int('guarantee_of_origin_id').autoincrement().primaryKey(),
     name: varchar('name', { length: 100 }).notNull().unique(),
     classification: mysqlEnum('classification', ['DO', 'DOP', 'DOCa', 'IGP', 'VT']).notNull().default('DO'),
@@ -62,7 +62,7 @@ export const guaranteesOfOrigin = mysqlTable('guarantee_of_origin', {
 });
 
 /** Familias de producto para los filtros; fijan el IVA (RF4, RF5). */
-export const typologies = mysqlTable('typology', {
+export const typologies = mysqlTable('typologies', {
     id: int('typology_id').autoincrement().primaryKey(),
     name: varchar('name', { length: 50 }).notNull().unique(),
     productType: mysqlEnum('product_type', ['Vino', 'Pasas']).notNull().default('Vino'),
@@ -71,20 +71,20 @@ export const typologies = mysqlTable('typology', {
 });
 
 /** Estilos concretos del vino: Fino, Manzanilla, Tinto roble... (RF4, RF5). */
-export const categories = mysqlTable('category', {
+export const categories = mysqlTable('categories', {
     id: int('category_id').autoincrement().primaryKey(),
     name: varchar('name', { length: 100 }).notNull().unique(),
 });
 
 /** Uvas utilizadas en la elaboración de vinos (RF4, RF5). */
-export const grapes = mysqlTable('grape', {
+export const grapes = mysqlTable('grapes', {
     id: int('grape_id').autoincrement().primaryKey(),
     name: varchar('name', { length: 100 }).notNull().unique(),
     color: mysqlEnum('color', ['Tinta', 'Blanca', 'Rosada']).notNull(), // Color de la piel; filtro de la lista de uvas
 });
 
 /** Etiquetas de cata de los vinos: Afrutado, Salino... (RF4). */
-export const tastingTags = mysqlTable('tasting_tag', {
+export const tastingTags = mysqlTable('tasting_tags', {
     id: int('tasting_tag_id').autoincrement().primaryKey(),
     name: varchar('name', { length: 50 }).notNull().unique(),
 });
@@ -94,7 +94,7 @@ export const products = mysqlTable('products', {
     id: int('product_id').autoincrement().primaryKey(),
     name: varchar('name', { length: 100 }).notNull(),
     wineryId: int('winery_id').notNull().references(() => wineries.id, { onUpdate: 'cascade' }),
-    guaranteeOfOriginId: int('guarantee_of_origin_id').notNull().references(() => guaranteesOfOrigin.id, { onUpdate: 'cascade' }),
+    guaranteeOfOriginId: int('guarantee_of_origin_id').notNull(),
     typologyId: int('typology_id').notNull().references(() => typologies.id, { onUpdate: 'cascade' }),
     vintage: int('vintage'),
     image: varchar('image', { length: 255 }),
@@ -118,6 +118,7 @@ export const products = mysqlTable('products', {
     ckTemp: check('ck_product_temp', sql`${t.minTemperature} <= ${t.maxTemperature}`),
     ckAltitude: check('ck_product_altitude', sql`${t.vineyardAltitude} >= 0`),
     ckYield: check('ck_product_yield', sql`${t.yield} > 0`),
+    fkGuarantee: foreignKey({ name: 'fk_product_guarantee', columns: [t.guaranteeOfOriginId], foreignColumns: [guaranteesOfOrigin.id] }).onUpdate('cascade'),
 }));
 
 /** Variantes de producto: botella, media botella, caja, racimo... (RF4). */
@@ -148,28 +149,36 @@ export const productSteps = mysqlTable('product_steps', {
     uqPosition: unique('uq_step_position').on(t.productId, t.position),
 }));
 
-/** Relación muchos a muchos entre productos y categorías (RF4). */
+/** Relación muchos a muchos entre productos y categorías (RF5). */
 export const productCategories = mysqlTable('product_categories', {
-    productId: int('product_id').notNull().references(() => products.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
-    categoryId: int('category_id').notNull().references(() => categories.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
+    productId: int('product_id').notNull(),
+    categoryId: int('category_id').notNull(),
 }, (t) => ({
-    pkProductCategory: primaryKey({ columns: [t.productId, t.categoryId] }),
+    pk: primaryKey({ columns: [t.productId, t.categoryId] }),
+    fkProduct: foreignKey({ name: 'fk_pc_product', columns: [t.productId], foreignColumns: [products.id] }).onDelete('cascade').onUpdate('cascade'),
+    fkCategory: foreignKey({ name: 'fk_pc_category', columns: [t.categoryId], foreignColumns: [categories.id] }).onDelete('cascade').onUpdate('cascade'),
 }));
 
-/** Relación muchos a muchos entre productos y uvas (RF4). */
+/** Relación muchos a muchos entre productos y uvas (RF5). */
 export const productGrapes = mysqlTable('product_grapes', {
-    productId: int('product_id').notNull().references(() => products.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
-    grapeId: int('grape_id').notNull().references(() => grapes.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
+    productId: int('product_id').notNull(),
+    grapeId: int('grape_id').notNull(),
     percentage: decimal('percentage', { precision: 5, scale: 2 }),
 }, (t) => ({
-    pkProductGrape: primaryKey({ columns: [t.productId, t.grapeId] }),
+    pk: primaryKey({ columns: [t.productId, t.grapeId] }),
+    fkProduct: foreignKey({ name: 'fk_pg_product', columns: [t.productId], foreignColumns: [products.id] }).onDelete('cascade').onUpdate('cascade'),
+    fkGrape: foreignKey({ name: 'fk_pg_grape', columns: [t.grapeId], foreignColumns: [grapes.id] }).onDelete('cascade').onUpdate('cascade'),
     ckPercentage: check('ck_grape_percentage', sql`${t.percentage} > 0 AND ${t.percentage} <= 100`),
 }));
 
 /** Relación muchos a muchos entre productos y etiquetas de cata (RF4). */
 export const productTastingTags = mysqlTable('product_tasting_tags', {
-    productId: int('product_id').notNull().references(() => products.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
-    tastingTagId: int('tasting_tag_id').notNull().references(() => tastingTags.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
+    productId: int('product_id').notNull(),
+    tastingTagId: int('tasting_tag_id').notNull(),
 }, (t) => ({
-    pkProductTastingTag: primaryKey({ columns: [t.productId, t.tastingTagId] }),
+    pk: primaryKey({ columns: [t.productId, t.tastingTagId] }),
+    fkProduct: foreignKey({ name: 'fk_ptt_product', columns: [t.productId], foreignColumns: [products.id] })
+        .onUpdate('cascade').onDelete('cascade'),
+    fkTag: foreignKey({ name: 'fk_ptt_tasting_tag', columns: [t.tastingTagId], foreignColumns: [tastingTags.id] })
+        .onUpdate('cascade').onDelete('cascade'),
 }));

@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "5",
-      "when": 1794159461482,
-      "tag": "0000_parallel_nomad",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1794161209249,
-      "tag": "0001_handy_magma",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1794165626932,
-      "tag": "0002_many_polaris",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "5",
-      "when": 1794166227993,
-      "tag": "0003_kind_medusa",
+      "when": 1794245021499,
+      "tag": "0000_sour_bromley",
       "breakpoints": true
     }
   ]

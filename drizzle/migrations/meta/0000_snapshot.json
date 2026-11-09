@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "582b8a46-6a92-43e3-8c28-b982283a25df",
+  "id": "a6e84301-6ae6-480d-8599-5a7ec69b6665",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "addresses": {
@@ -130,6 +130,886 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
+    "categories": {
+      "name": "categories",
+      "columns": {
+        "category_id": {
+          "name": "category_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "categories_category_id": {
+          "name": "categories_category_id",
+          "columns": [
+            "category_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "categories_name_unique": {
+          "name": "categories_name_unique",
+          "columns": [
+            "name"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "grapes": {
+      "name": "grapes",
+      "columns": {
+        "grape_id": {
+          "name": "grape_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "color": {
+          "name": "color",
+          "type": "enum('Tinta','Blanca','Rosada')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "grapes_grape_id": {
+          "name": "grapes_grape_id",
+          "columns": [
+            "grape_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "grapes_name_unique": {
+          "name": "grapes_name_unique",
+          "columns": [
+            "name"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "guarantees_of_origin": {
+      "name": "guarantees_of_origin",
+      "columns": {
+        "guarantee_of_origin_id": {
+          "name": "guarantee_of_origin_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "classification": {
+          "name": "classification",
+          "type": "enum('DO','DOP','DOCa','IGP','VT')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'DO'"
+        },
+        "region": {
+          "name": "region",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "regulatory_council": {
+          "name": "regulatory_council",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "founded_year": {
+          "name": "founded_year",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "website": {
+          "name": "website",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_blocked": {
+          "name": "is_blocked",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "guarantees_of_origin_guarantee_of_origin_id": {
+          "name": "guarantees_of_origin_guarantee_of_origin_id",
+          "columns": [
+            "guarantee_of_origin_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "guarantees_of_origin_name_unique": {
+          "name": "guarantees_of_origin_name_unique",
+          "columns": [
+            "name"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "product_categories": {
+      "name": "product_categories",
+      "columns": {
+        "product_id": {
+          "name": "product_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_pc_product": {
+          "name": "fk_pc_product",
+          "tableFrom": "product_categories",
+          "tableTo": "products",
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "product_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "fk_pc_category": {
+          "name": "fk_pc_category",
+          "tableFrom": "product_categories",
+          "tableTo": "categories",
+          "columnsFrom": [
+            "category_id"
+          ],
+          "columnsTo": [
+            "category_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "product_categories_product_id_category_id_pk": {
+          "name": "product_categories_product_id_category_id_pk",
+          "columns": [
+            "product_id",
+            "category_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "product_grapes": {
+      "name": "product_grapes",
+      "columns": {
+        "product_id": {
+          "name": "product_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "grape_id": {
+          "name": "grape_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "percentage": {
+          "name": "percentage",
+          "type": "decimal(5,2)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_pg_product": {
+          "name": "fk_pg_product",
+          "tableFrom": "product_grapes",
+          "tableTo": "products",
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "product_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "fk_pg_grape": {
+          "name": "fk_pg_grape",
+          "tableFrom": "product_grapes",
+          "tableTo": "grapes",
+          "columnsFrom": [
+            "grape_id"
+          ],
+          "columnsTo": [
+            "grape_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "product_grapes_product_id_grape_id_pk": {
+          "name": "product_grapes_product_id_grape_id_pk",
+          "columns": [
+            "product_id",
+            "grape_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {
+        "ck_grape_percentage": {
+          "name": "ck_grape_percentage",
+          "value": "`product_grapes`.`percentage` > 0 AND `product_grapes`.`percentage` <= 100"
+        }
+      }
+    },
+    "product_steps": {
+      "name": "product_steps",
+      "columns": {
+        "step_id": {
+          "name": "step_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "position": {
+          "name": "position",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "product_steps_product_id_products_product_id_fk": {
+          "name": "product_steps_product_id_products_product_id_fk",
+          "tableFrom": "product_steps",
+          "tableTo": "products",
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "product_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "product_steps_step_id": {
+          "name": "product_steps_step_id",
+          "columns": [
+            "step_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "uq_step_position": {
+          "name": "uq_step_position",
+          "columns": [
+            "product_id",
+            "position"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "product_tasting_tags": {
+      "name": "product_tasting_tags",
+      "columns": {
+        "product_id": {
+          "name": "product_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tasting_tag_id": {
+          "name": "tasting_tag_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_ptt_product": {
+          "name": "fk_ptt_product",
+          "tableFrom": "product_tasting_tags",
+          "tableTo": "products",
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "product_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "fk_ptt_tasting_tag": {
+          "name": "fk_ptt_tasting_tag",
+          "tableFrom": "product_tasting_tags",
+          "tableTo": "tasting_tags",
+          "columnsFrom": [
+            "tasting_tag_id"
+          ],
+          "columnsTo": [
+            "tasting_tag_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "product_tasting_tags_product_id_tasting_tag_id_pk": {
+          "name": "product_tasting_tags_product_id_tasting_tag_id_pk",
+          "columns": [
+            "product_id",
+            "tasting_tag_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "product_variants": {
+      "name": "product_variants",
+      "columns": {
+        "variant_id": {
+          "name": "variant_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "format": {
+          "name": "format",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "capacity": {
+          "name": "capacity",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "capacity_unit": {
+          "name": "capacity_unit",
+          "type": "enum('ml','g')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'ml'"
+        },
+        "price": {
+          "name": "price",
+          "type": "decimal(10,2)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "stock": {
+          "name": "stock",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "is_blocked": {
+          "name": "is_blocked",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "product_variants_product_id_products_product_id_fk": {
+          "name": "product_variants_product_id_products_product_id_fk",
+          "tableFrom": "product_variants",
+          "tableTo": "products",
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "product_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "product_variants_variant_id": {
+          "name": "product_variants_variant_id",
+          "columns": [
+            "variant_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "uq_variant_format": {
+          "name": "uq_variant_format",
+          "columns": [
+            "product_id",
+            "format",
+            "capacity"
+          ]
+        }
+      },
+      "checkConstraint": {
+        "ck_variant_capacity": {
+          "name": "ck_variant_capacity",
+          "value": "`product_variants`.`capacity` > 0"
+        },
+        "ck_variant_price": {
+          "name": "ck_variant_price",
+          "value": "`product_variants`.`price` >= 0"
+        },
+        "ck_variant_stock": {
+          "name": "ck_variant_stock",
+          "value": "`product_variants`.`stock` >= 0"
+        }
+      }
+    },
+    "products": {
+      "name": "products",
+      "columns": {
+        "product_id": {
+          "name": "product_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "winery_id": {
+          "name": "winery_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "guarantee_of_origin_id": {
+          "name": "guarantee_of_origin_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "typology_id": {
+          "name": "typology_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "vintage": {
+          "name": "vintage",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "image": {
+          "name": "image",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "visual_note": {
+          "name": "visual_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "aroma_note": {
+          "name": "aroma_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "palate_note": {
+          "name": "palate_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "min_temperature": {
+          "name": "min_temperature",
+          "type": "decimal(5,2)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "max_temperature": {
+          "name": "max_temperature",
+          "type": "decimal(5,2)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "alcohol_content": {
+          "name": "alcohol_content",
+          "type": "decimal(5,2)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "aging_time": {
+          "name": "aging_time",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "aging_method": {
+          "name": "aging_method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "production": {
+          "name": "production",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "vineyard_altitude": {
+          "name": "vineyard_altitude",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "soil_type": {
+          "name": "soil_type",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "yield": {
+          "name": "yield",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "food_pairing": {
+          "name": "food_pairing",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_blocked": {
+          "name": "is_blocked",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "products_winery_id_wineries_winery_id_fk": {
+          "name": "products_winery_id_wineries_winery_id_fk",
+          "tableFrom": "products",
+          "tableTo": "wineries",
+          "columnsFrom": [
+            "winery_id"
+          ],
+          "columnsTo": [
+            "winery_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        },
+        "products_typology_id_typologies_typology_id_fk": {
+          "name": "products_typology_id_typologies_typology_id_fk",
+          "tableFrom": "products",
+          "tableTo": "typologies",
+          "columnsFrom": [
+            "typology_id"
+          ],
+          "columnsTo": [
+            "typology_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        },
+        "fk_product_guarantee": {
+          "name": "fk_product_guarantee",
+          "tableFrom": "products",
+          "tableTo": "guarantees_of_origin",
+          "columnsFrom": [
+            "guarantee_of_origin_id"
+          ],
+          "columnsTo": [
+            "guarantee_of_origin_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "products_product_id": {
+          "name": "products_product_id",
+          "columns": [
+            "product_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {
+        "ck_product_temp": {
+          "name": "ck_product_temp",
+          "value": "`products`.`min_temperature` <= `products`.`max_temperature`"
+        },
+        "ck_product_altitude": {
+          "name": "ck_product_altitude",
+          "value": "`products`.`vineyard_altitude` >= 0"
+        },
+        "ck_product_yield": {
+          "name": "ck_product_yield",
+          "value": "`products`.`yield` > 0"
+        }
+      }
+    },
+    "tasting_tags": {
+      "name": "tasting_tags",
+      "columns": {
+        "tasting_tag_id": {
+          "name": "tasting_tag_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "tasting_tags_tasting_tag_id": {
+          "name": "tasting_tags_tasting_tag_id",
+          "columns": [
+            "tasting_tag_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "tasting_tags_name_unique": {
+          "name": "tasting_tags_name_unique",
+          "columns": [
+            "name"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "typologies": {
+      "name": "typologies",
+      "columns": {
+        "typology_id": {
+          "name": "typology_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "product_type": {
+          "name": "product_type",
+          "type": "enum('Vino','Pasas')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'Vino'"
+        },
+        "filter_order": {
+          "name": "filter_order",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "tax_rate": {
+          "name": "tax_rate",
+          "type": "decimal(5,2)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'21.00'"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "typologies_typology_id": {
+          "name": "typologies_typology_id",
+          "columns": [
+            "typology_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "typologies_name_unique": {
+          "name": "typologies_name_unique",
+          "columns": [
+            "name"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
     "users": {
       "name": "users",
       "columns": {
@@ -235,6 +1115,109 @@
           "name": "users_email_unique",
           "columns": [
             "email"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "wineries": {
+      "name": "wineries",
+      "columns": {
+        "winery_id": {
+          "name": "winery_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "address": {
+          "name": "address",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "city": {
+          "name": "city",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "province": {
+          "name": "province",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "country": {
+          "name": "country",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'España'"
+        },
+        "phone": {
+          "name": "phone",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "website": {
+          "name": "website",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_blocked": {
+          "name": "is_blocked",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "wineries_winery_id": {
+          "name": "wineries_winery_id",
+          "columns": [
+            "winery_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "wineries_name_unique": {
+          "name": "wineries_name_unique",
+          "columns": [
+            "name"
           ]
         }
       },
