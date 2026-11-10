@@ -10,7 +10,7 @@ services:
         ports:
             - '3306:3306'
         healthcheck:
-            test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-ujotron', '-pjotron_password']
+            test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-ujotron', '-pjotron_password']
             interval: 5s
             retries: 20
         volumes:
