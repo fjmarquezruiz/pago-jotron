@@ -96,9 +96,9 @@ async function main() {
 
     // Cuentas demo (las que aparecen en la guía de uso y en README.txt)
     const [adminHash, editorHash, userHash] = await Promise.all([
-        bcrypt.hash('admin123', 10),
-        bcrypt.hash('editor123', 10),
-        bcrypt.hash('user1234', 10),
+        bcrypt.hash('Admin1234', 10),
+        bcrypt.hash('Editor1234', 10),
+        bcrypt.hash('Cliente1234', 10),
     ]);
 
     await db.insert(users).values([
