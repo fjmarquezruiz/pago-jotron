@@ -24,6 +24,7 @@ describe('checkAccess', () => {
         ['/admin/usuarios', 'Editor', 'denied'],
         ['/admin/usuarios', 'Administrador', 'ok'],
         ['/productosx', null, 'login'],
+        ['/sistema-diseno', null, 'ok'],
     ] as const)('%s con %s → %s', (path, role, expected) => {
         expect(checkAccess(path, role)).toBe(expected);
     });

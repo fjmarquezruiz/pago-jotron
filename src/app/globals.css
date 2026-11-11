@@ -1,160 +1,587 @@
+/*
+  Sistema de diseño Jotron DS (Figma: "Jotron DS").
+  Capas:
+    1. Primitivas de color (:root) → nunca se usan directamente en componentes.
+    2. Tema semántico (light en :root, dark en .dark) → nombres de shadcn + extensiones Jotron.
+    3. Densidad (comfortable por defecto, compact con [data-density='compact']).
+    4. @theme inline → expone los tokens como utilidades de Tailwind 4.
+*/
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@import 'shadcn/tailwind.css';
-/*
-  ---break---
-*/
+
 @custom-variant dark (&:is(.dark *));
 
-/*
-  The default border color has changed to `currentcolor` in Tailwind CSS v4,
-  so we've added these compatibility styles to make sure everything still
-  looks the same as it did with Tailwind CSS v3.
+/* ---------------------------------------------------------------------------
+   1. Primitivas de color (colección "color primitives" de Figma, completa: 125)
+   --------------------------------------------------------------------------- */
+:root {
+    --black-alpha-50: color-mix(in srgb, var(--base-black) 5%, transparent);
+    --black-alpha-100: color-mix(in srgb, var(--base-black) 10%, transparent);
+    --black-alpha-200: color-mix(in srgb, var(--base-black) 20%, transparent);
+    --black-alpha-300: color-mix(in srgb, var(--base-black) 30%, transparent);
+    --black-alpha-400: color-mix(in srgb, var(--base-black) 40%, transparent);
+    --black-alpha-500: color-mix(in srgb, var(--base-black) 50%, transparent);
+    --black-alpha-600: color-mix(in srgb, var(--base-black) 60%, transparent);
+    --black-alpha-700: color-mix(in srgb, var(--base-black) 70%, transparent);
+    --black-alpha-800: color-mix(in srgb, var(--base-black) 80%, transparent);
+    --black-alpha-900: color-mix(in srgb, var(--base-black) 90%, transparent);
 
-  If we ever want to remove these styles, we need to add an explicit border
-  color utility to any element that depends on these defaults.
-*/
+    --white-alpha-50: color-mix(in srgb, var(--base-white) 5%, transparent);
+    --white-alpha-100: color-mix(in srgb, var(--base-white) 10%, transparent);
+    --white-alpha-200: color-mix(in srgb, var(--base-white) 20%, transparent);
+    --white-alpha-300: color-mix(in srgb, var(--base-white) 30%, transparent);
+    --white-alpha-400: color-mix(in srgb, var(--base-white) 40%, transparent);
+    --white-alpha-500: color-mix(in srgb, var(--base-white) 50%, transparent);
+    --white-alpha-600: color-mix(in srgb, var(--base-white) 60%, transparent);
+    --white-alpha-700: color-mix(in srgb, var(--base-white) 70%, transparent);
+    --white-alpha-800: color-mix(in srgb, var(--base-white) 80%, transparent);
+    --white-alpha-900: color-mix(in srgb, var(--base-white) 90%, transparent);
+
+    --blue-50: #f0f8fe;
+    --blue-100: #ddedfc;
+    --blue-200: #c2e1fb;
+    --blue-300: #98d0f8;
+    --blue-400: #67b6f3;
+    --blue-500: #4397ee;
+    --blue-600: #2e7ae2;
+    --blue-700: #2565d0;
+    --blue-800: #2452a9;
+    --blue-900: #234785;
+    --blue-950: #1a2c51;
+
+    --green-50: #f4ffe6;
+    --green-100: #e6fec9;
+    --green-200: #cdfc9a;
+    --green-300: #abf75f;
+    --green-400: #97ee43;
+    --green-500: #6cd210;
+    --green-600: #51a808;
+    --green-700: #3f800b;
+    --green-800: #34650f;
+    --green-900: #2d5512;
+    --green-950: #142f04;
+
+    --orange-50: #fffbea;
+    --orange-100: #fff4c5;
+    --orange-200: #ffe787;
+    --orange-300: #ffd548;
+    --orange-400: #ffc01e;
+    --orange-500: #fca311;
+    --orange-600: #df7500;
+    --orange-700: #b95104;
+    --orange-800: #963e0a;
+    --orange-900: #7b330c;
+    --orange-950: #471901;
+
+    --neutral-50: #fafafa;
+    --neutral-100: #f5f5f5;
+    --neutral-200: #e5e5e5;
+    --neutral-300: #d4d4d4;
+    --neutral-400: #a3a3a3;
+    --neutral-500: #737373;
+    --neutral-600: #525252;
+    --neutral-700: #404040;
+    --neutral-800: #262626;
+    --neutral-900: #171717;
+    --neutral-950: #0a0a0a;
+
+    --red-50: #fef2f2;
+    --red-100: #fee2e2;
+    --red-200: #fecbca;
+    --red-300: #fca6a5;
+    --red-400: #f77472;
+    --red-500: #ee4543;
+    --red-600: #db2927;
+    --red-700: #b81f1d;
+    --red-800: #981d1c;
+    --red-900: #7f1e1d;
+    --red-950: #450b0a;
+
+    --base-white: #ffffff;
+    --base-black: #0c0c0d;
+    --base-transparent: transparent;
+
+    --terracota-50: #fcf2ed;
+    --terracota-100: #f9e5d8;
+    --terracota-200: #f3ccb4;
+    --terracota-300: #eaab8a;
+    --terracota-400: #de8b62;
+    --terracota-500: #c17a3a;
+    --terracota-600: #a85d30;
+    --terracota-700: #884726;
+    --terracota-800: #69371f;
+    --terracota-900: #4f2a19;
+    --terracota-950: #30170d;
+
+    --purple-100: #eddcff;
+    --purple-300: #c79bf2;
+    --purple-700: #7828b4;
+    --purple-900: #4a1a6e;
+
+    --pink-100: #fcdceb;
+    --pink-300: #f29cc4;
+    --pink-700: #b42864;
+    --pink-900: #6e1a3f;
+
+    --gold-100: #fff8d2;
+    --gold-300: #f0d870;
+    --gold-700: #96780a;
+    --gold-900: #5c4a0a;
+
+    --amber-100: #ffedd5;
+    --amber-300: #fdba74;
+    --amber-700: #a0500a;
+    --amber-900: #5f300a;
+
+    --burgundy-100: #f7e3e7;
+    --burgundy-300: #e9a0b2;
+    --burgundy-700: #7a1d33;
+    --burgundy-900: #4a0f1f;
+
+    --warm-neutral-100: #f1efec;
+    --warm-neutral-700: #4a4540;
+
+    --olive-50: #e6f0e3;
+    --olive-700: #3c6b35;
+
+    --mustard-50: #faf1d2;
+    --mustard-700: #7f6200;
+
+    --brick-50: #fae6e3;
+    --brick-700: #a3322a;
+
+    --plum-100: #f1e7f1;
+    --plum-700: #6b3d6e;
+
+    --rose-100: #f9e7ed;
+    --rose-700: #9c3d5c;
+
+    --straw-100: #f3f1da;
+    --straw-700: #66601a;
+
+    --caramel-100: #f2e8e0;
+    --caramel-700: #6e4a2e;
+}
+
+/* ---------------------------------------------------------------------------
+   2. Tema semántico (colección "theme", modo light)
+   --------------------------------------------------------------------------- */
+:root {
+    --background: var(--base-white);
+    --foreground: var(--neutral-950);
+    --card: var(--base-white);
+    --card-foreground: var(--neutral-950);
+    --popover: var(--base-white);
+    --popover-foreground: var(--neutral-950);
+    --primary: var(--neutral-950);
+    --primary-foreground: var(--neutral-50);
+    --secondary: var(--neutral-100);
+    --secondary-foreground: var(--neutral-900);
+    --muted: var(--neutral-100);
+    --muted-foreground: var(--neutral-600);
+    --accent: var(--neutral-100);
+    --accent-foreground: var(--neutral-900);
+
+    --destructive: var(--red-700);
+    --destructive-foreground: var(--base-white);
+    --destructive-subtle: var(--red-50);
+    --success: var(--green-700);
+    --success-foreground: var(--base-white);
+    --success-subtle: var(--green-50);
+    --warning: var(--orange-700);
+    --warning-foreground: var(--base-white);
+    --warning-subtle: var(--orange-50);
+    --info: var(--blue-700);
+    --info-foreground: var(--base-white);
+    --info-subtle: var(--blue-50);
+
+    --brand: var(--terracota-600);
+    --brand-foreground: var(--neutral-50);
+    --brand-subtle: var(--terracota-50);
+
+    --border: var(--neutral-200);
+    --input: var(--black-alpha-300);
+    --ring: var(--neutral-950);
+
+    --link: var(--terracota-600);
+    --link-visited: var(--purple-700);
+    --overlay: var(--black-alpha-700);
+    --shadow: var(--black-alpha-100);
+
+    --chart-1: var(--terracota-500);
+    --chart-2: var(--blue-500);
+    --chart-3: var(--green-500);
+    --chart-4: var(--orange-500);
+    --chart-5: var(--purple-700);
+
+    --sidebar: var(--neutral-50);
+    --sidebar-foreground: var(--neutral-950);
+    --sidebar-primary: var(--neutral-950);
+    --sidebar-primary-foreground: var(--neutral-50);
+    --sidebar-accent: var(--neutral-100);
+    --sidebar-accent-foreground: var(--neutral-900);
+    --sidebar-border: var(--neutral-200);
+    --sidebar-ring: var(--neutral-950);
+
+    /* Tipos de vino (badges del catálogo) */
+    --wine-red: var(--burgundy-700);
+    --wine-red-subtle: var(--burgundy-100);
+    --wine-rose: var(--rose-700);
+    --wine-rose-subtle: var(--rose-100);
+    --wine-white: var(--straw-700);
+    --wine-white-subtle: var(--straw-100);
+    --wine-sweet: var(--plum-700);
+    --wine-sweet-subtle: var(--plum-100);
+    --wine-fortified: var(--caramel-700);
+    --wine-fortified-subtle: var(--caramel-100);
+
+    /* Resaltado de código (CodeBlock) */
+    --syntax-keyword: var(--purple-700);
+    --syntax-string: var(--green-800);
+    --syntax-number: var(--orange-700);
+    --syntax-comment: var(--neutral-600);
+    --syntax-function: var(--blue-700);
+    --syntax-variable: var(--red-700);
+}
+
+/* Tema semántico, modo dark */
+.dark {
+    --background: var(--base-black);
+    --foreground: var(--neutral-50);
+    --card: var(--neutral-900);
+    --card-foreground: var(--neutral-50);
+    --popover: var(--neutral-900);
+    --popover-foreground: var(--neutral-50);
+    --primary: var(--neutral-50);
+    --primary-foreground: var(--neutral-950);
+    --secondary: var(--neutral-800);
+    --secondary-foreground: var(--neutral-50);
+    --muted: var(--neutral-800);
+    --muted-foreground: var(--neutral-300);
+    --accent: var(--neutral-800);
+    --accent-foreground: var(--neutral-50);
+
+    --destructive: var(--red-400);
+    --destructive-foreground: var(--neutral-950);
+    --destructive-subtle: var(--red-950);
+    --success: var(--green-400);
+    --success-foreground: var(--neutral-950);
+    --success-subtle: var(--green-950);
+    --warning: var(--orange-400);
+    --warning-foreground: var(--neutral-950);
+    --warning-subtle: var(--orange-950);
+    --info: var(--blue-400);
+    --info-foreground: var(--neutral-950);
+    --info-subtle: var(--blue-950);
+
+    --brand: var(--terracota-600);
+    --brand-foreground: var(--neutral-50);
+    --brand-subtle: var(--terracota-950);
+
+    --border: var(--neutral-700);
+    --input: var(--white-alpha-300);
+    --ring: var(--neutral-50);
+
+    --link: var(--terracota-400);
+    --link-visited: var(--purple-300);
+    --overlay: var(--black-alpha-800);
+    --shadow: var(--black-alpha-300);
+
+    --chart-1: var(--terracota-400);
+    --chart-2: var(--blue-400);
+    --chart-3: var(--green-400);
+    --chart-4: var(--orange-400);
+    --chart-5: var(--purple-300);
+
+    --sidebar: var(--neutral-900);
+    --sidebar-foreground: var(--neutral-50);
+    --sidebar-primary: var(--neutral-50);
+    --sidebar-primary-foreground: var(--neutral-950);
+    --sidebar-accent: var(--neutral-800);
+    --sidebar-accent-foreground: var(--neutral-50);
+    --sidebar-border: var(--neutral-700);
+    --sidebar-ring: var(--neutral-50);
+
+    --wine-red: var(--burgundy-300);
+    --wine-red-subtle: var(--burgundy-900);
+    --wine-rose: var(--pink-300);
+    --wine-rose-subtle: var(--pink-900);
+    --wine-white: var(--gold-300);
+    --wine-white-subtle: var(--gold-900);
+    --wine-sweet: var(--purple-300);
+    --wine-sweet-subtle: var(--purple-900);
+    --wine-fortified: var(--amber-300);
+    --wine-fortified-subtle: var(--amber-900);
+
+    --syntax-keyword: var(--purple-300);
+    --syntax-string: var(--green-400);
+    --syntax-number: var(--orange-400);
+    --syntax-comment: var(--neutral-400);
+    --syntax-function: var(--blue-300);
+    --syntax-variable: var(--red-300);
+}
+
+/* ---------------------------------------------------------------------------
+   3. Densidad (colección "dimension": comfortable / compact)
+   --------------------------------------------------------------------------- */
+:root {
+    --control-3xs: 1rem;
+    --control-2xs: 1.25rem;
+    --control-xxs: 1.5rem;
+    --control-xs: 2rem;
+    --control-sm: 2.25rem;
+    --control-md: 2.5rem;
+    --control-lg: 3rem;
+    --control-xl: 3.5rem;
+
+    --inset-3xs: 0.125rem;
+    --inset-2xs: 0.25rem;
+    --inset-xs: 0.5rem;
+    --inset-sm: 0.75rem;
+    --inset-md: 1rem;
+    --inset-lg: 1.25rem;
+    --inset-xl: 1.5rem;
+    --inset-2xl: 2rem;
+    --inset-3xl: 3rem;
+
+    --gap-3xs: 0.125rem;
+    --gap-2xs: 0.25rem;
+    --gap-xs: 0.5rem;
+    --gap-sm: 0.75rem;
+    --gap-md: 1rem;
+    --gap-lg: 1.5rem;
+    --gap-xl: 2rem;
+}
+
+[data-density='compact'] {
+    --control-xs: 1.75rem;
+    --control-sm: 2rem;
+    --control-md: 2.25rem;
+    --control-lg: 2.5rem;
+    --control-xl: 3rem;
+
+    --inset-2xs: 0.125rem;
+    --inset-xs: 0.25rem;
+    --inset-sm: 0.5rem;
+    --inset-md: 0.75rem;
+    --inset-lg: 1rem;
+    --inset-xl: 1.25rem;
+    --inset-2xl: 1.5rem;
+    --inset-3xl: 2.5rem;
+
+    --gap-3xs: 1px;
+    --gap-2xs: 0.125rem;
+    --gap-xs: 0.25rem;
+    --gap-sm: 0.5rem;
+    --gap-md: 0.75rem;
+    --gap-lg: 1rem;
+    --gap-xl: 1.5rem;
+}
+
+/* ---------------------------------------------------------------------------
+   4. Tokens para Tailwind
+   --------------------------------------------------------------------------- */
+@theme inline {
+    /* Quito la paleta por defecto: en los componentes solo se usan tokens. */
+    --color-*: initial;
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-destructive-subtle: var(--destructive-subtle);
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-success-subtle: var(--success-subtle);
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+    --color-warning-subtle: var(--warning-subtle);
+    --color-info: var(--info);
+    --color-info-foreground: var(--info-foreground);
+    --color-info-subtle: var(--info-subtle);
+    --color-brand: var(--brand);
+    --color-brand-foreground: var(--brand-foreground);
+    --color-brand-subtle: var(--brand-subtle);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --color-link: var(--link);
+    --color-link-visited: var(--link-visited);
+    --color-overlay: var(--overlay);
+    --color-shadow: var(--shadow);
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-wine-red: var(--wine-red);
+    --color-wine-red-subtle: var(--wine-red-subtle);
+    --color-wine-rose: var(--wine-rose);
+    --color-wine-rose-subtle: var(--wine-rose-subtle);
+    --color-wine-white: var(--wine-white);
+    --color-wine-white-subtle: var(--wine-white-subtle);
+    --color-wine-sweet: var(--wine-sweet);
+    --color-wine-sweet-subtle: var(--wine-sweet-subtle);
+    --color-wine-fortified: var(--wine-fortified);
+    --color-wine-fortified-subtle: var(--wine-fortified-subtle);
+    --color-syntax-keyword: var(--syntax-keyword);
+    --color-syntax-string: var(--syntax-string);
+    --color-syntax-number: var(--syntax-number);
+    --color-syntax-comment: var(--syntax-comment);
+    --color-syntax-function: var(--syntax-function);
+    --color-syntax-variable: var(--syntax-variable);
+
+    /* Tipografía: Geist (texto), Geist Mono (código) y Funnel Display (títulos 3xl+) */
+    --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+    --font-display: var(--font-funnel-display), var(--font-geist-sans), sans-serif;
+    --text-2xs: 0.625rem;
+    --text-2xs--line-height: 0.875rem;
+    /* Tracking de los estilos de texto de Figma (2xs/xs +3,33 %, sm +1,79 %, 6xl+ −2 %) */
+    --text-2xs--letter-spacing: 0.0333em;
+    --text-xs--letter-spacing: 0.0333em;
+    --text-sm--letter-spacing: 0.0179em;
+    --text-6xl--letter-spacing: -0.02em;
+    --text-7xl--letter-spacing: -0.02em;
+    --text-8xl--letter-spacing: -0.02em;
+    --text-9xl--letter-spacing: -0.02em;
+
+    /* Densidad: h-control-md, px-inset-lg, gap-gap-xs... */
+    --spacing-control-3xs: var(--control-3xs);
+    --spacing-control-2xs: var(--control-2xs);
+    --spacing-control-xxs: var(--control-xxs);
+    --spacing-control-xs: var(--control-xs);
+    --spacing-control-sm: var(--control-sm);
+    --spacing-control-md: var(--control-md);
+    --spacing-control-lg: var(--control-lg);
+    --spacing-control-xl: var(--control-xl);
+    --spacing-inset-3xs: var(--inset-3xs);
+    --spacing-inset-2xs: var(--inset-2xs);
+    --spacing-inset-xs: var(--inset-xs);
+    --spacing-inset-sm: var(--inset-sm);
+    --spacing-inset-md: var(--inset-md);
+    --spacing-inset-lg: var(--inset-lg);
+    --spacing-inset-xl: var(--inset-xl);
+    --spacing-inset-2xl: var(--inset-2xl);
+    --spacing-inset-3xl: var(--inset-3xl);
+    --spacing-gap-3xs: var(--gap-3xs);
+    --spacing-gap-2xs: var(--gap-2xs);
+    --spacing-gap-xs: var(--gap-xs);
+    --spacing-gap-sm: var(--gap-sm);
+    --spacing-gap-md: var(--gap-md);
+    --spacing-gap-lg: var(--gap-lg);
+    --spacing-gap-xl: var(--gap-xl);
+
+    /* Tamaños de icono (size-icon-sm...) */
+    --spacing-icon-3xs: 0.75rem;
+    --spacing-icon-2xs: 0.875rem;
+    --spacing-icon-xs: 1rem;
+    --spacing-icon-sm: 1.25rem;
+    --spacing-icon-md: 1.5rem;
+    --spacing-icon-lg: 2rem;
+    --spacing-icon-xl: 2.5rem;
+
+    /* Contenedores: de 3xs a 7xl coinciden con Tailwind; Figma añade 8xl y 9xl */
+    --container-8xl: 84rem;
+    --container-9xl: 90rem;
+
+    /* Sombras de Figma (effect styles). El color sale del token shadow, que sube en oscuro. */
+    --shadow-2xs: 0 1px 0 0 var(--shadow);
+    --shadow-xs: 0 1px 2px 0 var(--shadow);
+    --shadow-sm: 0 1px 2px -1px var(--shadow), 0 1px 3px 0 var(--shadow);
+    --shadow-md: 0 2px 4px -2px var(--shadow), 0 4px 6px -1px var(--shadow);
+    --shadow-lg: 0 4px 6px -4px var(--shadow), 0 10px 15px -3px var(--shadow);
+    --shadow-xl: 0 8px 10px -6px var(--shadow), 0 20px 25px -5px var(--shadow);
+    --shadow-2xl: 0 20px 50px -5px var(--shadow);
+    --inset-shadow-xs: inset 0 1px 2px 0 var(--shadow);
+    --inset-shadow-sm: inset 0 2px 4px 0 var(--shadow);
+    --inset-shadow-md: inset 0 2px 4px -2px var(--shadow), inset 0 4px 8px 0 var(--shadow);
+    --inset-shadow-lg: inset 0 4px 8px -4px var(--shadow), inset 0 8px 16px 0 var(--shadow);
+
+    /* Breakpoints de Figma (sm, md, lg y xl coinciden con Tailwind) */
+    --breakpoint-2xs: 22.5rem;
+    --breakpoint-xs: 30rem;
+    --breakpoint-2xl: 90rem;
+    --breakpoint-3xl: 96rem;
+    --breakpoint-4xl: 120rem;
+
+    /* Animaciones de Accordion (Radix expone la altura del contenido) */
+    --animate-accordion-down: accordion-down 200ms ease-out;
+    --animate-accordion-up: accordion-up 200ms ease-out;
+}
+
+@keyframes accordion-down {
+    from {
+        height: 0;
+    }
+    to {
+        height: var(--radix-accordion-content-height);
+    }
+}
+
+@keyframes accordion-up {
+    from {
+        height: var(--radix-accordion-content-height);
+    }
+    to {
+        height: 0;
+    }
+}
+
 @layer base {
-    *,
-    ::after,
-    ::before,
-    ::backdrop,
-    ::file-selector-button {
-        border-color: var(--color-gray-200, currentcolor);
-    }
     * {
-        @apply border-border outline-ring/50;
-    }
-    body {
-        @apply bg-background text-foreground;
+        @apply border-border;
     }
     html {
         @apply font-sans;
     }
+    body {
+        @apply bg-background text-foreground antialiased;
+    }
+    /* Anillo de foco común (border/focus-ring: 2 px, offset 2 px) */
+    :focus-visible {
+        @apply outline-2 outline-offset-2 outline-ring;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        ::before,
+        ::after {
+            animation-duration: 0.01ms !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
 }
 
-@utility text-balance {
-    text-wrap: balance;
+/* Contenedor y secciones de página (DESIGN.md) */
+@utility container-main {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
 }
 
-/*
-  ---break---
-*/
-@theme inline {
-    --font-heading: var(--font-geist-sans);
-    --font-sans: var(--font-geist-sans);
-    --font-mono: var(--font-geist-mono);
-    --color-brand: var(--brand);
-    --color-sidebar-ring: var(--sidebar-ring);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar: var(--sidebar);
-    --color-chart-5: var(--chart-5);
-    --color-chart-4: var(--chart-4);
-    --color-chart-3: var(--chart-3);
-    --color-chart-2: var(--chart-2);
-    --color-chart-1: var(--chart-1);
-    --color-ring: var(--ring);
-    --color-input: var(--input);
-    --color-border: var(--border);
-    --color-destructive: var(--destructive);
-    --color-accent-foreground: var(--accent-foreground);
-    --color-accent: var(--accent);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-muted: var(--muted);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-secondary: var(--secondary);
-    --color-primary-foreground: var(--primary-foreground);
-    --color-primary: var(--primary);
-    --color-popover-foreground: var(--popover-foreground);
-    --color-popover: var(--popover);
-    --color-card-foreground: var(--card-foreground);
-    --color-card: var(--card);
-    --color-foreground: var(--foreground);
-    --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
+/* Rejilla de Figma (Grids): 4 columnas con 16 px en móvil, 8 con 32 px en tablet y 12 con 32 px en escritorio */
+@utility grid-layout {
+    @apply grid grid-cols-4 gap-x-4 md:grid-cols-8 md:gap-x-8 lg:grid-cols-12;
 }
-/*
-  ---break---
-*/
-:root {
-    --brand: #a85d30;
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-}
-/*
-  ---break---
-*/
-.dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+
+@utility section {
+    @apply py-12 lg:py-20;
 }
