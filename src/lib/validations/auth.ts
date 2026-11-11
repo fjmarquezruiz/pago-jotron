@@ -18,3 +18,11 @@ export const registerSchema = z.object({
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
+
+/** Datos del formulario de login (RF2). */
+export const loginSchema = z.object({
+    email: z.string().trim().toLowerCase().email('Introduce un correo válido'),
+    password: z.string().min(1, 'Introduce tu contraseña'),
+});
+
+export type LoginInput = z.infer<typeof loginSchema>;
