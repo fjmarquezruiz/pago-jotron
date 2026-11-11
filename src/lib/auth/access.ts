@@ -14,10 +14,7 @@ function matches(path: string, prefix: string): boolean {
  * @param path Ruta de la petición, p. ej. `/productos/fino`.
  */
 export function isPublicPath(path: string): boolean {
-    return (
-        PUBLIC_EXACT.includes(path) ||
-        PUBLIC_PREFIXES.some((p) => matches(path, p))
-    );
+    return PUBLIC_EXACT.includes(path) || PUBLIC_PREFIXES.some((p) => matches(path, p));
 }
 
 /**
