@@ -18,7 +18,7 @@ export default async function LoginPage({ searchParams }: Props) {
     if (session) redirect(callbackUrl);
 
     return (
-        <main className="bg-background flex min-h-screen w-full items-stretch">
+        <main className="flex min-h-screen w-full items-stretch bg-background">
             <div className="relative hidden min-w-px flex-1 md:block">
                 <Image
                     src="/images/auth/login-bg.png"
@@ -28,10 +28,10 @@ export default async function LoginPage({ searchParams }: Props) {
                     sizes="50vw"
                     className="object-cover"
                 />
-                <div className="absolute inset-0 bg-linear-to-l from-transparent to-black/40" />
+                <div className="overlay/60 absolute inset-0 bg-linear-to-l from-transparent" />
             </div>
 
-            <section className="bg-background flex min-w-px flex-1 flex-col items-center justify-center p-6 md:p-14">
+            <section className="flex min-w-px flex-1 flex-col items-center justify-center bg-background p-6 md:p-14">
                 <div className="flex w-full max-w-md flex-col items-center gap-12">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <Image
@@ -43,10 +43,10 @@ export default async function LoginPage({ searchParams }: Props) {
                     />
 
                     <div className="flex w-full flex-col items-center gap-3">
-                        <h1 className="text-foreground w-full text-xl leading-7 font-normal">
+                        <h1 className="w-full text-xl leading-7 font-normal text-foreground">
                             Te damos la bienvenida
                         </h1>
-                        <p className="text-muted-foreground w-full text-sm leading-5">
+                        <p className="w-full text-sm leading-5 text-muted-foreground">
                             Inicia sesión en tu cuenta
                         </p>
                     </div>

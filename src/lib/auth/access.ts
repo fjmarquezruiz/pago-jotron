@@ -1,7 +1,7 @@
 import { Role } from '@/types/auth';
 
 const PUBLIC_EXACT = ['/'];
-const PUBLIC_PREFIXES = ['/productos', '/auth', '/api/auth', '/acceso-denegado'];
+const PUBLIC_PREFIXES = ['/productos', '/auth', '/api/auth', '/acceso-denegado', '/sistema-diseno'];
 const ADMIN_ONLY = ['/admin/usuarios', '/admin/pedidos', '/admin/auditoria'];
 
 /** Comprueba si `path` es `prefix` o cuelga de él (`/admin` sí, `/administracion` no). */
