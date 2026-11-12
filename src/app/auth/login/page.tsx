@@ -43,10 +43,10 @@ export default async function LoginPage({ searchParams }: Props) {
                     />
 
                     <div className="flex w-full flex-col items-center gap-3">
-                        <h1 className="w-full text-xl leading-7 font-normal text-foreground">
+                        <h1 className="w-full text-center text-xl leading-7 font-normal text-foreground">
                             Te damos la bienvenida
                         </h1>
-                        <p className="w-full text-sm leading-5 text-muted-foreground">
+                        <p className="w-full text-center text-sm leading-5 text-muted-foreground">
                             Inicia sesión en tu cuenta
                         </p>
                     </div>

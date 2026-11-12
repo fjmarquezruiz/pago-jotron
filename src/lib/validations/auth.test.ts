@@ -43,6 +43,12 @@ describe('registerSchema', () => {
         expect(registerSchema.safeParse({ ...valid, password: 'PASSWORD123' }).success).toBe(false);
     });
 
+    it('rechaza una fecha de nacimiento que no existe', () => {
+        const result = registerSchema.safeParse({ ...valid, birthDate: '1990-02-30' });
+        expect(result.success).toBe(false);
+        expect(result.error?.issues[0].message).toBe('La fecha no existe');
+    });
+
     it('rechaza fecha de nacimiento en formato incorrecto', () => {
         expect(registerSchema.safeParse({ ...valid, birthDate: '01-01-1990' }).success).toBe(false);
     });
