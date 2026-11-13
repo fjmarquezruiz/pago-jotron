@@ -11,7 +11,6 @@ const PUBLIC_PREFIXES = [
     '/condiciones',
     '/privacidad',
     '/cookies',
-    '/sistema-diseno',
 ];
 /** Rutas que se pueden ver sin haber verificado la edad: acceso, API, la propia verificación y páginas legales. */
 const AGE_GATE_EXEMPT = [
@@ -22,7 +21,7 @@ const AGE_GATE_EXEMPT = [
     '/privacidad',
     '/cookies',
 ];
-const ADMIN_ONLY = ['/admin/usuarios', '/admin/pedidos', '/admin/auditoria'];
+const ADMIN_ONLY = ['/admin/usuarios', '/admin/pedidos', '/admin/auditoria', '/sistema-diseno'];
 
 /** Comprueba si `path` es `prefix` o cuelga de él (`/admin` sí, `/administracion` no). */
 function matches(path: string, prefix: string): boolean {
