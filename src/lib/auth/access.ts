@@ -1,7 +1,27 @@
 import { Role } from '@/types/auth';
 
 const PUBLIC_EXACT = ['/'];
-const PUBLIC_PREFIXES = ['/productos', '/auth', '/api/auth', '/acceso-denegado', '/sistema-diseno'];
+const PUBLIC_PREFIXES = [
+    '/productos',
+    '/auth',
+    '/api/auth',
+    '/api/verificar-edad',
+    '/acceso-denegado',
+    '/verificar-edad',
+    '/condiciones',
+    '/privacidad',
+    '/cookies',
+    '/sistema-diseno',
+];
+/** Rutas que se pueden ver sin haber verificado la edad: acceso, API, la propia verificación y páginas legales. */
+const AGE_GATE_EXEMPT = [
+    '/auth',
+    '/api',
+    '/verificar-edad',
+    '/condiciones',
+    '/privacidad',
+    '/cookies',
+];
 const ADMIN_ONLY = ['/admin/usuarios', '/admin/pedidos', '/admin/auditoria'];
 
 /** Comprueba si `path` es `prefix` o cuelga de él (`/admin` sí, `/administracion` no). */
@@ -29,4 +49,16 @@ export function checkAccess(path: string, role: Role | null): 'ok' | 'login' | '
     if (ADMIN_ONLY.some((p) => matches(path, p))) return role === 'Administrador' ? 'ok' : 'denied';
     if (matches(path, '/admin')) return role === 'Cliente' ? 'denied' : 'ok';
     return 'ok';
+}
+
+/**
+ * Decide si hay que mandar a la verificación de edad (RNF3). Quien tiene la cookie o una sesión
+ * ya la dio (al registrarse). Lo usa el middleware antes de `checkAccess`.
+ * @param path Ruta de la petición.
+ * @param hasCookie `true` si trae la cookie `age_verified`.
+ * @param hasSession `true` si hay sesión iniciada.
+ */
+export function needsAgeGate(path: string, hasCookie: boolean, hasSession: boolean): boolean {
+    if (hasCookie || hasSession) return false;
+    return !AGE_GATE_EXEMPT.some((p) => matches(path, p));
 }
