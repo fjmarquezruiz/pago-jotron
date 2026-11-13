@@ -1,3 +1,9 @@
+/** Cookie técnica que marca que se ha verificado la mayoría de edad. No guarda la fecha (RGPD). */
+export const AGE_VERIFIED_COOKIE = 'age_verified';
+
+/** Duración de la cookie de edad verificada: 30 días, en segundos. */
+export const AGE_VERIFIED_MAX_AGE = 60 * 60 * 24 * 30;
+
 /**
  * Comprueba que una cadena `AAAA-MM-DD` es una fecha real del calendario (RF2).
  * Rechaza formatos distintos y días que no existen (30 de febrero, 31 de abril, 29 de febrero

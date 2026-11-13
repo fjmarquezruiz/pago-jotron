@@ -8,6 +8,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff } from 'lucide-react';
 import { registerFormSchema, toBirthDate, type RegisterFormInput } from '@/lib/validations/auth';
+import { BirthDateSelects } from '@/components/auth/birth-date-selects';
 import { Alert } from '@/components/ui/alert';
 import { Button, IconButton } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -23,29 +24,6 @@ import { HelperText } from '@/components/ui/helper-text';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TextLink } from '@/components/ui/link';
-import {
-    Select,
-    SelectTrigger,
-    SelectValue,
-    SelectContent,
-    SelectItem,
-} from '@/components/ui/select';
-
-const MONTHS = [
-    'Enero',
-    'Febrero',
-    'Marzo',
-    'Abril',
-    'Mayo',
-    'Junio',
-    'Julio',
-    'Agosto',
-    'Septiembre',
-    'Octubre',
-    'Noviembre',
-    'Diciembre',
-];
-const DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1));
 
 const PASSWORD_HINT = 'Mínimo 8 caracteres, con mayúscula, minúscula y número.';
 
@@ -130,8 +108,6 @@ export function RegisterForm({ callbackUrl }: { callbackUrl: string }) {
     /** El botón solo se activa cuando se aceptan las condiciones (decisión de diseño). */
     const acceptedTerms = useWatch({ control, name: 'acceptPrivacy' });
 
-    const currentYear = new Date().getFullYear();
-    const years = Array.from({ length: 101 }, (_, i) => String(currentYear - i));
     const birthError = errors.birthDay ?? errors.birthMonth ?? errors.birthYear;
 
     async function onSubmit(data: RegisterFormInput) {
@@ -237,50 +213,7 @@ export function RegisterForm({ callbackUrl }: { callbackUrl: string }) {
                     invalid={!!birthError}
                     helper={birthError?.message}
                 >
-                    <div className="grid grid-cols-3 gap-x-6">
-                        {(
-                            [
-                                { name: 'birthDay', label: 'Día', options: DAYS },
-                                {
-                                    name: 'birthMonth',
-                                    label: 'Mes',
-                                    options: MONTHS.map((_, i) => String(i + 1)),
-                                },
-                                { name: 'birthYear', label: 'Año', options: years },
-                            ] as const
-                        ).map(({ name, label, options }) => (
-                            <Controller
-                                key={name}
-                                control={control}
-                                name={name}
-                                render={({ field }) => (
-                                    <Select
-                                        value={field.value || undefined}
-                                        onValueChange={field.onChange}
-                                    >
-                                        <SelectTrigger
-                                            ref={field.ref}
-                                            onBlur={field.onBlur}
-                                            aria-label={label}
-                                            aria-invalid={!!errors[name] || undefined}
-                                            className="data-placeholder:text-foreground [&_svg]:text-foreground"
-                                        >
-                                            <SelectValue placeholder={label} />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {options.map((value) => (
-                                                <SelectItem key={value} value={value}>
-                                                    {name === 'birthMonth'
-                                                        ? MONTHS[Number(value) - 1]
-                                                        : value}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                            />
-                        ))}
-                    </div>
+                    <BirthDateSelects control={control} />
                 </Fieldset>
 
                 <div className="flex flex-col gap-2">

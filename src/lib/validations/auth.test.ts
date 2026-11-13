@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+    ageGateFormSchema,
+    ageGateSchema,
     registerFormSchema,
     registerSchema,
     toBirthDate,
@@ -126,5 +128,54 @@ describe('registerFormSchema', () => {
         expect(issues({ ...validForm, birthDay: '' })).toEqual([
             { path: 'birthDay', message: 'Elige el día' },
         ]);
+    });
+});
+
+describe('ageGateFormSchema', () => {
+    const issues = (input: { birthDay: string; birthMonth: string; birthYear: string }) => {
+        const result = ageGateFormSchema.safeParse(input);
+        return result.success
+            ? []
+            : result.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message }));
+    };
+
+    it('acepta una fecha que existe', () => {
+        expect(issues({ birthDay: '15', birthMonth: '1', birthYear: '1990' })).toEqual([]);
+    });
+
+    it('no trata la minoría de edad como error de campo', () => {
+        const minorYear = String(new Date().getFullYear() - 10);
+        expect(issues({ birthDay: '1', birthMonth: '1', birthYear: minorYear })).toEqual([]);
+    });
+
+    it('rechaza una fecha imposible en birthDay', () => {
+        expect(issues({ birthDay: '31', birthMonth: '4', birthYear: '1990' })).toEqual([
+            { path: 'birthDay', message: 'La fecha no existe' },
+        ]);
+    });
+
+    it('pide los tres desplegables', () => {
+        expect(issues({ birthDay: '', birthMonth: '', birthYear: '' })).toEqual([
+            { path: 'birthDay', message: 'Elige el día' },
+            { path: 'birthMonth', message: 'Elige el mes' },
+            { path: 'birthYear', message: 'Elige el año' },
+        ]);
+    });
+});
+
+describe('ageGateSchema', () => {
+    it('acepta una fecha AAAA-MM-DD real', () => {
+        expect(ageGateSchema.safeParse({ birthDate: '1990-01-15' }).success).toBe(true);
+    });
+
+    it('rechaza una fecha que no existe', () => {
+        const result = ageGateSchema.safeParse({ birthDate: '1990-02-30' });
+        expect(result.success).toBe(false);
+        expect(result.error?.issues[0].message).toBe('La fecha no existe');
+    });
+
+    it('rechaza un formato que no es AAAA-MM-DD y un cuerpo sin fecha', () => {
+        expect(ageGateSchema.safeParse({ birthDate: '15/01/1990' }).success).toBe(false);
+        expect(ageGateSchema.safeParse({}).success).toBe(false);
     });
 });
