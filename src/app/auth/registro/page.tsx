@@ -20,16 +20,18 @@ export default async function RegisterPage({ searchParams }: Props) {
 
     return (
         <main className="flex min-h-screen w-full items-stretch bg-background">
-            <div className="relative hidden min-w-px flex-1 md:block">
-                <Image
-                    src="/images/auth/register-bg.png"
-                    alt=""
-                    fill
-                    priority
-                    sizes="50vw"
-                    className="object-cover"
-                />
-                <div className="to-black/40 absolute inset-0 bg-linear-to-l from-transparent" />
+            <div className="relative hidden min-w-px flex-1 p-2 md:flex">
+                <div className="relative w-full overflow-hidden rounded">
+                    <Image
+                        src="/images/auth/register-bg.png"
+                        alt=""
+                        fill
+                        priority
+                        sizes="50vw"
+                        className="object-cover"
+                    />
+                    <div className="to-black/40 absolute inset-0 bg-linear-to-l from-transparent" />
+                </div>
             </div>
 
             <section className="flex min-w-px flex-1 flex-col items-center justify-center bg-background p-6 md:p-14">
