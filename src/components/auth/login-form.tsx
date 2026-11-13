@@ -96,7 +96,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
                 variant="brand"
                 className="w-full"
             >
-                {isSubmitting ? 'Entrando…' : 'Iniciar sesión'}
+                Iniciar sesión
             </Button>
 
             <p className="flex items-start justify-center gap-1 text-sm leading-5 text-muted-foreground">
