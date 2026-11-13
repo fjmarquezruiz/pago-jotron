@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -31,6 +31,13 @@ export function AgeGate({ callbackUrl }: { callbackUrl: string }) {
         defaultValues: { birthDay: '', birthMonth: '', birthYear: '' },
     });
     const birthError = errors.birthDay ?? errors.birthMonth ?? errors.birthYear;
+    const minorHeadingRef = useRef<HTMLHeadingElement>(null);
+
+    // Al pasar a la pantalla de menores el botón que tenía el foco desaparece: se lleva el foco
+    // al título para que el lector de pantalla lo anuncie.
+    useEffect(() => {
+        if (isMinor) minorHeadingRef.current?.focus();
+    }, [isMinor]);
 
     async function onSubmit(data: AgeGateFormInput) {
         setFormError(null);
@@ -71,10 +78,14 @@ export function AgeGate({ callbackUrl }: { callbackUrl: string }) {
     if (isMinor) {
         return (
             <>
-                <h1 className="w-full text-center text-xl leading-7 font-normal text-foreground">
+                <h1
+                    ref={minorHeadingRef}
+                    tabIndex={-1}
+                    className="w-full text-center text-xl leading-7 font-normal text-foreground outline-none"
+                >
                     Lo sentimos
                 </h1>
-                <p role="status" className="w-full text-sm text-muted-foreground">
+                <p role="status" className="w-full text-center text-sm text-muted-foreground">
                     Vuelve cuando tengas 18 años
                 </p>
                 <div className="flex w-full items-start gap-6">
@@ -87,7 +98,7 @@ export function AgeGate({ callbackUrl }: { callbackUrl: string }) {
                             setIsMinor(false);
                         }}
                     >
-                        Salir
+                        Volver
                     </Button>
                 </div>
             </>
@@ -114,7 +125,7 @@ export function AgeGate({ callbackUrl }: { callbackUrl: string }) {
                     <BirthDateSelects control={control} showLabels />
                 </Fieldset>
 
-                <p className="w-full text-sm text-muted-foreground">
+                <p className="w-full text-center text-sm text-muted-foreground">
                     ¡Hola! Antes de explorar nuestra selección de vinos, por favor confirma que
                     tienes la edad legal para beber en tu país. ¡Salud y disfruta!
                 </p>
