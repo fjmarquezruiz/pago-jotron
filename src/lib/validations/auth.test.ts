@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { registerSchema, type RegisterInput } from './auth';
+import {
+    registerFormSchema,
+    registerSchema,
+    toBirthDate,
+    type RegisterFormInput,
+    type RegisterInput,
+} from './auth';
 
 const valid: RegisterInput = {
     email: '  Ana@Example.com ',
@@ -51,5 +57,74 @@ describe('registerSchema', () => {
 
     it('rechaza fecha de nacimiento en formato incorrecto', () => {
         expect(registerSchema.safeParse({ ...valid, birthDate: '01-01-1990' }).success).toBe(false);
+    });
+});
+
+describe('toBirthDate', () => {
+    it('rellena con ceros el día y el mes', () => {
+        expect(toBirthDate('5', '3', '1990')).toBe('1990-03-05');
+    });
+    it('respeta el día y el mes de dos cifras', () => {
+        expect(toBirthDate('25', '12', '1990')).toBe('1990-12-25');
+    });
+});
+
+describe('registerFormSchema', () => {
+    const validForm: RegisterFormInput = {
+        email: '  Ana@Example.com ',
+        password: 'Password123',
+        confirmPassword: 'Password123',
+        birthDay: '15',
+        birthMonth: '1',
+        birthYear: '1990',
+        acceptPrivacy: true,
+    };
+
+    /** Camino y mensaje de cada error que devuelve el esquema. */
+    const issues = (input: RegisterFormInput) => {
+        const result = registerFormSchema.safeParse(input);
+        return result.success
+            ? []
+            : result.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message }));
+    };
+
+    it('acepta un formulario válido y normaliza el email', () => {
+        const result = registerFormSchema.safeParse(validForm);
+        expect(result.success).toBe(true);
+        expect(result.data?.email).toBe('ana@example.com');
+    });
+
+    it('rechaza contraseñas distintas en confirmPassword', () => {
+        expect(issues({ ...validForm, confirmPassword: 'Password124' })).toEqual([
+            { path: 'confirmPassword', message: 'Las contraseñas no coinciden' },
+        ]);
+    });
+
+    it('rechaza una fecha imposible en birthDay', () => {
+        expect(issues({ ...validForm, birthDay: '31', birthMonth: '4' })).toEqual([
+            { path: 'birthDay', message: 'La fecha no existe' },
+        ]);
+    });
+
+    it('rechaza el 29 de febrero de un año no bisiesto en birthDay', () => {
+        expect(
+            issues({ ...validForm, birthDay: '29', birthMonth: '2', birthYear: '2001' }),
+        ).toEqual([{ path: 'birthDay', message: 'La fecha no existe' }]);
+    });
+
+    it('rechaza a un menor de edad en birthYear', () => {
+        const minorYear = String(new Date().getFullYear() - 10);
+        expect(issues({ ...validForm, birthYear: minorYear })).toEqual([
+            {
+                path: 'birthYear',
+                message: 'Tienes que ser mayor de edad (18 años o más) para registrarte',
+            },
+        ]);
+    });
+
+    it('no valida la fecha mientras falte alguno de los tres desplegables', () => {
+        expect(issues({ ...validForm, birthDay: '' })).toEqual([
+            { path: 'birthDay', message: 'Elige el día' },
+        ]);
     });
 });

@@ -24,14 +24,7 @@ export type RegisterInput = z.infer<typeof registerSchema>;
  * Datos del formulario de registro en pantalla: repite la contraseña y separa la fecha
  * de nacimiento en día, mes y año (los tres desplegables). Se convierte a `RegisterInput`
  * antes de llamar a la API.
-*/
-
-// export const registerFormSchema = registerSchema
-//     .extend({ confirmPassword: z.string() })
-//     .refine((d) => d.password === d.confirmPassword, {
-//         message: 'Las contraseñas no coinciden',
-//         path: ['confirmPassword'],
-//     });
+ */
 export const registerFormSchema = z
     .object({
         email: registerSchema.shape.email,
