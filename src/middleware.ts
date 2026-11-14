@@ -9,7 +9,13 @@ import { AGE_VERIFIED_COOKIE } from '@/lib/auth/age';
  */
 export async function middleware(req: NextRequest) {
     const { pathname } = req.nextUrl;
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+
+    const token = await getToken({
+        req,
+        secret: process.env.NEXTAUTH_SECRET,
+        secureCookie: req.nextUrl.protocol === 'https:',
+    });
+
     const hasAgeCookie = req.cookies.get(AGE_VERIFIED_COOKIE)?.value === '1';
 
     if (needsAgeGate(pathname, hasAgeCookie, !!token)) {
