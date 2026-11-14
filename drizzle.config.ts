@@ -15,8 +15,6 @@ export default defineConfig({
         user: decodeURIComponent(url.username),
         password: decodeURIComponent(url.password),
         database: url.pathname.slice(1),
-        ssl: process.env.DATABASE_SSL === 'true'
-            ? { minVersion: 'TLSv1.2', rejectUnauthorized: true }
-            : undefined,
+        ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: true } : undefined,
     },
 });
