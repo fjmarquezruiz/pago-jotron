@@ -41,6 +41,7 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { CloudinaryImage } from '@/components/ui/cloudinary-image';
 import {
     Dialog,
     DialogContent,
@@ -537,6 +538,23 @@ export function DesignSystemShowcase() {
                                     <CardDescription>Solo borde, sin sombra.</CardDescription>
                                 </CardHeader>
                                 <CardContent>Contenido de la tarjeta.</CardContent>
+                            </Card>
+                            <Card>
+                                <CardMedia>
+                                    <CloudinaryImage
+                                        src="pago-jotron/productos/payoya-negra-2022"
+                                        alt="Botella de Payoya Negra 2022"
+                                        fill
+                                        sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                                        className="object-contain"
+                                    />
+                                </CardMedia>
+                                <CardHeader>
+                                    <CardTitle>Payoya Negra 2022</CardTitle>
+                                    <CardDescription>
+                                        Imagen servida desde Cloudinary.
+                                    </CardDescription>
+                                </CardHeader>
                             </Card>
                         </div>
                         <Table>

@@ -199,6 +199,9 @@ importers:
       next-auth:
         specifier: ^4.24.15
         version: 4.24.15(next@14.2.35(@babel/core@7.29.13(supports-color@7.2.0))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      next-cloudinary:
+        specifier: ^7.1.0
+        version: 7.1.0(next@14.2.35(@babel/core@7.29.13(supports-color@7.2.0))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
       radix-ui:
         specifier: ^1.8.1
         version: 1.8.1(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -236,6 +239,9 @@ importers:
       '@types/react-dom':
         specifier: ^18
         version: 18.3.7(@types/react@18.3.31)
+      cloudinary:
+        specifier: ^2.11.0
+        version: 2.11.0
       dotenv:
         specifier: ^18.0.9
         version: 18.0.9
@@ -349,6 +355,21 @@ packages:
   '@babel/types@7.29.11':
     resolution: {integrity: sha512-WCsemW40Cpc6gouC1SrY6PBaZ+oLRlEVY9XBvZBI7il/HyUrb2nJ505wE1MHEFyDZNnrWDEuy4jL50WVHfTTSQ==}
     engines: {node: '>=6.9.0'}
+
+  '@cloudinary-util/types@1.7.0':
+    resolution: {integrity: sha512-4oz0zVupn1KFpi9BxzmhurYiVX5eek5DXhE1VlVwr+MeKEzrAFzrEkq2BAY0S7LRUnNT2p5UQIKoCE82MNju4g==}
+
+  '@cloudinary-util/url-loader@6.3.2':
+    resolution: {integrity: sha512-l/hLdFmTlQu0XCHzOBzXoSzhQKYuu96egPu7+W2Z5wBe7jRDfNHdH+ID4Ase1Jby8HI2xniJX2L83fglJV83+w==}
+
+  '@cloudinary-util/util@4.3.0':
+    resolution: {integrity: sha512-oP0HozxMd7XZcnh6VRUri2lXLvJVcT8IDou2470ZEcNXeX+6eeixZR1rAngjLcg+p6lVJsSHvrbJ3hODaYBXxw==}
+
+  '@cloudinary/transformation-builder-sdk@1.21.2':
+    resolution: {integrity: sha512-ehOgKUaP+Nvuf7B0TosmB8iilL0kdiVjzjl8tIK06cjvsNnwSJI3xP9nEJmKkvqNxwwFwvYXT+mxUTqnSv9JOA==}
+
+  '@cloudinary/url-gen@1.15.0':
+    resolution: {integrity: sha512-bjU67eZxLUgoRy/Plli4TQio7q6P31OYqnEgXxeN9TKXrzr6h0DeEdIUhKI9gy3HkEBWXWWJIPh7j7gkOJPnyA==}
 
   '@drizzle-team/brocli@0.10.2':
     resolution: {integrity: sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==}
@@ -2332,6 +2353,10 @@ packages:
   client-only@0.0.1:
     resolution: {integrity: sha512-IV3Ou0jSMzZrd3pZ48nLkT9DA7Ag1pnPzaiQhpW7c3RbcqqzvzzVu+L8gfqMp/8IM2MQtSiqaCxrrcfu8I8rMA==}
 
+  cloudinary@2.11.0:
+    resolution: {integrity: sha512-o2pAkDDqrzPFE/mn9GCfFjBIGQmPs++Ts6rtkFl4vY528DNHiMovKWjH16HBjeGa9iwI7eAad24aWN2emT0aww==}
+    engines: {node: '>=9'}
+
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
     engines: {node: '>=6'}
@@ -3186,6 +3211,9 @@ packages:
   lodash.merge@4.6.2:
     resolution: {integrity: sha512-0KpjqXRVvrYyCsX1swR/XTK0va6VQkQM6MNo7PqW77ByjAhoARA8EfrP1N4+KlKj8YS0ZUCtRT/YUuhyYDujIQ==}
 
+  lodash@4.18.1:
+    resolution: {integrity: sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==}
+
   long@5.3.2:
     resolution: {integrity: sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==}
 
@@ -3280,6 +3308,13 @@ packages:
         optional: true
       nodemailer:
         optional: true
+
+  next-cloudinary@7.1.0:
+    resolution: {integrity: sha512-xqvFjfVWytLNQ2aM2nr85cQiKq+1jt01ugLqlc6TfZ36g6nZhV84kTkxdjuzln8JbnCv1/W+f8pzecE/E+D5wQ==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      next: ^16
+      react: ^18.2.0 || ^19
 
   next@14.2.35:
     resolution: {integrity: sha512-KhYd2Hjt/O1/1aZVX3dCwGXM1QmOV4eNM2UTacK5gipDdPN/oHHK/4oVGy7X8GMfPMsUTUEmGlsy0EY1YGAkig==}
@@ -4164,6 +4199,24 @@ snapshots:
       '@babel/helper-string-parser': 7.29.13
       '@babel/helper-validator-identifier': 7.29.7
     optional: true
+
+  '@cloudinary-util/types@1.7.0': {}
+
+  '@cloudinary-util/url-loader@6.3.2':
+    dependencies:
+      '@cloudinary-util/types': 1.7.0
+      '@cloudinary-util/util': 4.3.0
+      '@cloudinary/url-gen': 1.15.0
+
+  '@cloudinary-util/util@4.3.0': {}
+
+  '@cloudinary/transformation-builder-sdk@1.21.2':
+    dependencies:
+      '@cloudinary/url-gen': 1.15.0
+
+  '@cloudinary/url-gen@1.15.0':
+    dependencies:
+      '@cloudinary/transformation-builder-sdk': 1.21.2
 
   '@drizzle-team/brocli@0.10.2': {}
 
@@ -5816,6 +5869,10 @@ snapshots:
 
   client-only@0.0.1: {}
 
+  cloudinary@2.11.0:
+    dependencies:
+      lodash: 4.18.1
+
   clsx@2.1.1: {}
 
   color-convert@2.0.1:
@@ -6777,6 +6834,8 @@ snapshots:
 
   lodash.merge@4.6.2: {}
 
+  lodash@4.18.1: {}
+
   long@5.3.2: {}
 
   loose-envify@1.4.0:
@@ -6861,6 +6920,14 @@ snapshots:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
       uuid: 11.1.1
+
+  next-cloudinary@7.1.0(next@14.2.35(@babel/core@7.29.13(supports-color@7.2.0))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1):
+    dependencies:
+      '@cloudinary-util/types': 1.7.0
+      '@cloudinary-util/url-loader': 6.3.2
+      '@cloudinary-util/util': 4.3.0
+      next: 14.2.35(@babel/core@7.29.13(supports-color@7.2.0))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react: 18.3.1
 
   next@14.2.35(@babel/core@7.29.13(supports-color@7.2.0))(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
