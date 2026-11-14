@@ -8,6 +8,7 @@
 
 # testing
 /coverage
+/public/images/productos/
 
 # next.js
 /.next/
