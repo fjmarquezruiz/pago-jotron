@@ -20,6 +20,10 @@ export interface EmptyStateProps extends Omit<React.HTMLAttributes<HTMLDivElemen
  * Caja con borde, icono en un círculo de 80 px, título en la fuente de titulares (3xl), texto de
  * apoyo y una fila de acciones, todo centrado en un ancho máximo de 640 px.
  *
+ * La caja ocupa todo el ancho de su contenedor y mide al menos 640 px de alto, con el contenido
+ * centrado en vertical, como la instancia de Figma (1440 × 640). Dentro de un contenedor pequeño
+ * (tarjeta, drawer, tabla) quita ese alto con `className="min-h-0"`.
+ *
  * @example
  * <EmptyState
  *     title="Sin resultados con: “Pago de Martinez”"
@@ -44,7 +48,7 @@ const EmptyState = React.forwardRef<HTMLDivElement, EmptyStateProps>(
         <div
             ref={ref}
             className={cn(
-                'flex flex-col items-center justify-center gap-6 rounded-sm p-6 text-center',
+                'flex min-h-160 w-full flex-col items-center justify-center gap-6 rounded-sm p-6 text-center',
                 bordered && 'border border-border',
                 className,
             )}

@@ -54,7 +54,7 @@ export function ProductShippingInfo({ shippingTypes }: ProductShippingInfoProps)
                     <AccordionContent className="px-inset-xs pt-inset-2xs">
                         <div className="flex flex-col gap-6 text-sm">
                             <PolicySection title="Envío">
-                                <ul className="flex list-disc flex-col gap-2 ps-[21px] text-muted-foreground">
+                                <ul className="flex list-disc flex-col gap-2 ps-5 text-muted-foreground">
                                     {shippingLines.map((line) => (
                                         <li key={line}>{line}</li>
                                     ))}

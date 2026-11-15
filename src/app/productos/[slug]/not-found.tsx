@@ -11,8 +11,8 @@ import { EmptyState } from '@/components/ui/empty-state';
  */
 export default function ProductNotFound() {
     return (
-        <main className="mx-auto w-full max-w-9xl px-6 py-16 lg:py-40">
-            <div className="mx-auto w-full max-w-6xl">
+        <main className="px-6 py-16 lg:py-40">
+            <div className="mx-auto w-full max-w-9xl">
                 <EmptyState
                     titleAs="h1"
                     title="Este producto no está disponible"

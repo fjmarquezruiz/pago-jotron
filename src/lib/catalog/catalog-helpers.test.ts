@@ -65,7 +65,12 @@ describe('typologyTone', () => {
 
 describe('buildSpecRows', () => {
     const wine: SpecSheetInput = {
-        guaranteeOfOrigin: { region: 'Montes de Málaga' },
+        winery: { name: 'Bodega Pago de Jotrón' },
+        guaranteeOfOrigin: {
+            name: 'Sierras de Málaga',
+            classification: 'DO',
+            region: 'Montes de Málaga',
+        },
         grapes: [
             { percentage: '50.00', grape: { name: 'Tintilla de Rota' } },
             { percentage: '30.00', grape: { name: 'Syrah' } },
@@ -76,24 +81,33 @@ describe('buildSpecRows', () => {
         minTemperature: '14.00',
         maxTemperature: '16.00',
         production: '18.000 botellas',
+        vineyardAltitude: 850,
+        soilType: 'Pizarra y arcilla',
+        yield: 4500,
         variants: [
             { capacity: 750, capacityUnit: 'ml' },
             { capacity: 375, capacityUnit: 'ml' },
         ],
     };
     const empty: SpecSheetInput = {
-        guaranteeOfOrigin: { region: null },
+        winery: { name: '' },
+        guaranteeOfOrigin: { name: '', classification: '', region: null },
         grapes: [],
         alcoholContent: null,
         agingTime: null,
         minTemperature: null,
         maxTemperature: null,
         production: null,
+        vineyardAltitude: null,
+        soilType: null,
+        yield: null,
         variants: [],
     };
 
-    it('devuelve todas las filas, en el orden del diseño', () => {
+    it('devuelve todas las filas, en orden', () => {
         expect(buildSpecRows(wine)).toEqual([
+            { label: 'Bodega', value: 'Bodega Pago de Jotrón' },
+            { label: 'Denominación de origen', value: 'DO Sierras de Málaga' },
             { label: 'Región', value: 'Montes de Málaga' },
             {
                 label: 'Variedades de uva',
@@ -103,7 +117,47 @@ describe('buildSpecRows', () => {
             { label: 'Crianza', value: '4 meses en barrica de roble francés' },
             { label: 'Temperatura de servicio', value: '14–16°C' },
             { label: 'Producción', value: '18.000 botellas' },
+            { label: 'Altitud del viñedo', value: '850 m' },
+            { label: 'Tipo de suelo', value: 'Pizarra y arcilla' },
+            { label: 'Rendimiento', value: '4.500 kg/ha' },
             { label: 'Formato de botella', value: '375ml, 750ml' },
+        ]);
+    });
+
+    it('la bodega y la denominación (con su clasificación) van las primeras', () => {
+        const [winery, origin] = buildSpecRows({
+            ...empty,
+            winery: { name: 'Lustau' },
+            guaranteeOfOrigin: {
+                name: 'Jerez-Xérès-Sherry',
+                classification: 'DO',
+                region: 'Marco de Jerez (Cádiz)',
+            },
+        });
+        expect(winery).toEqual({ label: 'Bodega', value: 'Lustau' });
+        expect(origin).toEqual({ label: 'Denominación de origen', value: 'DO Jerez-Xérès-Sherry' });
+    });
+
+    it.each([
+        [850, 'Altitud del viñedo', '850 m'],
+        [1100, 'Altitud del viñedo', '1.100 m'],
+        [4500, 'Rendimiento', '4.500 kg/ha'],
+        [12000, 'Rendimiento', '12.000 kg/ha'],
+        [null, 'Altitud del viñedo', null],
+        [null, 'Rendimiento', null],
+    ] as const)('medida %s (%s) → %s', (value, label, expected) => {
+        const rows = buildSpecRows({
+            ...empty,
+            vineyardAltitude: label === 'Altitud del viñedo' ? value : null,
+            yield: label === 'Rendimiento' ? value : null,
+        });
+        expect(rows.find((row) => row.label === label)?.value ?? null).toBe(expected);
+    });
+
+    it('el tipo de suelo vacío no se pinta', () => {
+        expect(buildSpecRows({ ...empty, soilType: '  ' })).toEqual([]);
+        expect(buildSpecRows({ ...empty, soilType: 'Albariza' })).toEqual([
+            { label: 'Tipo de suelo', value: 'Albariza' },
         ]);
     });
 

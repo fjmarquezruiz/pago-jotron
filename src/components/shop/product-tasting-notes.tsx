@@ -6,7 +6,7 @@ interface ProductTastingNotesProps {
     product: ProductDetail;
 }
 
-/** Bloque de texto con título: "Notas", "Paladar". */
+/** Bloque de texto con título: "Vista", "Notas", "Paladar", "Maridaje". */
 function NoteBlock({ title, text }: { title: string; text: string }) {
     return (
         <section className="flex flex-col gap-4">
@@ -17,19 +17,25 @@ function NoteBlock({ title, text }: { title: string; text: string }) {
 }
 
 /**
- * Notas de cata: las etiquetas de cata y los textos de aroma ("Notas") y de paladar ("Paladar").
- * Lo que no tiene dato no se pinta, y sin ninguno de los tres no devuelve nada. El diseño tiene
- * también un bloque "Final", pero la base de datos no guarda ese texto.
+ * Notas de cata: las etiquetas de cata y los textos de vista ("Vista"), aroma ("Notas"), paladar
+ * ("Paladar") y maridaje ("Maridaje"), en ese orden. Lo que no tiene dato no se pinta, y sin nada
+ * que pintar no devuelve nada.
+ *
+ * El diseño tiene también un bloque "Final", pero la base de datos no guarda ese texto: el
+ * maridaje va donde iría. "Vista" y "Maridaje" no están en el diseño; se añadieron a petición del
+ * producto.
  *
  * @example
  * <ProductTastingNotes product={product} />
  */
 export function ProductTastingNotes({ product }: ProductTastingNotesProps) {
     const tags = product.tastingTags.map(({ tastingTag }) => tastingTag);
+    const visual = product.visualNote?.trim();
     const aroma = product.aromaNote?.trim();
     const palate = product.palateNote?.trim();
+    const pairing = product.foodPairing?.trim();
 
-    if (tags.length === 0 && !aroma && !palate) return null;
+    if (tags.length === 0 && !visual && !aroma && !palate && !pairing) return null;
 
     return (
         <div className="flex flex-col gap-8">
@@ -42,8 +48,10 @@ export function ProductTastingNotes({ product }: ProductTastingNotesProps) {
                     ))}
                 </ul>
             )}
+            {visual && <NoteBlock title="Vista" text={visual} />}
             {aroma && <NoteBlock title="Notas" text={aroma} />}
             {palate && <NoteBlock title="Paladar" text={palate} />}
+            {pairing && <NoteBlock title="Maridaje" text={pairing} />}
         </div>
     );
 }

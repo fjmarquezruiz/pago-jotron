@@ -469,6 +469,7 @@ export function DesignSystemShowcase() {
                         <Card variant="outlined" className="max-w-md">
                             <EmptyState
                                 bordered={false}
+                                className="min-h-0"
                                 title="Aún no tienes pedidos"
                                 description="Cuando compres, verás aquí el estado de cada pedido."
                                 icon={<ShoppingBag />}
@@ -711,6 +712,7 @@ export function DesignSystemShowcase() {
                                     <DrawerBody>
                                         <EmptyState
                                             bordered={false}
+                                            className="min-h-0"
                                             title="Tu carrito está vacío"
                                             icon={<ShoppingBag />}
                                         />

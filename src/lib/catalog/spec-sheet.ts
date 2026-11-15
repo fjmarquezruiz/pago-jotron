@@ -1,12 +1,21 @@
 /** Lo que la ficha técnica necesita de un producto. Los `decimal` llegan como texto desde Drizzle. */
 export interface SpecSheetInput {
-    guaranteeOfOrigin: { region: string | null };
+    winery: { name: string };
+    guaranteeOfOrigin: {
+        name: string;
+        classification: string;
+        region: string | null;
+    };
     grapes: readonly { percentage: string | null; grape: { name: string } }[];
     alcoholContent: string | null;
     agingTime: string | null;
     minTemperature: string | null;
     maxTemperature: string | null;
     production: string | null;
+    vineyardAltitude: number | null;
+    soilType: string | null;
+    /** Rendimiento del viñedo en kg/ha. */
+    yield: number | null;
     /** Presentaciones a la venta (sin las bloqueadas): de ellas sale el formato de botella. */
     variants: readonly { capacity: number; capacityUnit: 'ml' | 'g' }[];
 }
@@ -23,6 +32,8 @@ const alcoholFormat = new Intl.NumberFormat('es-ES', {
 });
 const temperatureFormat = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1 });
 const percentageFormat = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 });
+// `useGrouping: true` agrupa siempre los miles (`4.500`); por defecto, en español, solo desde 5 cifras.
+const thousandsFormat = new Intl.NumberFormat('es-ES', { useGrouping: true });
 
 /** Texto sin espacios sobrantes, o `null` si no tiene contenido. */
 function clean(text: string | null): string | null {
@@ -62,10 +73,19 @@ function bottleFormatText(variants: SpecSheetInput['variants']): string | null {
         : capacities.map((capacity) => `${capacity}ml`).join(', ');
 }
 
+/** `850 m`, `4.500 kg/ha`: un entero con miles agrupados y su unidad; `null` si no hay dato. */
+function measureText(value: number | null, unit: string): string | null {
+    return value === null ? null : `${thousandsFormat.format(value)} ${unit}`;
+}
+
 /**
- * Filas de la ficha técnica en el orden del diseño: región, uvas, graduación, crianza,
- * temperatura de servicio, producción y formato de botella. Las filas sin dato no se incluyen
- * (por ejemplo, las pasas no tienen graduación ni uvas, y como van en gramos tampoco formato).
+ * Filas de la ficha técnica: bodega, denominación de origen y región; uvas, graduación, crianza,
+ * temperatura de servicio y producción (el orden del diseño); altitud, suelo y rendimiento del
+ * viñedo, y formato de botella al final. Las filas sin dato no se incluyen (por ejemplo, las
+ * pasas no tienen graduación ni uvas, y como van en gramos tampoco formato).
+ *
+ * La bodega y la denominación (`DO Sierras de Málaga`) no están en el diseño: se añadieron a
+ * petición del producto. Altitud, suelo y rendimiento tampoco; el rendimiento se da en kg/ha.
  *
  * El formato de botella no está en `products`: se saca de las capacidades en ml de las
  * presentaciones a la venta.
@@ -83,6 +103,13 @@ export function buildSpecRows(product: SpecSheetInput): SpecRow[] {
             : `${alcoholFormat.format(Number(product.alcoholContent))}% vol.`;
 
     const rows: { label: string; value: string | null }[] = [
+        { label: 'Bodega', value: clean(product.winery.name) },
+        {
+            label: 'Denominación de origen',
+            value: clean(
+                `${product.guaranteeOfOrigin.classification} ${product.guaranteeOfOrigin.name}`,
+            ),
+        },
         { label: 'Región', value: clean(product.guaranteeOfOrigin.region) },
         {
             label: 'Variedades de uva',
@@ -95,6 +122,9 @@ export function buildSpecRows(product: SpecSheetInput): SpecRow[] {
             value: temperatureText(product.minTemperature, product.maxTemperature),
         },
         { label: 'Producción', value: clean(product.production) },
+        { label: 'Altitud del viñedo', value: measureText(product.vineyardAltitude, 'm') },
+        { label: 'Tipo de suelo', value: clean(product.soilType) },
+        { label: 'Rendimiento', value: measureText(product.yield, 'kg/ha') },
         { label: 'Formato de botella', value: bottleFormatText(product.variants) },
     ];
 
