@@ -24,7 +24,7 @@ interface ProductCardProps {
  * Todavía no es un enlace: aún no hay consulta real que dé el slug de la ficha.
  *
  * @example
- * <ProductCard name="Payoya Negra" region="Sierras de Málaga" price={23.5} image="/images/placeholders/payoya-negra.png" alt="Botella de Payoya Negra" />
+ * <ProductCard name="Payoya Negra" region="Sierras de Málaga" price={23.5} image="/images/placeholders/payoya-negra.png" alt="Payoya Negra" />
  */
 export function ProductCard({ name, region, price, image, alt, className }: ProductCardProps) {
     // TODO: enlazar a /productos/[slug] cuando haya consulta real

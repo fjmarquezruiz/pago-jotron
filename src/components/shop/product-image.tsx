@@ -14,7 +14,7 @@ interface ProductImageProps {
  * lleva `priority`.
  *
  * @example
- * <ProductImage src={product.image} alt={`Botella de ${product.name}`} />
+ * <ProductImage src={product.image} alt={product.name} />
  */
 export function ProductImage({ src, alt }: ProductImageProps) {
     return (

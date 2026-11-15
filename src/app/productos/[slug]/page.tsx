@@ -64,7 +64,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
             <div className="mx-auto flex w-full max-w-9xl flex-col gap-16 lg:gap-40">
                 <div className="mx-auto flex w-full max-w-6xl flex-col gap-16 lg:flex-row lg:items-start">
                     <div className="min-w-0 lg:flex-1">
-                        <ProductImage src={product.image} alt={`Botella de ${product.name}`} />
+                        <ProductImage src={product.image} alt={product.name} />
                     </div>
                     <div className="flex min-w-0 flex-col gap-12 lg:flex-1">
                         <ProductHeader product={product} />

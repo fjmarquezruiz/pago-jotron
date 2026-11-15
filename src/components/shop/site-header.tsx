@@ -2,15 +2,18 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Navbar, NavbarItem } from '@/components/ui/navbar';
 
-/** Enlaces de la izquierda. Las rutas con `#` aún no existen. */
+/**
+ * Enlaces de la izquierda. Salvo `/productos`, ninguna ruta existe todavía: llevan un slug
+ * ficticio (no `#`, que el lector de pantalla anuncia como un enlace que no va a ningún sitio).
+ */
 const mainLinks = [
     { label: 'La tienda', href: '/productos' },
-    // TODO: ruta pendiente
-    { label: 'Eventos', href: '#' },
-    // TODO: ruta pendiente
-    { label: 'La bodega', href: '#' },
-    // TODO: ruta pendiente
-    { label: 'Blog', href: '#' },
+    // TODO: ruta pendiente (slug ficticio)
+    { label: 'Eventos', href: '/eventos' },
+    // TODO: ruta pendiente (slug ficticio)
+    { label: 'La bodega', href: '/la-bodega' },
+    // TODO: ruta pendiente (slug ficticio)
+    { label: 'Blog', href: '/blog' },
 ];
 
 /**
@@ -50,15 +53,15 @@ export function SiteHeader() {
             actions={
                 <>
                     <NavbarItem asChild className="hidden lg:inline-flex">
-                        {/* TODO: ruta pendiente */}
-                        <Link href="#">Encuéntranos</Link>
+                        {/* TODO: ruta pendiente (slug ficticio) */}
+                        <Link href="/encuentranos">Encuéntranos</Link>
                     </NavbarItem>
                     <NavbarItem asChild className="hidden lg:inline-flex">
                         <Link href="/auth/login">Iniciar sesión</Link>
                     </NavbarItem>
                     <NavbarItem asChild>
-                        {/* TODO: ruta pendiente */}
-                        <Link href="#">Carrito ({cartCount})</Link>
+                        {/* TODO(A8): ruta del carrito (slug ficticio) */}
+                        <Link href="/carrito">Carrito ({cartCount})</Link>
                     </NavbarItem>
                 </>
             }

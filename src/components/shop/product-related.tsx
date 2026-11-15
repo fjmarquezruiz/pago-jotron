@@ -57,11 +57,7 @@ export function ProductRelated() {
                         key={product.name}
                         className={cn('min-w-0 flex-1', index >= 2 ? 'hidden lg:flex' : 'flex')}
                     >
-                        <ProductCard
-                            {...product}
-                            alt={`Botella de ${product.name}`}
-                            className="w-full"
-                        />
+                        <ProductCard {...product} alt={product.name} className="w-full" />
                     </li>
                 ))}
             </ul>

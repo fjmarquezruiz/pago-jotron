@@ -5,63 +5,69 @@ import { Button } from '@/components/ui/button';
 interface FooterLink {
     label: string;
     href: string;
+    /** Enlace a otro sitio: se abre en una pestaña nueva. */
+    external?: boolean;
 }
 
 /**
- * Columnas de enlaces del footer. Ninguna de estas rutas existe todavía.
- * TODO: ruta pendiente en todos los `href: '#'`.
+ * Columnas de enlaces del footer. Ninguna de estas rutas existe todavía: llevan un slug ficticio
+ * (no `#`, que el lector de pantalla anuncia como un enlace que no va a ningún sitio).
+ * TODO: ruta pendiente en todos los enlaces de las columnas.
  */
 const columns: { title: string; links: FooterLink[] }[] = [
     {
         title: 'TIENDA',
         links: [
-            { label: 'Colecciones', href: '#' },
-            { label: 'Vinos tintos', href: '#' },
-            { label: 'Vinos blancos', href: '#' },
-            { label: 'Pasas', href: '#' },
+            { label: 'Colecciones', href: '/colecciones' },
+            { label: 'Vinos tintos', href: '/vinos-tintos' },
+            { label: 'Vinos blancos', href: '/vinos-blancos' },
+            { label: 'Pasas', href: '/pasas' },
         ],
     },
     {
         title: 'SOBRE NOSOTROS',
         links: [
-            { label: 'Nuestra historia', href: '#' },
-            { label: 'La bodega', href: '#' },
-            { label: 'Diario', href: '#' },
-            { label: 'Eventos', href: '#' },
+            { label: 'Nuestra historia', href: '/nuestra-historia' },
+            { label: 'La bodega', href: '/la-bodega' },
+            { label: 'Diario', href: '/diario' },
+            { label: 'Eventos', href: '/eventos' },
         ],
     },
     {
         title: 'AYUDA',
         links: [
-            { label: 'Preguntas frecuentes', href: '#' },
-            { label: 'Contacto', href: '#' },
-            { label: 'Envíos', href: '#' },
-            { label: 'Devoluciones', href: '#' },
+            { label: 'Preguntas frecuentes', href: '/preguntas-frecuentes' },
+            { label: 'Contacto', href: '/contacto' },
+            { label: 'Envíos', href: '/envios' },
+            { label: 'Devoluciones', href: '/devoluciones' },
         ],
     },
 ];
 
-/** Columna extra del footer móvil: en escritorio estas redes van como iconos. TODO: URLs de las redes. */
-const socialColumn = {
+/**
+ * Columna extra del footer móvil: en escritorio estas redes van como iconos. Las redes son sitios
+ * externos, así que llevan la portada de cada plataforma. TODO: URL del perfil de la bodega.
+ */
+const socialColumn: { title: string; links: FooterLink[] } = {
     title: 'SÍGUENOS',
     links: [
-        { label: 'instagram', href: '#' },
-        { label: 'x / twitter', href: '#' },
-        { label: 'facebook', href: '#' },
+        { label: 'instagram', href: 'https://www.instagram.com/', external: true },
+        { label: 'x / twitter', href: 'https://x.com/', external: true },
+        { label: 'facebook', href: 'https://www.facebook.com/', external: true },
     ],
 };
 
-/** Iconos de redes del footer de escritorio. TODO: URLs de las redes. */
+/** Iconos de redes del footer de escritorio. TODO: URL del perfil de la bodega en cada red. */
 const socialIcons = [
-    { label: 'Instagram', href: '#', icon: '/images/brand/instagram.svg' },
-    { label: 'X', href: '#', icon: '/images/brand/x.svg' },
-    { label: 'Facebook', href: '#', icon: '/images/brand/facebook.svg' },
+    { label: 'Instagram', href: 'https://www.instagram.com/', icon: '/images/brand/instagram.svg' },
+    { label: 'X', href: 'https://x.com/', icon: '/images/brand/x.svg' },
+    { label: 'Facebook', href: 'https://www.facebook.com/', icon: '/images/brand/facebook.svg' },
 ];
 
 /** Enlaces legales. Privacidad, cookies y condiciones ya son rutas públicas. */
 const legalLinks: FooterLink[] = [
-    // TODO: ruta pendiente
-    { label: 'Aviso legal', href: '#' },
+    // TODO: ruta pendiente (slug ficticio)
+    { label: 'Aviso legal', href: '/aviso-legal' },
     { label: 'Privacidad', href: '/privacidad' },
     { label: 'Cookies', href: '/cookies' },
     { label: 'Condiciones de compra', href: '/condiciones' },
@@ -77,8 +83,13 @@ function FooterColumn({ title, links }: { title: string; links: FooterLink[] }) 
     return (
         <div className="flex flex-col gap-3">
             <p className="font-semibold">{title}</p>
-            {links.map(({ label, href }) => (
-                <Link key={label} href={href} className="w-fit opacity-60 hover:opacity-100">
+            {links.map(({ label, href, external }) => (
+                <Link
+                    key={label}
+                    href={href}
+                    className="w-fit opacity-60 hover:opacity-100"
+                    {...(external && { target: '_blank', rel: 'noopener noreferrer' })}
+                >
                     {label}
                 </Link>
             ))}
@@ -115,7 +126,12 @@ export function SiteFooter() {
                             {socialIcons.map(({ label, href, icon }) => (
                                 <li key={label}>
                                     <Button asChild variant="ghost" size="icon">
-                                        <a href={href} aria-label={label}>
+                                        <a
+                                            href={href}
+                                            aria-label={label}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
                                             <Image src={icon} alt="" width={16} height={16} />
                                         </a>
                                     </Button>
