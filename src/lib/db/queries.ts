@@ -5,6 +5,7 @@ import {
     productGrapes,
     productVariants,
     products,
+    shippingTypes,
     users,
     wineries,
 } from '@/db/schema';
@@ -79,3 +80,17 @@ export async function getProductBySlug(slug: string) {
 
 /** Producto de la ficha con todas sus relaciones: el tipo que reciben los componentes de `/productos/[slug]`. */
 export type ProductDetail = NonNullable<Awaited<ReturnType<typeof getProductBySlug>>>;
+
+/**
+ * Modalidades de envío que se ofrecen (RF8): las no bloqueadas, por orden de alta. La ficha las
+ * enseña con su plazo y su precio, y el checkout (A8) cobrará lo mismo porque lee la misma tabla.
+ *
+ * @returns Las modalidades de envío disponibles.
+ */
+export async function getShippingTypes() {
+    return db
+        .select()
+        .from(shippingTypes)
+        .where(eq(shippingTypes.isBlocked, false))
+        .orderBy(asc(shippingTypes.id));
+}

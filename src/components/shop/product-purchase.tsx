@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldControl, FieldLabel } from '@/components/ui/field';
 import { NumberInput } from '@/components/ui/number-input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { formatPresentation, pickDefaultVariant } from '@/lib/catalog/presentation';
+import { formatPresentation, pickDefaultVariant, soldOutMessage } from '@/lib/catalog/presentation';
 import { formatEuros } from '@/lib/utils';
 import type { ProductDetail } from '@/lib/db/queries';
 
@@ -22,7 +22,9 @@ export interface ProductPurchaseProps {
  *
  * - Al abrir queda elegida la primera presentación con stock (`pickDefaultVariant`).
  * - La cantidad va de 1 al stock de la presentación y vuelve a 1 al cambiar de presentación.
- * - Si la presentación elegida está agotada, el botón dice "Agotado" y la cantidad se desactiva.
+ * - Si la presentación elegida está agotada, el botón dice "Agotado", la cantidad se desactiva y
+ *   un aviso invita a elegir otro formato, o dice que no queda nada si todas están agotadas
+ *   (`soldOutMessage`).
  *
  * Devuelve dos bloques sin envoltorio (descripción con precio, y selector con botón), para que
  * el contenedor de la ficha (columna con separación de 48 px) los separe como el resto.
@@ -107,10 +109,8 @@ export function ProductPurchase({ variants, children }: ProductPurchaseProps) {
                         {soldOut ? 'Agotado' : 'Añadir al carrito'}
                     </Button>
                     {soldOut && (
-                        // Texto del diseño. Promete un aviso de reposición que todavía no existe.
                         <p className="text-sm leading-[normal] text-foreground">
-                            Este vino está agotado. Te avisaremos en la tienda cuando vuelva a estar
-                            disponible.
+                            {soldOutMessage(variants)}
                         </p>
                     )}
                 </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatPresentation, pickDefaultVariant } from './presentation';
+import { formatPresentation, pickDefaultVariant, soldOutMessage } from './presentation';
 import { buildSpecRows, type SpecSheetInput } from './spec-sheet';
 import { typologyTone } from './typology-tone';
 
@@ -29,6 +29,23 @@ describe('pickDefaultVariant', () => {
 
     it('devuelve undefined sin presentaciones', () => {
         expect(pickDefaultVariant([])).toBeUndefined();
+    });
+});
+
+describe('soldOutMessage', () => {
+    it.each([
+        [
+            [{ stock: 0 }, { stock: 3 }],
+            'Esta presentación está agotada. Elige otro formato o vuelve más adelante.',
+        ],
+        [
+            [{ stock: 5 }, { stock: 0 }],
+            'Esta presentación está agotada. Elige otro formato o vuelve más adelante.',
+        ],
+        [[{ stock: 0 }, { stock: 0 }], 'Ahora mismo no nos queda. Vuelve más adelante.'],
+        [[{ stock: 0 }], 'Ahora mismo no nos queda. Vuelve más adelante.'],
+    ])('%j → %j', (variants, expected) => {
+        expect(soldOutMessage(variants)).toBe(expected);
     });
 });
 

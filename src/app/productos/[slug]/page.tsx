@@ -10,7 +10,7 @@ import { ProductSpecSheet } from '@/components/shop/product-spec-sheet';
 import { ProductTastingNotes } from '@/components/shop/product-tasting-notes';
 import { cloudinaryLoader } from '@/lib/cloudinary';
 import { isProductPageAvailable } from '@/lib/catalog/visibility';
-import { getProductBySlug } from '@/lib/db/queries';
+import { getProductBySlug, getShippingTypes } from '@/lib/db/queries';
 
 /**
  * La ficha depende del stock y de los bloqueos (producto, bodega, D.O. y presentaciones), que
@@ -57,6 +57,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
     const product = await loadProduct(params.slug);
     if (!product || !isProductPageAvailable(product)) notFound();
 
+    const shippingTypes = await getShippingTypes();
+
     return (
         <main className="mx-auto flex w-full max-w-9xl flex-col gap-16 px-6 py-16 lg:gap-40 lg:py-40">
             <div className="mx-auto flex w-full max-w-6xl flex-col gap-16 lg:flex-row lg:items-start">
@@ -68,7 +70,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     <ProductPurchase variants={product.variants}>
                         {product.description && <p className="text-base">{product.description}</p>}
                     </ProductPurchase>
-                    <ProductShippingInfo />
+                    <ProductShippingInfo shippingTypes={shippingTypes} />
                 </div>
             </div>
 
@@ -82,7 +84,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 </div>
             </div>
 
-            <ProductRelated />
+            {/* Mockup con datos de ejemplo: no sale en producción hasta que haya consulta real. */}
+            {process.env.VERCEL_ENV !== 'production' && <ProductRelated />}
         </main>
     );
 }

@@ -41,3 +41,21 @@ export function pickDefaultVariant<T extends { stock: number }>(
 ): T | undefined {
     return variants.find((variant) => variant.stock > 0) ?? variants[0];
 }
+
+/**
+ * Aviso que acompaña a una presentación agotada. Si queda otra con stock, invita a elegirla;
+ * si no queda ninguna, dice que no hay nada ahora mismo. No promete avisos de reposición, que
+ * no existen.
+ *
+ * @param variants - Todas las presentaciones a la venta del producto.
+ * @returns El texto del aviso.
+ *
+ * @example
+ * soldOutMessage([{ stock: 0 }, { stock: 3 }]);
+ * // 'Esta presentación está agotada. Elige otro formato o vuelve más adelante.'
+ */
+export function soldOutMessage(variants: readonly { stock: number }[]): string {
+    return variants.some((variant) => variant.stock > 0)
+        ? 'Esta presentación está agotada. Elige otro formato o vuelve más adelante.'
+        : 'Ahora mismo no nos queda. Vuelve más adelante.';
+}
