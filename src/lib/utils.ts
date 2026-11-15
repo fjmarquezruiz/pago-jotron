@@ -34,6 +34,25 @@ export function cn(...inputs: ClassValue[]): string {
     return twMerge(clsx(inputs));
 }
 
+const euroFormat = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
+
+/**
+ * Da formato de euros en español: coma decimal, dos decimales y el símbolo detrás, separado por
+ * un espacio duro (`18,50 €`). Acepta el `string` con el que Drizzle devuelve los `decimal`.
+ *
+ * @param amount - Importe en euros, como número o como texto (`'18.50'`).
+ * @returns El importe formateado.
+ * @throws Si el importe no es un número finito.
+ *
+ * @example
+ * formatEuros('18.5'); // '18,50 €'
+ */
+export function formatEuros(amount: number | string): string {
+    const value = typeof amount === 'string' && amount.trim() === '' ? NaN : Number(amount);
+    if (!Number.isFinite(value)) throw new RangeError(`Importe no válido: ${amount}`);
+    return euroFormat.format(value);
+}
+
 /**
  * Convierte un texto en un slug en kebab-case, apto para URLs y `public_id` de Cloudinary:
  * minúsculas, sin tildes (la ñ pasa a n) y con guiones en lugar de espacios y símbolos.

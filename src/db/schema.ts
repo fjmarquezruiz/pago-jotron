@@ -129,6 +129,7 @@ export const products = mysqlTable(
     {
         id: int('product_id').autoincrement().primaryKey(),
         name: varchar('name', { length: 100 }).notNull(),
+        slug: varchar('slug', { length: 150 }).notNull().unique(), // URL de la ficha: /productos/[slug]; nombre + añada (tinto-roble-2023) para que convivan varias añadas
         wineryId: int('winery_id')
             .notNull()
             .references(() => wineries.id, { onUpdate: 'cascade' }),

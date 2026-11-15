@@ -15,6 +15,13 @@
       "when": 1794246765747,
       "tag": "0001_polite_kingpin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1794744358577,
+      "tag": "0002_sloppy_spiral",
+      "breakpoints": true
     }
   ]
 }
