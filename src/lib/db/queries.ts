@@ -1,6 +1,23 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, type SQL } from 'drizzle-orm';
 import { db } from '@/db';
-import { users } from '@/db/schema';
+import { guaranteesOfOrigin, products, users, wineries } from '@/db/schema';
+
+/**
+ * Condición `WHERE` de la regla de visibilidad del catálogo (RF4): ni el producto, ni su bodega,
+ * ni su D.O. están bloqueados. Úsala en las consultas del listado, que deben hacer `join` con
+ * `wineries` y `guaranteesOfOrigin`.
+ *
+ * Es la misma regla que `isProductVisible` (`src/lib/catalog/visibility.ts`), que decide en la
+ * ficha con el producto ya cargado. Si cambia una, cambia la otra: `queries.test.ts` comprueba
+ * que esta condición mira los tres bloqueos.
+ */
+export function visibleProductsCondition(): SQL {
+    return and(
+        eq(products.isBlocked, false),
+        eq(wineries.isBlocked, false),
+        eq(guaranteesOfOrigin.isBlocked, false),
+    ) as SQL;
+}
 
 /**
  * Busca un usuario por su email (RF2). Lo usa el login para comprobar la contraseña.

@@ -26,21 +26,21 @@ DROP TABLE IF EXISTS `addresses`;
 CREATE TABLE `addresses` (
   `address_id` int NOT NULL AUTO_INCREMENT,
   `user_id` int NOT NULL,
-  `phone` varchar(20) NOT NULL,
-  `street_type` enum('Calle','Avenida','Plaza','Paseo','Camino','Carretera','Ronda','Travesía','Glorieta','Urbanización') NOT NULL DEFAULT 'Calle',
-  `street_name` varchar(100) NOT NULL,
-  `number` varchar(10) NOT NULL,
-  `floor` varchar(20) DEFAULT NULL,
-  `postal_code` varchar(10) NOT NULL,
-  `city` varchar(100) NOT NULL,
-  `province` varchar(100) NOT NULL,
-  `country` varchar(100) NOT NULL DEFAULT 'España',
-  `address_type` enum('Envío','Facturación') NOT NULL DEFAULT 'Envío',
+  `phone` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `street_type` enum('Calle','Avenida','Plaza','Paseo','Camino','Carretera','Ronda','Travesía','Glorieta','Urbanización') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Calle',
+  `street_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `number` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `floor` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `postal_code` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `city` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `province` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `country` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'España',
+  `address_type` enum('Envío','Facturación') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Envío',
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY (`address_id`),
   KEY `addresses_user_id_users_user_id_fk` (`user_id`),
   CONSTRAINT `addresses_user_id_users_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -53,13 +53,13 @@ DROP TABLE IF EXISTS `audit_logs`;
 CREATE TABLE `audit_logs` (
   `audit_log_id` int NOT NULL AUTO_INCREMENT,
   `user_id` int DEFAULT NULL,
-  `action` text NOT NULL,
+  `action` text COLLATE utf8mb4_unicode_ci NOT NULL,
   `logged_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `details` text,
+  `details` text COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY (`audit_log_id`),
   KEY `fk_auditlog_user` (`user_id`),
   CONSTRAINT `fk_auditlog_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -71,9 +71,9 @@ DROP TABLE IF EXISTS `cancellation_types`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `cancellation_types` (
   `cancellation_type_id` int NOT NULL AUTO_INCREMENT,
-  `description` text NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`cancellation_type_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -93,7 +93,7 @@ CREATE TABLE `cart_products` (
   CONSTRAINT `fk_cartproduct_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_cartproduct_variant` FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`variant_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `ck_cartproduct_quantity` CHECK ((`quantity` > 0))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -105,10 +105,10 @@ DROP TABLE IF EXISTS `categories`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `categories` (
   `category_id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) NOT NULL,
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`category_id`),
   UNIQUE KEY `categories_name_unique` (`name`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -120,11 +120,11 @@ DROP TABLE IF EXISTS `grapes`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `grapes` (
   `grape_id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) NOT NULL,
-  `color` enum('Tinta','Blanca','Rosada') NOT NULL,
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `color` enum('Tinta','Blanca','Rosada') COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`grape_id`),
   UNIQUE KEY `grapes_name_unique` (`name`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -136,17 +136,17 @@ DROP TABLE IF EXISTS `guarantees_of_origin`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `guarantees_of_origin` (
   `guarantee_of_origin_id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) NOT NULL,
-  `classification` enum('DO','DOP','DOCa','IGP','VT') NOT NULL DEFAULT 'DO',
-  `region` varchar(100) DEFAULT NULL,
-  `regulatory_council` varchar(150) DEFAULT NULL,
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `classification` enum('DO','DOP','DOCa','IGP','VT') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'DO',
+  `region` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `regulatory_council` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `founded_year` int DEFAULT NULL,
-  `website` varchar(255) DEFAULT NULL,
-  `description` text,
+  `website` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
   `is_blocked` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`guarantee_of_origin_id`),
   UNIQUE KEY `guarantees_of_origin_name_unique` (`name`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -159,7 +159,7 @@ DROP TABLE IF EXISTS `invoices`;
 CREATE TABLE `invoices` (
   `invoice_id` int NOT NULL AUTO_INCREMENT,
   `order_id` int NOT NULL,
-  `number` varchar(50) NOT NULL,
+  `number` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `issue_date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `tax_base` decimal(10,2) NOT NULL,
   `tax_amount` decimal(10,2) NOT NULL,
@@ -169,7 +169,7 @@ CREATE TABLE `invoices` (
   UNIQUE KEY `invoices_number_unique` (`number`),
   CONSTRAINT `fk_invoice_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`order_id`) ON UPDATE CASCADE,
   CONSTRAINT `ck_invoice_total` CHECK ((`total` = (`tax_base` + `tax_amount`)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -190,7 +190,7 @@ CREATE TABLE `order_products` (
   CONSTRAINT `fk_orderproduct_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`order_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_orderproduct_variant` FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`variant_id`) ON UPDATE CASCADE,
   CONSTRAINT `ck_orderproduct_quantity` CHECK ((`quantity` > 0))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -202,10 +202,10 @@ DROP TABLE IF EXISTS `order_statuses`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `order_statuses` (
   `status_id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(50) NOT NULL,
+  `name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`status_id`),
   UNIQUE KEY `order_statuses_name_unique` (`name`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -220,13 +220,13 @@ CREATE TABLE `orders` (
   `user_id` int NOT NULL,
   `shipping_address_id` int DEFAULT NULL,
   `billing_address_id` int DEFAULT NULL,
-  `payment_method` enum('Tarjeta','PayPal','Transferencia') NOT NULL,
+  `payment_method` enum('Tarjeta','PayPal','Transferencia') COLLATE utf8mb4_unicode_ci NOT NULL,
   `shipping_type_id` int NOT NULL,
   `shipping_cost` decimal(10,2) NOT NULL DEFAULT '0.00',
   `total` decimal(10,2) NOT NULL,
   `status_id` int NOT NULL,
   `status_updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `cancelled_by` enum('Cliente','Administrador') DEFAULT NULL,
+  `cancelled_by` enum('Cliente','Administrador') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `cancellation_type_id` int DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `shipping_date` date DEFAULT NULL,
@@ -244,7 +244,7 @@ CREATE TABLE `orders` (
   CONSTRAINT `fk_order_status` FOREIGN KEY (`status_id`) REFERENCES `order_statuses` (`status_id`) ON UPDATE CASCADE,
   CONSTRAINT `orders_user_id_users_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON UPDATE CASCADE,
   CONSTRAINT `ck_order_total` CHECK (((`total` >= 0) and (`shipping_cost` >= 0)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -261,7 +261,7 @@ CREATE TABLE `product_categories` (
   KEY `fk_pc_category` (`category_id`),
   CONSTRAINT `fk_pc_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`category_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_pc_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`product_id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -280,7 +280,7 @@ CREATE TABLE `product_grapes` (
   CONSTRAINT `fk_pg_grape` FOREIGN KEY (`grape_id`) REFERENCES `grapes` (`grape_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_pg_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`product_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `ck_grape_percentage` CHECK (((`percentage` > 0) and (`percentage` <= 100)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -294,12 +294,12 @@ CREATE TABLE `product_steps` (
   `step_id` int NOT NULL AUTO_INCREMENT,
   `product_id` int NOT NULL,
   `position` int NOT NULL,
-  `title` varchar(100) NOT NULL,
-  `description` text,
+  `title` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY (`step_id`),
   UNIQUE KEY `uq_step_position` (`product_id`,`position`),
   CONSTRAINT `product_steps_product_id_products_product_id_fk` FOREIGN KEY (`product_id`) REFERENCES `products` (`product_id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -316,7 +316,7 @@ CREATE TABLE `product_tasting_tags` (
   KEY `fk_ptt_tasting_tag` (`tasting_tag_id`),
   CONSTRAINT `fk_ptt_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`product_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_ptt_tasting_tag` FOREIGN KEY (`tasting_tag_id`) REFERENCES `tasting_tags` (`tasting_tag_id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -329,9 +329,9 @@ DROP TABLE IF EXISTS `product_variants`;
 CREATE TABLE `product_variants` (
   `variant_id` int NOT NULL AUTO_INCREMENT,
   `product_id` int NOT NULL,
-  `format` varchar(50) NOT NULL,
+  `format` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `capacity` int NOT NULL,
-  `capacity_unit` enum('ml','g') NOT NULL DEFAULT 'ml',
+  `capacity_unit` enum('ml','g') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ml',
   `price` decimal(10,2) NOT NULL,
   `stock` int NOT NULL DEFAULT '0',
   `is_blocked` tinyint(1) NOT NULL DEFAULT '0',
@@ -341,7 +341,7 @@ CREATE TABLE `product_variants` (
   CONSTRAINT `ck_variant_capacity` CHECK ((`capacity` > 0)),
   CONSTRAINT `ck_variant_price` CHECK ((`price` >= 0)),
   CONSTRAINT `ck_variant_stock` CHECK ((`stock` >= 0))
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -353,29 +353,31 @@ DROP TABLE IF EXISTS `products`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `products` (
   `product_id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) NOT NULL,
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   `winery_id` int NOT NULL,
   `guarantee_of_origin_id` int NOT NULL,
   `typology_id` int NOT NULL,
   `vintage` int DEFAULT NULL,
-  `image` varchar(255) DEFAULT NULL,
-  `description` text,
-  `visual_note` text,
-  `aroma_note` text,
-  `palate_note` text,
+  `image` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `visual_note` text COLLATE utf8mb4_unicode_ci,
+  `aroma_note` text COLLATE utf8mb4_unicode_ci,
+  `palate_note` text COLLATE utf8mb4_unicode_ci,
   `min_temperature` decimal(5,2) DEFAULT NULL,
   `max_temperature` decimal(5,2) DEFAULT NULL,
   `alcohol_content` decimal(5,2) DEFAULT NULL,
-  `aging_time` varchar(100) DEFAULT NULL,
-  `aging_method` text,
-  `production` varchar(50) DEFAULT NULL,
+  `aging_time` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `aging_method` text COLLATE utf8mb4_unicode_ci,
+  `production` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `vineyard_altitude` int DEFAULT NULL,
-  `soil_type` varchar(100) DEFAULT NULL,
+  `soil_type` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `yield` int DEFAULT NULL,
-  `food_pairing` text,
+  `food_pairing` text COLLATE utf8mb4_unicode_ci,
   `is_blocked` tinyint(1) NOT NULL DEFAULT '0',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `slug` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`product_id`),
+  UNIQUE KEY `products_slug_unique` (`slug`),
   KEY `products_winery_id_wineries_winery_id_fk` (`winery_id`),
   KEY `products_typology_id_typologies_typology_id_fk` (`typology_id`),
   KEY `fk_product_guarantee` (`guarantee_of_origin_id`),
@@ -385,7 +387,7 @@ CREATE TABLE `products` (
   CONSTRAINT `ck_product_altitude` CHECK ((`vineyard_altitude` >= 0)),
   CONSTRAINT `ck_product_temp` CHECK ((`min_temperature` <= `max_temperature`)),
   CONSTRAINT `ck_product_yield` CHECK ((`yield` > 0))
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -397,7 +399,7 @@ DROP TABLE IF EXISTS `shipping_types`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `shipping_types` (
   `shipping_type_id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(50) NOT NULL,
+  `name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `cost` decimal(10,2) NOT NULL DEFAULT '0.00',
   `min_delivery_days` tinyint unsigned DEFAULT NULL,
   `max_delivery_days` tinyint unsigned DEFAULT NULL,
@@ -406,7 +408,7 @@ CREATE TABLE `shipping_types` (
   UNIQUE KEY `shipping_types_name_unique` (`name`),
   CONSTRAINT `ck_shipping_cost` CHECK ((`cost` >= 0)),
   CONSTRAINT `ck_shipping_days` CHECK (((`min_delivery_days` is null) or (`max_delivery_days` is null) or (`min_delivery_days` <= `max_delivery_days`)))
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -418,10 +420,10 @@ DROP TABLE IF EXISTS `tasting_tags`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `tasting_tags` (
   `tasting_tag_id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(50) NOT NULL,
+  `name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`tasting_tag_id`),
   UNIQUE KEY `tasting_tags_name_unique` (`name`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -433,13 +435,13 @@ DROP TABLE IF EXISTS `typologies`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `typologies` (
   `typology_id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(50) NOT NULL,
-  `product_type` enum('Vino','Pasas') NOT NULL DEFAULT 'Vino',
+  `name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `product_type` enum('Vino','Pasas') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Vino',
   `filter_order` int NOT NULL DEFAULT '0',
   `tax_rate` decimal(5,2) NOT NULL DEFAULT '21.00',
   PRIMARY KEY (`typology_id`),
   UNIQUE KEY `typologies_name_unique` (`name`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -451,20 +453,20 @@ DROP TABLE IF EXISTS `users`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `users` (
   `user_id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) DEFAULT NULL,
-  `last_name` varchar(100) DEFAULT NULL,
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `last_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `birth_date` date NOT NULL,
-  `password_hash` varchar(255) NOT NULL,
-  `id_card` varchar(20) DEFAULT NULL,
-  `email` varchar(100) NOT NULL,
-  `phone` varchar(20) DEFAULT NULL,
-  `role` enum('Cliente','Editor','Administrador') NOT NULL DEFAULT 'Cliente',
+  `password_hash` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_card` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `email` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `role` enum('Cliente','Editor','Administrador') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Cliente',
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
   `registration_date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`user_id`),
   UNIQUE KEY `users_email_unique` (`email`),
   UNIQUE KEY `users_id_card_unique` (`id_card`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -476,19 +478,19 @@ DROP TABLE IF EXISTS `wineries`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `wineries` (
   `winery_id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) NOT NULL,
-  `description` text,
-  `address` varchar(255) DEFAULT NULL,
-  `city` varchar(100) DEFAULT NULL,
-  `province` varchar(100) DEFAULT NULL,
-  `country` varchar(100) NOT NULL DEFAULT 'España',
-  `phone` varchar(20) DEFAULT NULL,
-  `email` varchar(100) DEFAULT NULL,
-  `website` varchar(255) DEFAULT NULL,
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `address` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `city` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `province` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `country` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'España',
+  `phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `email` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `website` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `is_blocked` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`winery_id`),
   UNIQUE KEY `wineries_name_unique` (`name`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -500,4 +502,4 @@ CREATE TABLE `wineries` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-11-10 18:11:38
+-- Dump completed on 2026-11-15 16:11:27
