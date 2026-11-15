@@ -375,7 +375,9 @@ CREATE TABLE `products` (
   `food_pairing` text,
   `is_blocked` tinyint(1) NOT NULL DEFAULT '0',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `slug` varchar(150) NOT NULL,
   PRIMARY KEY (`product_id`),
+  UNIQUE KEY `products_slug_unique` (`slug`),
   KEY `products_winery_id_wineries_winery_id_fk` (`winery_id`),
   KEY `products_typology_id_typologies_typology_id_fk` (`typology_id`),
   KEY `fk_product_guarantee` (`guarantee_of_origin_id`),
@@ -500,4 +502,3 @@ CREATE TABLE `wineries` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-11-10 18:11:38

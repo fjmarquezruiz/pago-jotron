@@ -503,11 +503,12 @@ async function main() {
     await db.insert(products).values([
         {
             name: 'Jotrón Tinto Roble',
+            slug: 'jotron-tinto-roble-2023',
             wineryId: wineryId['Bodega Pago de Jotrón'],
             guaranteeOfOriginId: doId['Sierras de Málaga'],
             typologyId: typologyId['Tinto'],
             vintage: 2023,
-            image: 'jotron-tinto-roble.jpg',
+            image: 'pago-jotron/productos/jotron-tinto-roble',
             description:
                 'Tinto con cuatro meses en barrica de roble francés, elaborado con tempranillo y syrah de nuestros viñedos.',
             visualNote: 'Rojo picota con ribete violáceo.',
@@ -528,11 +529,12 @@ async function main() {
         },
         {
             name: 'Jotrón Moscatel Dulce',
+            slug: 'jotron-moscatel-dulce-2022',
             wineryId: wineryId['Bodega Pago de Jotrón'],
             guaranteeOfOriginId: doId['Málaga'],
             typologyId: typologyId['Dulce'],
             vintage: 2022,
-            image: 'jotron-moscatel-dulce.jpg',
+            image: 'pago-jotron/productos/jotron-moscatel-dulce',
             description:
                 'Vino dulce natural de moscatel de Alejandría, con la uva asoleada en los paseros de la finca.',
             visualNote: 'Oro viejo, limpio y brillante.',
@@ -553,11 +555,12 @@ async function main() {
         },
         {
             name: 'Pasas de Málaga Jotrón',
+            slug: 'pasas-de-malaga-jotron-2025',
             wineryId: wineryId['Bodega Pago de Jotrón'],
             guaranteeOfOriginId: doId['Pasas de Málaga'],
             typologyId: typologyId['Pasa moscatel'],
             vintage: 2025,
-            image: 'pasas-jotron-500g.jpg',
+            image: 'pago-jotron/productos/pasas-de-malaga-jotron',
             description:
                 'Pasas de moscatel secadas al sol en los paseros de la finca y despalilladas a mano.',
             foodPairing: 'Solas, con queso fresco o en ensaladas.',
@@ -565,10 +568,11 @@ async function main() {
         },
         {
             name: 'Tío Pepe Fino',
+            slug: 'tio-pepe-fino',
             wineryId: wineryId['González Byass'],
             guaranteeOfOriginId: doId['Jerez-Xérès-Sherry'],
             typologyId: typologyId['Generoso'],
-            image: 'tio-pepe-fino.jpg',
+            image: 'pago-jotron/productos/tio-pepe-fino',
             description:
                 'Fino muy seco de palomino, criado bajo velo de flor en el sistema de criaderas y soleras.',
             visualNote: 'Amarillo pajizo pálido.',
@@ -582,10 +586,11 @@ async function main() {
         },
         {
             name: 'Solear Manzanilla',
+            slug: 'solear-manzanilla',
             wineryId: wineryId['Bodegas Barbadillo'],
             guaranteeOfOriginId: doId['Manzanilla-Sanlúcar de Barrameda'],
             typologyId: typologyId['Generoso'],
-            image: 'solear-manzanilla.jpg',
+            image: 'pago-jotron/productos/manzanilla-solear-2024',
             description:
                 'Manzanilla criada bajo velo de flor en las bodegas de Sanlúcar de Barrameda.',
             visualNote: 'Amarillo pálido con reflejos verdosos.',
@@ -599,10 +604,11 @@ async function main() {
         },
         {
             name: 'Lustau San Emilio Pedro Ximénez',
+            slug: 'lustau-san-emilio-pedro-ximenez',
             wineryId: wineryId['Emilio Lustau'],
             guaranteeOfOriginId: doId['Jerez-Xérès-Sherry'],
             typologyId: typologyId['Dulce'],
-            image: 'lustau-san-emilio-px.jpg',
+            image: 'pago-jotron/productos/lustau-san-emilio-pedro-ximenez',
             description: 'Dulce natural de pedro ximénez con envejecimiento oxidativo en solera.',
             visualNote: 'Caoba muy oscuro, casi opaco.',
             aromaNote: 'Higo, dátil, café y cacao.',
@@ -615,10 +621,11 @@ async function main() {
         },
         {
             name: 'Alvear Fino C.B.',
+            slug: 'alvear-fino-cb',
             wineryId: wineryId['Bodegas Alvear'],
             guaranteeOfOriginId: doId['Montilla-Moriles'],
             typologyId: typologyId['Generoso'],
-            image: 'alvear-fino-cb.jpg',
+            image: 'pago-jotron/productos/alvear-fino-cb',
             description:
                 'Fino de pedro ximénez de la Sierra de Montilla, criado bajo velo de flor sin encabezar.',
             visualNote: 'Oro pálido.',
@@ -632,11 +639,12 @@ async function main() {
         },
         {
             name: 'Cortijo Los Aguilares Pinot Noir',
+            slug: 'cortijo-los-aguilares-pinot-noir-2022',
             wineryId: wineryId['Cortijo Los Aguilares'],
             guaranteeOfOriginId: doId['Sierras de Málaga'],
             typologyId: typologyId['Tinto'],
             vintage: 2022,
-            image: 'aguilares-pinot-noir.jpg',
+            image: 'pago-jotron/productos/cortijo-los-aguilares-pinot-noir',
             description:
                 'Tinto de pinot noir de la serranía de Ronda, con crianza en barrica de roble francés.',
             visualNote: 'Rojo cereza de capa media.',
