@@ -84,6 +84,12 @@ export function FormExtrasShowcase() {
                     </FieldControl>
                 </Field>
                 <Field>
+                    <FieldLabel>Cantidad (ancho completo)</FieldLabel>
+                    <FieldControl>
+                        <NumberInput fluid value={qty} onValueChange={setQty} min={1} max={12} />
+                    </FieldControl>
+                </Field>
+                <Field>
                     <FieldLabel>Teléfono</FieldLabel>
                     <FieldControl>
                         <PhoneInput

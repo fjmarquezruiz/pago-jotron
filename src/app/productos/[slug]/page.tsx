@@ -1,6 +1,13 @@
 import { cache } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { ProductHeader } from '@/components/shop/product-header';
+import { ProductImage } from '@/components/shop/product-image';
+import { ProductPurchase } from '@/components/shop/product-purchase';
+import { ProductRelated } from '@/components/shop/product-related';
+import { ProductShippingInfo } from '@/components/shop/product-shipping-info';
+import { ProductSpecSheet } from '@/components/shop/product-spec-sheet';
+import { ProductTastingNotes } from '@/components/shop/product-tasting-notes';
 import { cloudinaryLoader } from '@/lib/cloudinary';
 import { isProductPageAvailable } from '@/lib/catalog/visibility';
 import { getProductBySlug } from '@/lib/db/queries';
@@ -40,8 +47,8 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 }
 
 /**
- * Ficha de producto (RF4). Provisional: vuelca el producto en crudo para comprobar la consulta
- * en local y en la vista previa de Vercel contra TiDB. La interfaz llega después.
+ * Ficha de producto (RF4): foto, cabecera, compra, envío y devoluciones, notas de cata y ficha
+ * técnica. Es un Server Component; lo único con estado es `ProductPurchase`.
  *
  * Si el producto no existe o no se puede mostrar (bloqueado él, su bodega, su D.O. o sin
  * presentaciones a la venta), responde con `not-found.tsx`.
@@ -51,8 +58,31 @@ export default async function ProductPage({ params }: ProductPageProps) {
     if (!product || !isProductPageAvailable(product)) notFound();
 
     return (
-        <main className="container-main py-16">
-            <pre className="overflow-x-auto text-xs">{JSON.stringify(product, null, 2)}</pre>
+        <main className="mx-auto flex w-full max-w-9xl flex-col gap-16 px-6 py-16 lg:gap-40 lg:py-40">
+            <div className="mx-auto flex w-full max-w-6xl flex-col gap-16 lg:flex-row lg:items-start">
+                <div className="min-w-0 lg:flex-1">
+                    <ProductImage src={product.image} alt={`Botella de ${product.name}`} />
+                </div>
+                <div className="flex min-w-0 flex-col gap-12 lg:flex-1">
+                    <ProductHeader product={product} />
+                    <ProductPurchase variants={product.variants}>
+                        {product.description && <p className="text-base">{product.description}</p>}
+                    </ProductPurchase>
+                    <ProductShippingInfo />
+                </div>
+            </div>
+
+            {/* Sin notas de cata ni ficha técnica (los dos vacíos), la sección no ocupa sitio. */}
+            <div className="mx-auto hidden w-full max-w-6xl flex-col gap-16 has-[>:not(:empty)]:flex lg:flex-row lg:items-start">
+                <div className="min-w-0 empty:hidden lg:flex-1">
+                    <ProductTastingNotes product={product} />
+                </div>
+                <div className="min-w-0 empty:hidden lg:flex-1">
+                    <ProductSpecSheet product={product} />
+                </div>
+            </div>
+
+            <ProductRelated />
         </main>
     );
 }

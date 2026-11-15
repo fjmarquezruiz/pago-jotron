@@ -372,6 +372,21 @@ export function DesignSystemShowcase() {
                                     <Label htmlFor="urgente">Envío urgente</Label>
                                 </div>
                             </RadioGroup>
+                            <RadioGroup
+                                defaultValue="botella"
+                                orientation="horizontal"
+                                aria-label="Presentación"
+                            >
+                                <RadioGroupItem variant="chip" value="botella">
+                                    Botella 75 cl
+                                </RadioGroupItem>
+                                <RadioGroupItem variant="chip" value="media">
+                                    Media botella 37,5 cl
+                                </RadioGroupItem>
+                                <RadioGroupItem variant="chip" value="magnum" disabled>
+                                    Mágnum 150 cl
+                                </RadioGroupItem>
+                            </RadioGroup>
                             <div className="flex flex-col gap-gap-sm">
                                 {(['xs', 'sm', 'md', 'lg'] as const).map((size) => (
                                     <div key={size} className="flex items-center gap-gap-xs">
@@ -453,6 +468,7 @@ export function DesignSystemShowcase() {
                         </div>
                         <Card variant="outlined" className="max-w-md">
                             <EmptyState
+                                bordered={false}
                                 title="Aún no tienes pedidos"
                                 description="Cuando compres, verás aquí el estado de cada pedido."
                                 icon={<ShoppingBag />}
@@ -694,6 +710,7 @@ export function DesignSystemShowcase() {
                                     </DrawerHeader>
                                     <DrawerBody>
                                         <EmptyState
+                                            bordered={false}
                                             title="Tu carrito está vacío"
                                             icon={<ShoppingBag />}
                                         />
