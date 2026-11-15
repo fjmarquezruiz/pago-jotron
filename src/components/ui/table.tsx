@@ -175,7 +175,7 @@ TableCell.displayName = 'TableCell';
  * Fila de estado vacío (Figma: Table state=empty). Ocupa todas las columnas.
  *
  * @example
- * <TableBody><TableEmpty colSpan={4}><EmptyState title="Sin pedidos" /></TableEmpty></TableBody>
+ * <TableBody><TableEmpty colSpan={4}><EmptyState bordered={false} className="min-h-0" title="Sin pedidos" /></TableEmpty></TableBody>
  */
 function TableEmpty({ colSpan, children }: { colSpan: number; children: React.ReactNode }) {
     return (
