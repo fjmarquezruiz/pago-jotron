@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
     boolean,
     date,
@@ -292,6 +292,51 @@ export const productTastingTags = mysqlTable(
             .onDelete('cascade'),
     }),
 );
+
+/**
+ * Relaciones para la API relacional de Drizzle (`db.query.products.findFirst({ with: … })`).
+ * No crean columnas ni migraciones: las claves foráneas ya están en las tablas.
+ */
+export const productsRelations = relations(products, ({ one, many }) => ({
+    winery: one(wineries, { fields: [products.wineryId], references: [wineries.id] }),
+    guaranteeOfOrigin: one(guaranteesOfOrigin, {
+        fields: [products.guaranteeOfOriginId],
+        references: [guaranteesOfOrigin.id],
+    }),
+    typology: one(typologies, { fields: [products.typologyId], references: [typologies.id] }),
+    variants: many(productVariants),
+    grapes: many(productGrapes), // Filas de unión, con el porcentaje; la uva está en `grape`
+    tastingTags: many(productTastingTags), // Filas de unión; la etiqueta está en `tastingTag`
+}));
+
+export const wineriesRelations = relations(wineries, ({ many }) => ({
+    products: many(products),
+}));
+
+export const guaranteesOfOriginRelations = relations(guaranteesOfOrigin, ({ many }) => ({
+    products: many(products),
+}));
+
+export const typologiesRelations = relations(typologies, ({ many }) => ({
+    products: many(products),
+}));
+
+export const productVariantsRelations = relations(productVariants, ({ one }) => ({
+    product: one(products, { fields: [productVariants.productId], references: [products.id] }),
+}));
+
+export const productGrapesRelations = relations(productGrapes, ({ one }) => ({
+    product: one(products, { fields: [productGrapes.productId], references: [products.id] }),
+    grape: one(grapes, { fields: [productGrapes.grapeId], references: [grapes.id] }),
+}));
+
+export const productTastingTagsRelations = relations(productTastingTags, ({ one }) => ({
+    product: one(products, { fields: [productTastingTags.productId], references: [products.id] }),
+    tastingTag: one(tastingTags, {
+        fields: [productTastingTags.tastingTagId],
+        references: [tastingTags.id],
+    }),
+}));
 
 /** Tablas para pedidos y facturas */
 

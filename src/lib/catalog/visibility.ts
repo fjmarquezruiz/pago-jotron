@@ -26,3 +26,20 @@ export function isProductVisible({
 }: ProductVisibilityInput): boolean {
     return !isBlocked && !winery.isBlocked && !guaranteeOfOrigin.isBlocked;
 }
+
+/**
+ * Si la ficha de un producto se puede mostrar: visible según RF4 (`isProductVisible`) y con al
+ * menos una presentación a la venta. Sin presentaciones (todas bloqueadas) no hay nada que
+ * vender, así que la ficha se trata como no visible.
+ *
+ * @param product - El producto con el estado de bloqueo de su bodega y su D.O., y sus presentaciones sin bloquear.
+ * @returns `true` si la página puede mostrar la ficha; si no, debe llamar a `notFound()`.
+ *
+ * @example
+ * if (!product || !isProductPageAvailable(product)) notFound();
+ */
+export function isProductPageAvailable(
+    product: ProductVisibilityInput & { variants: readonly unknown[] },
+): boolean {
+    return isProductVisible(product) && product.variants.length > 0;
+}

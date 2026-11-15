@@ -17,5 +17,12 @@ export const pool =
     });
 if (process.env.NODE_ENV !== 'production') globalForDb.pool = pool;
 
-/** Cliente Drizzle con el esquema tipado. */
-export const db = drizzle(pool, { schema, mode: 'default' });
+/**
+ * Cliente Drizzle con el esquema tipado.
+ *
+ * `mode: 'planetscale'` no significa que usemos PlanetScale: es el modo de la API relacional
+ * (`db.query`) que resuelve los `with` de tipo `many` con subconsultas correlacionadas. El modo
+ * `'default'` usa `LATERAL JOIN`, que MySQL 8.4 admite pero TiDB no. Así el mismo SQL funciona
+ * en local (MySQL) y en producción (TiDB). Solo cambia el SQL generado, no los resultados.
+ */
+export const db = drizzle(pool, { schema, mode: 'planetscale' });
