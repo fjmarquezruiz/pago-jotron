@@ -5,6 +5,7 @@ import {
     catalogItemsQuery,
     featuredProductsQuery,
     isNewCondition,
+    relatedProductsQuery,
     visibleProductsCondition,
 } from './queries';
 
@@ -141,5 +142,45 @@ describe('featuredProductsQuery', () => {
         expect(sql).toContain('inner join `product_variants`');
         expect(sql).toContain('min(`product_variants`.`price`)');
         expect(sql).toContain('sum(`product_variants`.`stock`)');
+    });
+});
+
+describe('relatedProductsQuery', () => {
+    const args = { productId: 3, wineryId: 7, typologyId: 2, limit: 4 };
+    const { sql, params } = relatedProductsQuery(args).toSQL();
+
+    it('aplica la visibilidad y excluye el propio producto', () => {
+        expect(sql).toContain(
+            'where ((`products`.`is_blocked` = ? and `wineries`.`is_blocked` = ? and `guarantees_of_origin`.`is_blocked` = ?) and `products`.`product_id` <> ?)',
+        );
+        // presentación sin bloquear, 3 bloqueos y el id excluido
+        expect(params.slice(0, 5)).toEqual([false, false, false, false, 3]);
+    });
+
+    it('ordena por afinidad (bodega 2, tipología 1, resto 0) y después al azar', () => {
+        expect(sql).toContain(
+            'order by case when `products`.`winery_id` = ? then 2 when `products`.`typology_id` = ? then 1 else 0 end desc, rand()',
+        );
+        // los dos ids de la afinidad, y el límite al final
+        expect(params.slice(5, 7)).toEqual([7, 2]);
+        expect(params.at(-1)).toBe(4);
+    });
+
+    it('agrupa también por bodega y tipología, que usa el orden', () => {
+        expect(sql).toMatch(/group by .*`products`\.`winery_id`, `products`\.`typology_id`/);
+    });
+
+    it('usa las mismas uniones y agregados que el listado', () => {
+        expect(sql).toContain('inner join `product_variants`');
+        expect(sql).toContain('min(`product_variants`.`price`)');
+        expect(sql).toContain('sum(`product_variants`.`stock`)');
+    });
+
+    it('normaliza un límite inválido a 1', () => {
+        expect(
+            relatedProductsQuery({ ...args, limit: 0 })
+                .toSQL()
+                .params.at(-1),
+        ).toBe(1);
     });
 });

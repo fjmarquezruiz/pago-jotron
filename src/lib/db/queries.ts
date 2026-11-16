@@ -6,6 +6,7 @@ import {
     desc,
     eq,
     min,
+    ne,
     not,
     sql,
     sum,
@@ -278,4 +279,58 @@ export async function getFeaturedProducts({ limit }: { limit: number }) {
     if (fresh.length >= size) return fresh;
     const others = await featuredProductsQuery({ onlyNew: false, limit: size - fresh.length });
     return [...fresh, ...others];
+}
+
+/** Producto de la ficha respecto al que se buscan recomendados. */
+export interface RelatedProductsParams {
+    /** Id del producto de la ficha: no se recomienda a sí mismo. */
+    productId: number;
+    wineryId: number;
+    typologyId: number;
+    /** Cuántos como máximo (4 en la tienda). */
+    limit: number;
+}
+
+/**
+ * Consulta de recomendados de una ficha: productos visibles y con alguna presentación a la venta
+ * (mismas uniones y condiciones que el listado), sin el propio producto, ordenados por afinidad y
+ * al azar dentro de cada nivel de afinidad:
+ *
+ * 1. De la misma bodega.
+ * 2. De la misma tipología (Tinto, Dulce, Pasa moscatel…), de otra bodega.
+ * 3. El resto del catálogo.
+ *
+ * Con `limit` en una sola consulta, los niveles se rellenan por orden: si la bodega no llega al
+ * número pedido, se completa con su tipología y después con el resto.
+ *
+ * @param params - El producto de la ficha y cuántos recomendados.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function relatedProductsQuery({
+    productId,
+    wineryId,
+    typologyId,
+    limit,
+}: RelatedProductsParams) {
+    const affinity = sql`case when ${products.wineryId} = ${wineryId} then 2 when ${products.typologyId} = ${typologyId} then 1 else 0 end`;
+    return catalogRowsQuery()
+        .where(and(visibleProductsCondition(), ne(products.id, productId)) as SQL)
+        .groupBy(...catalogGroupBy(), products.wineryId, products.typologyId)
+        .orderBy(desc(affinity), sql`rand()`)
+        .limit(toPositiveInt(limit));
+}
+
+/**
+ * Productos de "También te puede gustar" de una ficha: al azar entre los de la misma bodega y,
+ * si no hay suficientes, completados con los de la misma tipología y después con el resto del
+ * catálogo. Nunca incluye el propio producto. Cambia en cada llamada.
+ *
+ * @param params - El producto de la ficha y cuántos recomendados.
+ * @returns Hasta `limit` productos con el mismo formato que `getCatalogPage`.
+ *
+ * @example
+ * const related = await getRelatedProducts({ productId: 3, wineryId: 1, typologyId: 2, limit: 4 });
+ */
+export async function getRelatedProducts(params: RelatedProductsParams) {
+    return relatedProductsQuery(params);
 }

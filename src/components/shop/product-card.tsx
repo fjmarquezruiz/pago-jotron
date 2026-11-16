@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,11 +18,6 @@ interface ProductCardProps {
     product: ProductCardProduct;
     /** Carga la imagen con prioridad: las primeras tarjetas del listado, que son el LCP. */
     priority?: boolean;
-    /**
-     * Ruta de una imagen local (`/images/…`) que sustituye a la de Cloudinary. Solo para los datos
-     * de muestra de "También te puede gustar"; los productos reales usan `product.image`.
-     */
-    localImage?: string;
     className?: string;
 }
 
@@ -47,7 +41,7 @@ const imageSizes = '(min-width: 1024px) 288px, 240px';
  * @example
  * <ProductCard product={item} priority={index < 4} />
  */
-export function ProductCard({ product, priority, localImage, className }: ProductCardProps) {
+export function ProductCard({ product, priority, className }: ProductCardProps) {
     const { slug, name, originName, image, minPrice, variantCount, totalStock, isNew } = product;
     const badge = productCardBadge({ totalStock, isNew });
 
@@ -77,26 +71,15 @@ export function ProductCard({ product, priority, localImage, className }: Produc
 
             <div className="relative flex w-full flex-col items-center overflow-clip">
                 <div className="relative aspect-square w-full max-w-60 lg:max-w-72">
-                    {localImage ? (
-                        <Image
-                            src={localImage}
+                    {image && (
+                        <CloudinaryImage
+                            src={image}
                             alt={name}
                             fill
                             priority={priority}
                             sizes={imageSizes}
                             className="object-contain"
                         />
-                    ) : (
-                        image && (
-                            <CloudinaryImage
-                                src={image}
-                                alt={name}
-                                fill
-                                priority={priority}
-                                sizes={imageSizes}
-                                className="object-contain"
-                            />
-                        )
                     )}
                 </div>
                 {totalStock > 0 && (

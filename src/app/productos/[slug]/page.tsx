@@ -97,8 +97,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                         </div>
                     </div>
 
-                    {/* Mockup con datos de ejemplo: no sale en producción hasta que haya consulta real. */}
-                    {process.env.VERCEL_ENV !== 'production' && <ProductRelated />}
+                    <ProductRelated product={product} />
                 </div>
             </main>
         </>
