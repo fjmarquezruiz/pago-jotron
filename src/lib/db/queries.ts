@@ -1,5 +1,6 @@
-import { and, asc, count, countDistinct, desc, eq, sql, sum, type SQL } from 'drizzle-orm';
+import { and, asc, count, countDistinct, desc, eq, min, sum, type SQL } from 'drizzle-orm';
 import { db } from '@/db';
+import { toPositiveInt } from '@/lib/catalog/pagination';
 import {
     guaranteesOfOrigin,
     productGrapes,
@@ -111,11 +112,6 @@ const joinSellableVariant = and(
     eq(productVariants.isBlocked, false),
 );
 
-/** Entero >= 1: una página o un tamaño inválidos (`0`, negativos, `NaN`) no rompen el SQL. */
-function positiveInt(value: number): number {
-    return Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 1;
-}
-
 /**
  * Consulta de los productos de una página del listado, con sus datos agregados: precio mínimo,
  * número de presentaciones y stock total. Se separa de `getCatalogPage` para poder comprobar su
@@ -132,7 +128,7 @@ function positiveInt(value: number): number {
  * @returns La consulta, lista para ejecutar con `await`.
  */
 export function catalogItemsQuery({ page, pageSize }: CatalogPageParams) {
-    const size = positiveInt(pageSize);
+    const size = toPositiveInt(pageSize);
     return db
         .select({
             id: products.id,
@@ -142,8 +138,8 @@ export function catalogItemsQuery({ page, pageSize }: CatalogPageParams) {
             vintage: products.vintage,
             /** Nombre de la D.O.: lo que la tarjeta pinta bajo el nombre. */
             originName: guaranteesOfOrigin.name,
-            /** Precio más bajo entre sus presentaciones, para el "desde". Nunca es nulo: hay al menos una. */
-            minPrice: sql<string>`min(${productVariants.price})`,
+            /** Precio más bajo entre sus presentaciones, para el "desde". Nunca es nulo: el `innerJoin` exige al menos una. */
+            minPrice: min(productVariants.price) as SQL<string>,
             /** Número de presentaciones a la venta: con más de una, el precio lleva "Desde". */
             variantCount: count(productVariants.id),
             /** Stock sumado de todas sus presentaciones: 0 = agotado. */
@@ -165,7 +161,7 @@ export function catalogItemsQuery({ page, pageSize }: CatalogPageParams) {
         )
         .orderBy(desc(products.createdAt), desc(products.id))
         .limit(size)
-        .offset((positiveInt(page) - 1) * size);
+        .offset((toPositiveInt(page) - 1) * size);
 }
 
 /**
