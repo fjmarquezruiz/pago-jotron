@@ -20,14 +20,21 @@ const mainLinks = [
  * Cabecera de la tienda (Figma: Menu): enlaces a la izquierda, logo centrado y cuenta y carrito a
  * la derecha. Por debajo de `lg` los enlaces pasan al menú lateral y solo queda el carrito.
  *
+ * Con `overlay` se superpone al principio de la página (el hero del listado): se coloca en
+ * absoluto arriba, en el tema oscuro del sistema (texto claro) y con el logo blanco. El menú
+ * lateral del móvil sigue con el tema claro, porque se abre fuera de este bloque.
+ *
+ * @param props.overlay - `true` para superponerla sobre una imagen oscura.
+ *
  * @example
  * <SiteHeader />
+ * <SiteHeader overlay />
  */
-export function SiteHeader() {
+export function SiteHeader({ overlay = false }: { overlay?: boolean }) {
     // TODO(A8): contador real del carrito.
     const cartCount = 0;
 
-    return (
+    const header = (
         <Navbar
             layout="centered"
             variant="transparent"
@@ -35,7 +42,7 @@ export function SiteHeader() {
             brand={
                 <Link href="/" aria-label="Pago de Jotrón, ir a la portada" className="flex">
                     <Image
-                        src="/images/brand/logo.svg"
+                        src={overlay ? '/images/brand/logo-white.svg' : '/images/brand/logo.svg'}
                         alt=""
                         width={201}
                         height={28}
@@ -46,7 +53,7 @@ export function SiteHeader() {
                         alt=""
                         width={87}
                         height={48}
-                        className="lg:hidden"
+                        className={overlay ? 'invert lg:hidden' : 'lg:hidden'}
                     />
                 </Link>
             }
@@ -73,4 +80,7 @@ export function SiteHeader() {
             ))}
         </Navbar>
     );
+
+    if (!overlay) return header;
+    return <div className="dark absolute inset-x-0 top-0 z-40 text-foreground">{header}</div>;
 }

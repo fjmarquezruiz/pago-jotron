@@ -1,56 +1,115 @@
 import Image from 'next/image';
+import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { cn, formatEuros } from '@/lib/utils';
+import { CloudinaryImage } from '@/components/ui/cloudinary-image';
+import { productCardBadge, productCardPrice } from '@/lib/catalog/product-card';
+import type { CatalogItem } from '@/lib/db/queries';
+import { cn } from '@/lib/utils';
+
+/** Lo que la tarjeta necesita de un producto del listado (`CatalogItem`). */
+export type ProductCardProduct = Pick<
+    CatalogItem,
+    'slug' | 'name' | 'originName' | 'image' | 'minPrice' | 'variantCount' | 'totalStock' | 'isNew'
+>;
 
 interface ProductCardProps {
-    /** Nombre del producto. */
-    name: string;
-    /** Denominación de origen que se muestra bajo el nombre. */
-    region: string;
-    /** Precio en euros, como número o como el texto con el que Drizzle devuelve un `decimal`. */
-    price: number | string;
-    /** Ruta de la imagen (cuadrada). */
-    image: string;
-    /** Texto alternativo de la imagen. */
-    alt: string;
+    /** Producto del listado, con su precio mínimo, número de presentaciones y stock total. */
+    product: ProductCardProduct;
+    /** Carga la imagen con prioridad: las primeras tarjetas del listado, que son el LCP. */
+    priority?: boolean;
+    /**
+     * Ruta de una imagen local (`/images/…`) que sustituye a la de Cloudinary. Solo para los datos
+     * de muestra de "También te puede gustar"; los productos reales usan `product.image`.
+     */
+    localImage?: string;
     className?: string;
 }
 
+const imageSizes = '(min-width: 1024px) 288px, 240px';
+
 /**
- * Tarjeta de producto del catálogo (Figma: ProductCard): nombre, D.O., precio e imagen cuadrada
- * abajo, todo centrado. El nombre ocupa el alto sobrante para que las tarjetas de una misma fila
- * midan lo mismo aunque un nombre ocupe más líneas.
+ * Tarjeta de producto del catálogo (Figma: ProductCard): nombre, D.O., un badge ("Agotado" o
+ * "¡NUEVO!", si toca), precio e imagen cuadrada abajo, todo centrado. El bloque de texto ocupa el
+ * alto sobrante para que las tarjetas de una misma fila midan lo mismo aunque un nombre ocupe
+ * más líneas.
  *
- * Todavía no es un enlace: aún no hay consulta real que dé el slug de la ficha.
+ * Toda la tarjeta enlaza a la ficha (`/productos/[slug]`) con un enlace estirado: el `Link` es el
+ * nombre y su `::after` cubre la tarjeta, así el lector de pantalla anuncia un solo enlace con el
+ * nombre del producto y el foco de teclado se dibuja alrededor de toda la tarjeta.
+ *
+ * Al pasar el ratón aparece sobre el borde inferior de la imagen un botón "Añadir" (como en el
+ * diseño). Mientras no exista el carrito (A8) está deshabilitado y es solo decorativo: va en un
+ * contenedor `aria-hidden` y sin eventos de puntero para que no se anuncie un botón que no se
+ * puede usar ni intercepte el clic del enlace. Un producto agotado no lo lleva.
  *
  * @example
- * <ProductCard name="Payoya Negra" region="Sierras de Málaga" price={23.5} image="/images/placeholders/payoya-negra.png" alt="Payoya Negra" />
+ * <ProductCard product={item} priority={index < 4} />
  */
-export function ProductCard({ name, region, price, image, alt, className }: ProductCardProps) {
-    // TODO: enlazar a /productos/[slug] cuando haya consulta real
+export function ProductCard({ product, priority, localImage, className }: ProductCardProps) {
+    const { slug, name, originName, image, minPrice, variantCount, totalStock, isNew } = product;
+    const badge = productCardBadge({ totalStock, isNew });
+
     return (
         <Card
             variant="outlined"
             className={cn(
-                'items-center gap-5 rounded-sm bg-transparent p-6 text-center lg:gap-6 lg:p-8',
+                'group relative items-center gap-5 rounded-sm bg-transparent p-6 text-center has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring lg:gap-6 lg:p-8',
                 className,
             )}
         >
             <div className="flex w-full flex-1 flex-col items-center gap-2.5">
-                <h3 className="text-xl lg:text-2xl">{name}</h3>
-                <p className="text-sm text-muted-foreground">{region}</p>
+                <h3 className="flex-1 text-xl break-words lg:text-2xl">
+                    <Link
+                        href={`/productos/${slug}`}
+                        className="outline-none after:absolute after:inset-0 after:z-10"
+                    >
+                        {name}
+                    </Link>
+                </h3>
+                <p className="text-sm text-muted-foreground">{originName}</p>
+                {badge === 'sold-out' && <Badge>Agotado</Badge>}
+                {badge === 'new' && <Badge tone="brand">¡NUEVO!</Badge>}
             </div>
-            <p className="text-lg font-medium">{formatEuros(price)}</p>
-            <div className="flex w-full flex-col items-center overflow-clip">
+
+            <p className="text-lg font-medium">{productCardPrice(minPrice, variantCount)}</p>
+
+            <div className="relative flex w-full flex-col items-center overflow-clip">
                 <div className="relative aspect-square w-full max-w-60 lg:max-w-72">
-                    <Image
-                        src={image}
-                        alt={alt}
-                        fill
-                        sizes="(min-width: 1024px) 288px, 240px"
-                        className="object-cover"
-                    />
+                    {localImage ? (
+                        <Image
+                            src={localImage}
+                            alt={name}
+                            fill
+                            priority={priority}
+                            sizes={imageSizes}
+                            className="object-contain"
+                        />
+                    ) : (
+                        image && (
+                            <CloudinaryImage
+                                src={image}
+                                alt={name}
+                                fill
+                                priority={priority}
+                                sizes={imageSizes}
+                                className="object-contain"
+                            />
+                        )
+                    )}
                 </div>
+                {totalStock > 0 && (
+                    <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute right-0 bottom-0 left-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+                    >
+                        {/* TODO(A8): añadir al carrito desde la tarjeta */}
+                        <Button variant="brand" size="lg" className="w-full" tabIndex={-1} disabled>
+                            Añadir
+                        </Button>
+                    </div>
+                )}
             </div>
         </Card>
     );

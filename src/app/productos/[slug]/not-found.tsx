@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { SiteHeader } from '@/components/shop/site-header';
 import { EmptyState } from '@/components/ui/empty-state';
 
 /**
@@ -11,18 +12,21 @@ import { EmptyState } from '@/components/ui/empty-state';
  */
 export default function ProductNotFound() {
     return (
-        <main className="px-6 py-16 lg:py-40">
-            <div className="mx-auto w-full max-w-9xl">
-                <EmptyState
-                    titleAs="h1"
-                    title="Este producto no está disponible"
-                    action={
-                        <Button asChild variant="brand">
-                            <Link href="/productos">Explora nuestros vinos</Link>
-                        </Button>
-                    }
-                />
-            </div>
-        </main>
+        <>
+            <SiteHeader />
+            <main className="px-6 py-16 lg:py-40">
+                <div className="mx-auto w-full max-w-9xl">
+                    <EmptyState
+                        titleAs="h1"
+                        title="Este producto no está disponible"
+                        action={
+                            <Button asChild variant="brand">
+                                <Link href="/productos">Explora nuestros vinos</Link>
+                            </Button>
+                        }
+                    />
+                </div>
+            </main>
+        </>
     );
 }

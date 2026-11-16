@@ -1,14 +1,13 @@
 import { SiteFooter } from '@/components/shop/site-footer';
-import { SiteHeader } from '@/components/shop/site-header';
 
 /**
- * Marco de la tienda: cabecera arriba y footer abajo para todas las páginas de `/productos`
- * (la ficha, su `not-found` y el listado que vendrá).
+ * Marco de la tienda: el footer abajo para todas las páginas de `/productos`. La cabecera no va
+ * aquí: cada página pinta la suya (`SiteHeader`) porque el listado la superpone al hero, con otro
+ * estilo, y el resto la lleva normal arriba.
  */
 export default function ShopLayout({ children }: { children: React.ReactNode }) {
     return (
         <>
-            <SiteHeader />
             {children}
             <SiteFooter />
         </>

@@ -43,7 +43,7 @@ export function ProductTastingNotes({ product }: ProductTastingNotesProps) {
                 <ul className="flex flex-wrap gap-x-3 gap-y-1.5 lg:gap-y-3">
                     {tags.map((tag) => (
                         <li key={tag.id}>
-                            <Badge>{tag.name}</Badge>
+                            <Badge className="h-control-xxs">{tag.name}</Badge>
                         </li>
                     ))}
                 </ul>

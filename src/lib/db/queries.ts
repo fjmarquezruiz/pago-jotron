@@ -1,5 +1,18 @@
-import { and, asc, count, countDistinct, desc, eq, min, sum, type SQL } from 'drizzle-orm';
+import {
+    and,
+    asc,
+    count,
+    countDistinct,
+    desc,
+    eq,
+    min,
+    not,
+    sql,
+    sum,
+    type SQL,
+} from 'drizzle-orm';
 import { db } from '@/db';
+import { NEW_PRODUCT_DAYS } from '@/lib/catalog/novelty';
 import { toPositiveInt } from '@/lib/catalog/pagination';
 import {
     guaranteesOfOrigin,
@@ -113,6 +126,60 @@ const joinSellableVariant = and(
 );
 
 /**
+ * Condición SQL de producto nuevo: dado de alta en los últimos `NEW_PRODUCT_DAYS` días. Usa la
+ * hora de la BD (`NOW()`), la misma con la que se rellena `created_at`.
+ *
+ * @returns La condición, para usarla en un `where` o como columna calculada.
+ */
+export function isNewCondition(): SQL {
+    return sql`${products.createdAt} >= DATE_SUB(NOW(), INTERVAL ${sql.raw(String(NEW_PRODUCT_DAYS))} DAY)`;
+}
+
+/** Columnas de una tarjeta de producto: las que comparten el listado y los favoritos. */
+function catalogColumns() {
+    return {
+        id: products.id,
+        slug: products.slug,
+        name: products.name,
+        image: products.image,
+        vintage: products.vintage,
+        /** Nombre de la D.O.: lo que la tarjeta pinta bajo el nombre. */
+        originName: guaranteesOfOrigin.name,
+        /** `true` si es nuevo (`isNewCondition`): la tarjeta lleva "¡NUEVO!". */
+        isNew: isNewCondition().mapWith(Boolean),
+        /** Precio más bajo entre sus presentaciones, para el "desde". Nunca es nulo: el `innerJoin` exige al menos una. */
+        minPrice: min(productVariants.price) as SQL<string>,
+        /** Número de presentaciones a la venta: con más de una, el precio lleva "Desde". */
+        variantCount: count(productVariants.id),
+        /** Stock sumado de todas sus presentaciones: 0 = agotado. */
+        totalStock: sum(productVariants.stock).mapWith(Number),
+    };
+}
+
+/** Columnas por las que se agrupa: todas las que se piden sin agregar, más `created_at` (la fecha de `isNew`). */
+function catalogGroupBy() {
+    return [
+        products.id,
+        products.slug,
+        products.name,
+        products.image,
+        products.vintage,
+        products.createdAt,
+        guaranteesOfOrigin.name,
+    ] as const;
+}
+
+/** Productos de tarjeta con sus uniones, sin condición ni agrupación: base del listado y de los favoritos. */
+function catalogRowsQuery() {
+    return db
+        .select(catalogColumns())
+        .from(products)
+        .innerJoin(wineries, joinWinery)
+        .innerJoin(guaranteesOfOrigin, joinOrigin)
+        .innerJoin(productVariants, joinSellableVariant);
+}
+
+/**
  * Consulta de los productos de una página del listado, con sus datos agregados: precio mínimo,
  * número de presentaciones y stock total. Se separa de `getCatalogPage` para poder comprobar su
  * SQL sin conectar a la BD.
@@ -129,36 +196,9 @@ const joinSellableVariant = and(
  */
 export function catalogItemsQuery({ page, pageSize }: CatalogPageParams) {
     const size = toPositiveInt(pageSize);
-    return db
-        .select({
-            id: products.id,
-            slug: products.slug,
-            name: products.name,
-            image: products.image,
-            vintage: products.vintage,
-            /** Nombre de la D.O.: lo que la tarjeta pinta bajo el nombre. */
-            originName: guaranteesOfOrigin.name,
-            /** Precio más bajo entre sus presentaciones, para el "desde". Nunca es nulo: el `innerJoin` exige al menos una. */
-            minPrice: min(productVariants.price) as SQL<string>,
-            /** Número de presentaciones a la venta: con más de una, el precio lleva "Desde". */
-            variantCount: count(productVariants.id),
-            /** Stock sumado de todas sus presentaciones: 0 = agotado. */
-            totalStock: sum(productVariants.stock).mapWith(Number),
-        })
-        .from(products)
-        .innerJoin(wineries, joinWinery)
-        .innerJoin(guaranteesOfOrigin, joinOrigin)
-        .innerJoin(productVariants, joinSellableVariant)
+    return catalogRowsQuery()
         .where(visibleProductsCondition())
-        .groupBy(
-            products.id,
-            products.slug,
-            products.name,
-            products.image,
-            products.vintage,
-            products.createdAt,
-            guaranteesOfOrigin.name,
-        )
+        .groupBy(...catalogGroupBy())
         .orderBy(desc(products.createdAt), desc(products.id))
         .limit(size)
         .offset((toPositiveInt(page) - 1) * size);
@@ -204,3 +244,38 @@ export type CatalogPage = Awaited<ReturnType<typeof getCatalogPage>>;
 
 /** Un producto del listado, con su precio mínimo, número de presentaciones y stock total. */
 export type CatalogItem = CatalogPage['items'][number];
+
+/**
+ * Consulta de productos al azar para "Nuestros favoritos": los visibles y con alguna presentación
+ * a la venta, solo los nuevos o solo los que no lo son. Mismas uniones y columnas que el listado.
+ *
+ * @param params.onlyNew - `true` para los nuevos; `false` para los que no lo son.
+ * @param params.limit - Cuántos como máximo.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function featuredProductsQuery({ onlyNew, limit }: { onlyNew: boolean; limit: number }) {
+    const novelty = onlyNew ? isNewCondition() : not(isNewCondition());
+    return catalogRowsQuery()
+        .where(and(visibleProductsCondition(), novelty) as SQL)
+        .groupBy(...catalogGroupBy())
+        .orderBy(sql`rand()`)
+        .limit(toPositiveInt(limit));
+}
+
+/**
+ * Productos para "Nuestros favoritos": al azar entre los nuevos y, si no llegan al número pedido,
+ * completados al azar con el resto del catálogo. Los nuevos van primero. Cambia en cada llamada.
+ *
+ * @param params.limit - Cuántos como máximo (8 en la tienda).
+ * @returns Hasta `limit` productos con el mismo formato que `getCatalogPage`.
+ *
+ * @example
+ * const favorites = await getFeaturedProducts({ limit: 8 });
+ */
+export async function getFeaturedProducts({ limit }: { limit: number }) {
+    const size = toPositiveInt(limit);
+    const fresh = await featuredProductsQuery({ onlyNew: true, limit: size });
+    if (fresh.length >= size) return fresh;
+    const others = await featuredProductsQuery({ onlyNew: false, limit: size - fresh.length });
+    return [...fresh, ...others];
+}

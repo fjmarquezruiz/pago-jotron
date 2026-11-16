@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getPagination, toPositiveInt } from './pagination';
+import { getPageWindow, getPagination, toPositiveInt } from './pagination';
 
 describe('toPositiveInt', () => {
     it.each([
@@ -59,5 +59,43 @@ describe('getPagination', () => {
             totalPages: 1,
             hasNext: false,
         });
+    });
+});
+
+describe('getPageWindow', () => {
+    it.each([
+        [1, 1, [1]],
+        [1, 3, [1, 2, 3]],
+        [4, 7, [1, 2, 3, 4, 5, 6, 7]],
+        [1, 10, [1, 2, 3, 4, 5, 'ellipsis', 10]],
+        [3, 10, [1, 2, 3, 4, 5, 'ellipsis', 10]],
+        [4, 10, [1, 2, 3, 4, 5, 'ellipsis', 10]],
+        [5, 10, [1, 'ellipsis', 4, 5, 6, 'ellipsis', 10]],
+        [6, 10, [1, 'ellipsis', 5, 6, 7, 'ellipsis', 10]],
+        [7, 10, [1, 'ellipsis', 6, 7, 8, 9, 10]],
+        [10, 10, [1, 'ellipsis', 6, 7, 8, 9, 10]],
+        [4, 8, [1, 2, 3, 4, 5, 'ellipsis', 8]],
+        [5, 8, [1, 'ellipsis', 4, 5, 6, 7, 8]],
+        [8, 8, [1, 'ellipsis', 4, 5, 6, 7, 8]],
+    ] as const)('página %s de %s → %j', (page, totalPages, expected) => {
+        expect(getPageWindow(page, totalPages)).toEqual(expected);
+    });
+
+    it.each([
+        [0, 10],
+        [-3, 10],
+        [Number.NaN, 10],
+        [99, 10],
+    ])('una página inválida (%s de %s) se ajusta al rango', (page, totalPages) => {
+        const window = getPageWindow(page, totalPages);
+        expect(window.length).toBe(7);
+        expect(window[0]).toBe(1);
+        expect(window.at(-1)).toBe(totalPages);
+    });
+
+    it('con más de 7 páginas siempre mide 7 huecos', () => {
+        for (let page = 1; page <= 12; page++) {
+            expect(getPageWindow(page, 12)).toHaveLength(7);
+        }
     });
 });

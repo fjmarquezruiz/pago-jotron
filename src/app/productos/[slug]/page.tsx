@@ -6,6 +6,7 @@ import { ProductImage } from '@/components/shop/product-image';
 import { ProductPurchase } from '@/components/shop/product-purchase';
 import { ProductRelated } from '@/components/shop/product-related';
 import { ProductShippingInfo } from '@/components/shop/product-shipping-info';
+import { SiteHeader } from '@/components/shop/site-header';
 import { ProductSpecSheet } from '@/components/shop/product-spec-sheet';
 import { ProductTastingNotes } from '@/components/shop/product-tasting-notes';
 import { cloudinaryLoader } from '@/lib/cloudinary';
@@ -60,43 +61,46 @@ export default async function ProductPage({ params }: ProductPageProps) {
     const shippingTypes = await getShippingTypes();
 
     return (
-        <main className="px-6 py-16 lg:py-40">
-            <div className="mx-auto flex w-full max-w-9xl flex-col gap-16 lg:gap-40">
-                <div className="mx-auto flex w-full max-w-6xl flex-col gap-16 lg:flex-row lg:items-start">
-                    <div className="min-w-0 lg:flex-1">
-                        <ProductImage src={product.image} alt={product.name} />
+        <>
+            <SiteHeader />
+            <main className="px-6 py-16 lg:py-40">
+                <div className="mx-auto flex w-full max-w-9xl flex-col gap-16 lg:gap-40">
+                    <div className="mx-auto flex w-full max-w-6xl flex-col gap-16 lg:flex-row lg:items-start">
+                        <div className="min-w-0 lg:flex-1">
+                            <ProductImage src={product.image} alt={product.name} />
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-12 lg:flex-1">
+                            <ProductHeader product={product} />
+                            <ProductPurchase variants={product.variants}>
+                                {(product.description || product.agingMethod) && (
+                                    <div className="flex flex-col gap-4">
+                                        {product.description && (
+                                            <p className="text-base">{product.description}</p>
+                                        )}
+                                        {product.agingMethod && (
+                                            <p className="text-base">{product.agingMethod}</p>
+                                        )}
+                                    </div>
+                                )}
+                            </ProductPurchase>
+                            <ProductShippingInfo shippingTypes={shippingTypes} />
+                        </div>
                     </div>
-                    <div className="flex min-w-0 flex-col gap-12 lg:flex-1">
-                        <ProductHeader product={product} />
-                        <ProductPurchase variants={product.variants}>
-                            {(product.description || product.agingMethod) && (
-                                <div className="flex flex-col gap-4">
-                                    {product.description && (
-                                        <p className="text-base">{product.description}</p>
-                                    )}
-                                    {product.agingMethod && (
-                                        <p className="text-base">{product.agingMethod}</p>
-                                    )}
-                                </div>
-                            )}
-                        </ProductPurchase>
-                        <ProductShippingInfo shippingTypes={shippingTypes} />
-                    </div>
-                </div>
 
-                {/* Sin notas de cata ni ficha técnica (los dos vacíos), la sección no ocupa sitio. */}
-                <div className="mx-auto hidden w-full max-w-6xl flex-col gap-16 has-[>:not(:empty)]:flex lg:flex-row lg:items-start">
-                    <div className="min-w-0 empty:hidden lg:flex-1">
-                        <ProductTastingNotes product={product} />
+                    {/* Sin notas de cata ni ficha técnica (los dos vacíos), la sección no ocupa sitio. */}
+                    <div className="mx-auto hidden w-full max-w-6xl flex-col gap-16 has-[>:not(:empty)]:flex lg:flex-row lg:items-start">
+                        <div className="min-w-0 empty:hidden lg:flex-1">
+                            <ProductTastingNotes product={product} />
+                        </div>
+                        <div className="min-w-0 empty:hidden lg:flex-1">
+                            <ProductSpecSheet product={product} />
+                        </div>
                     </div>
-                    <div className="min-w-0 empty:hidden lg:flex-1">
-                        <ProductSpecSheet product={product} />
-                    </div>
-                </div>
 
-                {/* Mockup con datos de ejemplo: no sale en producción hasta que haya consulta real. */}
-                {process.env.VERCEL_ENV !== 'production' && <ProductRelated />}
-            </div>
-        </main>
+                    {/* Mockup con datos de ejemplo: no sale en producción hasta que haya consulta real. */}
+                    {process.env.VERCEL_ENV !== 'production' && <ProductRelated />}
+                </div>
+            </main>
+        </>
     );
 }

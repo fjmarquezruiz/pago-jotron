@@ -1,6 +1,12 @@
 import { MySqlDialect } from 'drizzle-orm/mysql-core';
 import { describe, expect, it, vi } from 'vitest';
-import { catalogCountQuery, catalogItemsQuery, visibleProductsCondition } from './queries';
+import {
+    catalogCountQuery,
+    catalogItemsQuery,
+    featuredProductsQuery,
+    isNewCondition,
+    visibleProductsCondition,
+} from './queries';
 
 // `queries.ts` importa el cliente de BD; aquí solo se construye SQL, sin conectar.
 vi.mock('@/db', async () => {
@@ -95,5 +101,45 @@ describe('catalogCountQuery', () => {
         );
         expect(sql).not.toMatch(/limit|offset|order by|group by/);
         expect(params).toEqual([false, false, false, false]);
+    });
+});
+
+describe('isNewCondition', () => {
+    it('compara created_at con la hora de la BD menos NEW_PRODUCT_DAYS días', () => {
+        const { sql, params } = new MySqlDialect().sqlToQuery(isNewCondition());
+        expect(sql).toBe('`products`.`created_at` >= DATE_SUB(NOW(), INTERVAL 30 DAY)');
+        expect(params).toEqual([]);
+    });
+});
+
+describe('catalogItemsQuery: isNew', () => {
+    it('pide isNew como columna calculada y agrupa por created_at', () => {
+        const { sql } = catalogItemsQuery({ page: 1, pageSize: 12 }).toSQL();
+        expect(sql).toContain('`products`.`created_at` >= DATE_SUB(NOW(), INTERVAL 30 DAY)');
+        expect(sql).toMatch(/group by .*`products`\.`created_at`/);
+    });
+});
+
+describe('featuredProductsQuery', () => {
+    it('solo nuevos: visibles, isNew en el where, al azar y con límite', () => {
+        const { sql, params } = featuredProductsQuery({ onlyNew: true, limit: 8 }).toSQL();
+        expect(sql).toContain(
+            'where ((`products`.`is_blocked` = ? and `wineries`.`is_blocked` = ? and `guarantees_of_origin`.`is_blocked` = ?) and `products`.`created_at` >= DATE_SUB(NOW(), INTERVAL 30 DAY))',
+        );
+        expect(sql).toContain('order by rand()');
+        expect(sql).toMatch(/limit \?$/);
+        expect(params.at(-1)).toBe(8);
+    });
+
+    it('solo los que no son nuevos: niega la condición', () => {
+        const { sql } = featuredProductsQuery({ onlyNew: false, limit: 3 }).toSQL();
+        expect(sql).toContain('not `products`.`created_at` >= DATE_SUB(NOW(), INTERVAL 30 DAY)');
+    });
+
+    it('usa las mismas uniones y agregados que el listado', () => {
+        const { sql } = featuredProductsQuery({ onlyNew: true, limit: 8 }).toSQL();
+        expect(sql).toContain('inner join `product_variants`');
+        expect(sql).toContain('min(`product_variants`.`price`)');
+        expect(sql).toContain('sum(`product_variants`.`stock`)');
     });
 });

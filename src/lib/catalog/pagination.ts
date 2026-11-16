@@ -1,3 +1,6 @@
+/** Productos por página del listado: 4 columnas × 3 filas, como en Figma. */
+export const CATALOG_PAGE_SIZE = 12;
+
 /** Resultado de calcular la paginación de un listado. */
 export interface Pagination {
     /** Página a mostrar, ya ajustada al rango `1..totalPages`. */
@@ -59,4 +62,30 @@ export function getPagination(input: {
         hasPrevious: page > 1,
         hasNext: page < totalPages,
     };
+}
+
+/** Un número de página o un hueco (`…`) de la paginación. */
+export type PageWindowItem = number | 'ellipsis';
+
+/**
+ * Números de página que enseña la paginación (variante `full` del sistema de diseño): siempre la
+ * primera, la última y las cercanas a la actual, con `…` en los saltos. Con 7 páginas o menos se
+ * ven todas. Con más, la lista mide siempre 7 huecos para que la paginación no cambie de ancho al
+ * pasar de página.
+ *
+ * @param page - Página actual (ya ajustada con `getPagination`).
+ * @param totalPages - Número total de páginas.
+ * @returns Los números y los huecos, en orden.
+ *
+ * @example
+ * getPageWindow(3, 10); // [1, 2, 3, 4, 5, 'ellipsis', 10]
+ * getPageWindow(6, 10); // [1, 'ellipsis', 5, 6, 7, 'ellipsis', 10]
+ */
+export function getPageWindow(page: number, totalPages: number): PageWindowItem[] {
+    const last = toPositiveInt(totalPages);
+    const current = Math.min(toPositiveInt(page), last);
+    if (last <= 7) return Array.from({ length: last }, (_, index) => index + 1);
+    if (current <= 4) return [1, 2, 3, 4, 5, 'ellipsis', last];
+    if (current >= last - 3) return [1, 'ellipsis', last - 4, last - 3, last - 2, last - 1, last];
+    return [1, 'ellipsis', current - 1, current, current + 1, 'ellipsis', last];
 }
