@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, type SQL } from 'drizzle-orm';
+import { and, asc, count, countDistinct, desc, eq, sql, sum, type SQL } from 'drizzle-orm';
 import { db } from '@/db';
 import {
     guaranteesOfOrigin,
@@ -94,3 +94,117 @@ export async function getShippingTypes() {
         .where(eq(shippingTypes.isBlocked, false))
         .orderBy(asc(shippingTypes.id));
 }
+
+/** Parámetros del listado: página (desde 1) y productos por página. */
+export interface CatalogPageParams {
+    page: number;
+    pageSize: number;
+}
+
+// Uniones del listado. Las comparten la consulta de productos y la del total, para que cuenten
+// exactamente lo mismo. Solo cuentan las presentaciones a la venta (sin bloquear): el `innerJoin`
+// deja fuera los productos que no tienen ninguna, igual que la ficha (`isProductPageAvailable`).
+const joinWinery = eq(wineries.id, products.wineryId);
+const joinOrigin = eq(guaranteesOfOrigin.id, products.guaranteeOfOriginId);
+const joinSellableVariant = and(
+    eq(productVariants.productId, products.id),
+    eq(productVariants.isBlocked, false),
+);
+
+/** Entero >= 1: una página o un tamaño inválidos (`0`, negativos, `NaN`) no rompen el SQL. */
+function positiveInt(value: number): number {
+    return Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 1;
+}
+
+/**
+ * Consulta de los productos de una página del listado, con sus datos agregados: precio mínimo,
+ * número de presentaciones y stock total. Se separa de `getCatalogPage` para poder comprobar su
+ * SQL sin conectar a la BD.
+ *
+ * Orden: el más reciente primero (`created_at`), y el id como desempate para que la paginación
+ * sea estable cuando dos productos comparten fecha.
+ *
+ * El `groupBy` incluye todas las columnas que se piden sin agregar (no solo `products.id`): así
+ * es válido con `ONLY_FULL_GROUP_BY` aunque el motor (MySQL o TiDB) no deduzca las dependencias
+ * funcionales, y el resultado es el mismo.
+ *
+ * @param params - Página (desde 1) y productos por página.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function catalogItemsQuery({ page, pageSize }: CatalogPageParams) {
+    const size = positiveInt(pageSize);
+    return db
+        .select({
+            id: products.id,
+            slug: products.slug,
+            name: products.name,
+            image: products.image,
+            vintage: products.vintage,
+            /** Nombre de la D.O.: lo que la tarjeta pinta bajo el nombre. */
+            originName: guaranteesOfOrigin.name,
+            /** Precio más bajo entre sus presentaciones, para el "desde". Nunca es nulo: hay al menos una. */
+            minPrice: sql<string>`min(${productVariants.price})`,
+            /** Número de presentaciones a la venta: con más de una, el precio lleva "Desde". */
+            variantCount: count(productVariants.id),
+            /** Stock sumado de todas sus presentaciones: 0 = agotado. */
+            totalStock: sum(productVariants.stock).mapWith(Number),
+        })
+        .from(products)
+        .innerJoin(wineries, joinWinery)
+        .innerJoin(guaranteesOfOrigin, joinOrigin)
+        .innerJoin(productVariants, joinSellableVariant)
+        .where(visibleProductsCondition())
+        .groupBy(
+            products.id,
+            products.slug,
+            products.name,
+            products.image,
+            products.vintage,
+            products.createdAt,
+            guaranteesOfOrigin.name,
+        )
+        .orderBy(desc(products.createdAt), desc(products.id))
+        .limit(size)
+        .offset((positiveInt(page) - 1) * size);
+}
+
+/**
+ * Consulta del total de productos del listado, con las mismas uniones y condiciones que
+ * `catalogItemsQuery` pero sin paginar. Alimenta la paginación.
+ *
+ * @returns La consulta, lista para ejecutar con `await`: una fila con `total`.
+ */
+export function catalogCountQuery() {
+    return db
+        .select({ total: countDistinct(products.id) })
+        .from(products)
+        .innerJoin(wineries, joinWinery)
+        .innerJoin(guaranteesOfOrigin, joinOrigin)
+        .innerJoin(productVariants, joinSellableVariant)
+        .where(visibleProductsCondition());
+}
+
+/**
+ * Una página del listado de productos (RF4): solo los visibles (`visibleProductsCondition`) y con
+ * alguna presentación a la venta, del más reciente al más antiguo.
+ *
+ * @param params - Página (desde 1) y productos por página.
+ * @returns `items` con los productos de la página y sus agregados, y `total` con todos los
+ *   productos del listado, para calcular las páginas.
+ *
+ * @example
+ * const { items, total } = await getCatalogPage({ page: 1, pageSize: 12 });
+ */
+export async function getCatalogPage(params: CatalogPageParams) {
+    const [items, [{ total }]] = await Promise.all([
+        catalogItemsQuery(params),
+        catalogCountQuery(),
+    ]);
+    return { items, total };
+}
+
+/** Una página del listado: los productos con sus agregados y el total para paginar. */
+export type CatalogPage = Awaited<ReturnType<typeof getCatalogPage>>;
+
+/** Un producto del listado, con su precio mínimo, número de presentaciones y stock total. */
+export type CatalogItem = CatalogPage['items'][number];
