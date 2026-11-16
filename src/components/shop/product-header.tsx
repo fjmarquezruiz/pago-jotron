@@ -52,8 +52,12 @@ export function ProductHeader({ product }: ProductHeaderProps) {
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <p className="text-2xl text-muted-foreground">{product.guaranteeOfOrigin.name}</p>
-                <Badge tone={typologyTone(product.typology.name)}>{product.typology.name}</Badge>
-                {product.vintage !== null && <Badge>{product.vintage}</Badge>}
+                <Badge tone={typologyTone(product.typology.name)} className="h-control-xxs">
+                    {product.typology.name}
+                </Badge>
+                {product.vintage !== null && (
+                    <Badge className="h-control-xxs">{product.vintage}</Badge>
+                )}
             </div>
         </div>
     );

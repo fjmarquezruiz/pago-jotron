@@ -1,46 +1,37 @@
 import { ProductCard } from '@/components/shop/product-card';
+import { getRelatedProducts, type ProductDetail } from '@/lib/db/queries';
 import { cn } from '@/lib/utils';
 
-// TODO: sustituir por la consulta de recomendados
-const PLACEHOLDER_PRODUCTS = [
-    {
-        name: 'Payoya Negra',
-        region: 'Sierras de Málaga',
-        price: 23.5,
-        image: '/images/placeholders/payoya-negra.png',
-    },
-    {
-        name: 'MH Vino de Autor Melonera',
-        region: 'Sierras de Málaga',
-        price: 42,
-        image: '/images/placeholders/mh-vino-de-autor-melonera.png',
-    },
-    {
-        name: 'Encina del Inglés Blanco',
-        region: 'Sierras de Málaga',
-        price: 12.9,
-        image: '/images/placeholders/encina-del-ingles-blanco.png',
-    },
-    {
-        name: 'Pago de Jotrón Tinto Selección',
-        region: 'Sierras de Málaga',
-        price: 18.5,
-        image: '/images/placeholders/pago-de-jotron-tinto-seleccion.png',
-    },
-];
+/** Cuántos productos recomienda la ficha. */
+const RELATED_COUNT = 4;
+
+interface ProductRelatedProps {
+    /** Producto de la ficha: de él salen su id, su bodega y su tipología. */
+    product: Pick<ProductDetail, 'id' | 'wineryId' | 'typologyId'>;
+}
 
 /**
- * Sección "También te puede gustar": título y una fila de tarjetas de producto. Con datos de
- * muestra hasta que exista la consulta de recomendados.
+ * Sección "También te puede gustar": título y una fila de tarjetas con 4 productos al azar,
+ * primero de la misma bodega y, si no hay suficientes, de la misma tipología y después del resto
+ * del catálogo (`getRelatedProducts`). Nunca incluye el producto de la ficha. Si no hay ningún
+ * otro producto a la venta, no pinta nada.
  *
  * Cuatro tarjetas desde `lg` (1024 px) y dos por debajo, como el diseño móvil: a 1024 px cada
  * tarjeta mide unos 220 px, justo para que los nombres largos pasen a tres líneas sin romperse.
  * Es `w-full`: la página la coloca en un contenedor de 1440 px como máximo.
  *
  * @example
- * <ProductRelated />
+ * <ProductRelated product={product} />
  */
-export function ProductRelated() {
+export async function ProductRelated({ product }: ProductRelatedProps) {
+    const related = await getRelatedProducts({
+        productId: product.id,
+        wineryId: product.wineryId,
+        typologyId: product.typologyId,
+        limit: RELATED_COUNT,
+    });
+    if (related.length === 0) return null;
+
     return (
         <section aria-labelledby="related-title" className="flex w-full flex-col gap-8 lg:gap-12">
             <div className="flex min-h-9 items-center lg:min-h-12 lg:items-baseline">
@@ -52,12 +43,12 @@ export function ProductRelated() {
                 </h2>
             </div>
             <ul className="flex items-stretch gap-6 lg:gap-8">
-                {PLACEHOLDER_PRODUCTS.map((product, index) => (
+                {related.map((item, index) => (
                     <li
-                        key={product.name}
+                        key={item.id}
                         className={cn('min-w-0 flex-1', index >= 2 ? 'hidden lg:flex' : 'flex')}
                     >
-                        <ProductCard {...product} alt={product.name} className="w-full" />
+                        <ProductCard product={item} className="w-full" />
                     </li>
                 ))}
             </ul>
