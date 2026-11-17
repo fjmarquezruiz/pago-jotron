@@ -22,7 +22,7 @@ import { db } from '@/db';
 import { NEW_PRODUCT_DAYS } from '@/lib/catalog/novelty';
 import { toPositiveInt } from '@/lib/catalog/pagination';
 import { priceRangeBounds } from '@/lib/catalog/price-range';
-import { toVintageOptions, type FilterOption } from '@/lib/catalog/filter-options';
+import { toVintageOptions, type CatalogFilterOptions } from '@/lib/catalog/filter-options';
 import { LIKE_ESCAPE, searchPattern } from '@/lib/catalog/search';
 import {
     DEFAULT_CATALOG_SORT,
@@ -383,20 +383,6 @@ export type CatalogPage = Awaited<ReturnType<typeof getCatalogPage>>;
 
 /** Un producto del listado, con su precio mínimo, número de presentaciones y stock total. */
 export type CatalogItem = CatalogPage['items'][number];
-
-/** Las opciones de los selects del listado, cada lista con sus valores ya ordenados. */
-export interface CatalogFilterOptions {
-    /** Denominaciones de origen (`?do=`), por nombre. */
-    origins: FilterOption[];
-    /** Bodegas (`?bodega=`), por nombre. */
-    wineries: FilterOption[];
-    /** Uvas (`?uva=`), por nombre. */
-    grapes: FilterOption[];
-    /** Tipologías (`?tipologia=`), en el orden pensado para el filtro (`filter_order`). */
-    typologies: FilterOption[];
-    /** Añadas (`?anada=`): `id` es el año y `name` el año como texto; la más reciente primero. */
-    vintages: FilterOption[];
-}
 
 /**
  * Deja la consulta de una lista de opciones con las mismas uniones y la misma regla que el

@@ -1,14 +1,18 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { CatalogFilters } from '@/components/shop/catalog-filters';
 import { CatalogHero } from '@/components/shop/catalog-hero';
+import { CatalogNoResults } from '@/components/shop/catalog-no-results';
 import { CatalogPagination } from '@/components/shop/catalog-pagination';
 import { CollectionsSection } from '@/components/shop/collections-section';
 import { FavoritesSection } from '@/components/shop/favorites-section';
 import { ProductCard } from '@/components/shop/product-card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { hasActiveFilters } from '@/lib/catalog/active-filters';
 import { catalogPageHref } from '@/lib/catalog/catalog-url';
+import { sanitizeFilters } from '@/lib/catalog/filter-options';
 import { CATALOG_PAGE_SIZE, getPagination } from '@/lib/catalog/pagination';
-import { getCatalogPage } from '@/lib/db/queries';
+import { getCatalogFilterOptions, getCatalogPage } from '@/lib/db/queries';
 import { catalogSearchParamsSchema } from '@/lib/validations/catalog';
 
 /**
@@ -24,19 +28,30 @@ interface CatalogPageProps {
 }
 
 /**
- * Listado de productos (RF4): hero, número de productos, rejilla de 12 tarjetas por página,
- * paginación con enlaces `?page=N`, colecciones y favoritos. La barra de filtros, el buscador y
- * el orden llegan después.
+ * Listado de productos (RF4, RF5): hero, barra de búsqueda, filtros y orden, rejilla de 12
+ * tarjetas por página, paginación con enlaces `?page=N`, colecciones y favoritos.
  *
- * `page` se valida con `catalogSearchParamsSchema`: lo que no sea un entero >= 1 vale 1. Si la
- * página pedida pasa de la última (o ya no hay tantos productos), redirige a la última en vez de
- * pintar una rejilla vacía; si no hay ningún producto, enseña el estado vacío.
+ * La URL lleva el estado: `page`, `q`, `do`, `bodega`, `uva`, `tipologia`, `precio`, `anada` y
+ * `orden` se validan con `catalogSearchParamsSchema` (lo inválido no rompe la página: se corrige o
+ * se ignora) y los ids se comprueban además contra las opciones de los selects: un id que no se
+ * puede elegir (no existe, está bloqueado o no tiene productos) se descarta en vez de filtrar por
+ * algo que la barra no deja quitar. Si la página pedida pasa de la última, redirige a la última
+ * conservando los filtros. Sin resultados, enseña el estado vacío: el de los filtros si hay alguno
+ * activo y el del catálogo vacío si no.
  */
 export default async function CatalogPage({ searchParams }: CatalogPageProps) {
-    const { page: requestedPage } = catalogSearchParamsSchema.parse(searchParams);
+    const {
+        page: requestedPage,
+        orden,
+        ...requestedFilters
+    } = catalogSearchParamsSchema.parse(searchParams);
+    const options = await getCatalogFilterOptions();
+    const filters = sanitizeFilters(requestedFilters, options);
     const { items, total } = await getCatalogPage({
         page: requestedPage,
         pageSize: CATALOG_PAGE_SIZE,
+        filters,
+        orden,
     });
 
     const pagination = getPagination({
@@ -44,7 +59,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
         pageSize: CATALOG_PAGE_SIZE,
         total,
     });
-    if (pagination.outOfRange) redirect(catalogPageHref(pagination.page));
+    if (pagination.outOfRange) redirect(catalogPageHref(pagination.page, { filters, orden }));
 
     return (
         <main>
@@ -52,13 +67,14 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
             <div className="px-6 py-16 lg:py-40">
                 <div className="mx-auto flex w-full max-w-9xl flex-col gap-16 lg:gap-40">
                     <section aria-label="Productos" className="flex flex-col gap-12">
+                        <CatalogFilters
+                            options={options}
+                            filters={filters}
+                            orden={orden}
+                            total={total}
+                        />
                         {total > 0 ? (
                             <>
-                                <p className="flex h-10 items-center text-sm text-muted-foreground">
-                                    {total === 1
-                                        ? 'Mostrando 1 producto'
-                                        : `Mostrando ${total} productos`}
-                                </p>
                                 {/* Sin diseño para tablet ni móvil: 2 columnas por debajo de `lg`. */}
                                 <ul className="grid grid-cols-2 gap-6 lg:grid-cols-4 lg:gap-8">
                                     {items.map((product, index) => (
@@ -70,8 +86,12 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
                                 <CatalogPagination
                                     page={pagination.page}
                                     totalPages={pagination.totalPages}
+                                    filters={filters}
+                                    orden={orden}
                                 />
                             </>
+                        ) : hasActiveFilters(filters) ? (
+                            <CatalogNoResults q={filters.q} orden={orden} />
                         ) : (
                             <EmptyState titleAs="h2" title="No hay productos disponibles" />
                         )}

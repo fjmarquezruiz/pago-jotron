@@ -9,10 +9,10 @@ import {
     PaginationPrevious,
     PaginationSummary,
 } from '@/components/ui/pagination';
-import { catalogPageHref } from '@/lib/catalog/catalog-url';
+import { catalogPageHref, type CatalogUrlState } from '@/lib/catalog/catalog-url';
 import { getPageWindow } from '@/lib/catalog/pagination';
 
-interface CatalogPaginationProps {
+interface CatalogPaginationProps extends CatalogUrlState {
     /** Página actual, ya ajustada al rango (`getPagination`). */
     page: number;
     /** Número total de páginas. */
@@ -27,23 +27,28 @@ interface CatalogPaginationProps {
  * y la última página, Anterior y Siguiente quedan deshabilitados, sin enlace. No pinta nada si
  * hay una sola página.
  *
+ * Los enlaces conservan la búsqueda, los filtros y el orden (`filters` y `orden`): pasar de página
+ * no los pierde.
+ *
  * @example
- * <CatalogPagination page={3} totalPages={10} />
+ * <CatalogPagination page={3} totalPages={10} filters={{ tipologia: 1 }} orden="nombre" />
  */
-export function CatalogPagination({ page, totalPages }: CatalogPaginationProps) {
+export function CatalogPagination({ page, totalPages, filters, orden }: CatalogPaginationProps) {
     if (totalPages <= 1) return null;
+
+    const href = (target: number) => catalogPageHref(target, { filters, orden });
 
     const hasPrevious = page > 1;
     const hasNext = page < totalPages;
 
     const previous = (
         <PaginationPrevious size="lg" variant="ghost" disabled={!hasPrevious} asChild>
-            <Link href={catalogPageHref(page - 1)} rel="prev" />
+            <Link href={href(page - 1)} rel="prev" />
         </PaginationPrevious>
     );
     const next = (
         <PaginationNext size="lg" variant="ghost" disabled={!hasNext} asChild>
-            <Link href={catalogPageHref(page + 1)} rel="next" />
+            <Link href={href(page + 1)} rel="next" />
         </PaginationNext>
     );
 
@@ -65,7 +70,7 @@ export function CatalogPagination({ page, totalPages }: CatalogPaginationProps) 
                                     isActive={item === page}
                                     aria-label={`Página ${item}`}
                                 >
-                                    <Link href={catalogPageHref(item)}>{item}</Link>
+                                    <Link href={href(item)}>{item}</Link>
                                 </PaginationLink>
                             </PaginationItem>
                         ),

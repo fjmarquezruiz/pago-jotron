@@ -1,31 +1,25 @@
 import { z } from 'zod';
 
-/** Tramos de precio del filtro `precio`, de menor a mayor (valores de la URL). */
-export const PRICE_RANGES = ['hasta-10', '10-15', '15-25', 'mas-25'] as const;
+import {
+    CATALOG_SORTS,
+    DEFAULT_CATALOG_SORT,
+    PRICE_RANGES,
+    SEARCH_MAX_LENGTH,
+    VINTAGE_MAX,
+    VINTAGE_MIN,
+} from '@/lib/catalog/filter-constants';
 
-/**
- * Tramo de precio (`?precio=10-15`). Se mide sobre el precio mínimo de las presentaciones del
- * producto, en euros, con el extremo inferior incluido y el superior excluido para que no haya
- * huecos ni solapes: `hasta-10` es < 10, `10-15` es >= 10 y < 15, `15-25` es >= 15 y < 25 y
- * `mas-25` es >= 25.
- */
-export type PriceRange = (typeof PRICE_RANGES)[number];
-
-/** Criterios de orden del listado (`?orden=precio-asc`). El primero es el que se aplica por defecto. */
-export const CATALOG_SORTS = ['recientes', 'precio-asc', 'precio-desc', 'nombre'] as const;
-
-/** Criterio de orden: más recientes, precio de menor a mayor o de mayor a menor, y nombre A→Z. */
-export type CatalogSort = (typeof CATALOG_SORTS)[number];
-
-/** Orden que se aplica cuando falta `orden` o su valor no es uno de `CATALOG_SORTS`. */
-export const DEFAULT_CATALOG_SORT: CatalogSort = CATALOG_SORTS[0];
-
-/** Longitud máxima del texto de `q`: una búsqueda más larga se descarta. */
-export const SEARCH_MAX_LENGTH = 100;
-
-/** Añadas que acepta `anada`: fuera de este rango no puede haber un vino y se descarta. */
-export const VINTAGE_MIN = 1900;
-export const VINTAGE_MAX = 2100;
+// Los valores y tipos de los filtros viven en `filter-constants.ts`; se reexportan para que quien
+// valida la URL los tenga junto al esquema.
+export {
+    CATALOG_SORTS,
+    DEFAULT_CATALOG_SORT,
+    PRICE_RANGES,
+    SEARCH_MAX_LENGTH,
+    VINTAGE_MAX,
+    VINTAGE_MIN,
+};
+export type { CatalogSort, PriceRange } from '@/lib/catalog/filter-constants';
 
 /** El `int` de MySQL más alto: un id mayor no puede existir en las tablas. */
 const MAX_ID = 2_147_483_647;
