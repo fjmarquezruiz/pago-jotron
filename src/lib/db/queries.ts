@@ -2,12 +2,16 @@ import {
     and,
     asc,
     count,
-    countDistinct,
     desc,
     eq,
+    exists,
+    gte,
+    like,
+    lt,
     min,
     ne,
     not,
+    or,
     sql,
     sum,
     type SQL,
@@ -15,6 +19,9 @@ import {
 import { db } from '@/db';
 import { NEW_PRODUCT_DAYS } from '@/lib/catalog/novelty';
 import { toPositiveInt } from '@/lib/catalog/pagination';
+import { priceRangeBounds } from '@/lib/catalog/price-range';
+import { searchPattern } from '@/lib/catalog/search';
+import type { CatalogFilters } from '@/lib/validations/catalog';
 import {
     guaranteesOfOrigin,
     productGrapes,
@@ -110,10 +117,12 @@ export async function getShippingTypes() {
         .orderBy(asc(shippingTypes.id));
 }
 
-/** Parámetros del listado: página (desde 1) y productos por página. */
+/** Parámetros del listado: página (desde 1), productos por página y filtros (RF5). */
 export interface CatalogPageParams {
     page: number;
     pageSize: number;
+    /** Búsqueda y filtros ya validados (`catalogSearchParamsSchema`). Sin ellos, el catálogo entero. */
+    filters?: CatalogFilters;
 }
 
 // Uniones del listado. Las comparten la consulta de productos y la del total, para que cuenten
@@ -180,62 +189,140 @@ function catalogRowsQuery() {
         .innerJoin(productVariants, joinSellableVariant);
 }
 
+/** Condiciones SQL del listado: las que van en `where` y la que va en `having`. */
+export interface CatalogConditions {
+    where: SQL;
+    having: SQL | undefined;
+}
+
+/**
+ * Las condiciones del listado en un solo sitio (RF4, RF5): la consulta de productos y la del total
+ * las usan tal cual, así no pueden contar cosas distintas.
+ *
+ * `where` lleva la regla de visibilidad (`visibleProductsCondition`) y los filtros que se evalúan
+ * por fila de producto, todos unidos con `and`:
+ * - `q`: `like` sin distinguir mayúsculas ni acentos (lo hace la collation de las columnas) sobre
+ *   el nombre o la descripción. Los comodines de `like` que escriba la persona se escapan.
+ * - `do`, `bodega`, `tipologia` y `anada`: igualdad con `guarantee_of_origin_id`, `winery_id`,
+ *   `typology_id` y `vintage`.
+ * - `uva`: `exists` sobre `product_grapes`, en vez de otro `join`, que repetiría el producto
+ *   (y su precio y su stock) una vez por cada uva.
+ *
+ * `having` lleva `precio` porque se mide sobre un agregado: el precio mínimo de las presentaciones
+ * a la venta, el mismo que enseña la tarjeta ("Desde X €"). No existe sin `group by`.
+ *
+ * @param filters - Filtros ya validados; vacío o sin campos = ningún filtro.
+ * @returns `where`, y `having` solo si hay filtro de precio.
+ *
+ * @example
+ * const { where, having } = catalogConditions({ tipologia: 1, precio: '10-15' });
+ */
+export function catalogConditions(filters: CatalogFilters = {}): CatalogConditions {
+    const { q, do: guaranteeOfOriginId, bodega, uva, tipologia, precio, anada } = filters;
+
+    const pattern = searchPattern(q);
+    const conditions: (SQL | undefined)[] = [
+        visibleProductsCondition(),
+        pattern ? or(like(products.name, pattern), like(products.description, pattern)) : undefined,
+        guaranteeOfOriginId === undefined
+            ? undefined
+            : eq(products.guaranteeOfOriginId, guaranteeOfOriginId),
+        bodega === undefined ? undefined : eq(products.wineryId, bodega),
+        tipologia === undefined ? undefined : eq(products.typologyId, tipologia),
+        anada === undefined ? undefined : eq(products.vintage, anada),
+        uva === undefined
+            ? undefined
+            : exists(
+                  db
+                      .select({ one: sql`1` })
+                      .from(productGrapes)
+                      .where(
+                          and(
+                              eq(productGrapes.productId, products.id),
+                              eq(productGrapes.grapeId, uva),
+                          ),
+                      ),
+              ),
+    ];
+
+    const { from, to } = precio ? priceRangeBounds(precio) : {};
+    const minPrice = min(productVariants.price);
+    const having = and(
+        from === undefined ? undefined : gte(minPrice, from),
+        to === undefined ? undefined : lt(minPrice, to),
+    );
+
+    return { where: and(...conditions) as SQL, having };
+}
+
 /**
  * Consulta de los productos de una página del listado, con sus datos agregados: precio mínimo,
  * número de presentaciones y stock total. Se separa de `getCatalogPage` para poder comprobar su
  * SQL sin conectar a la BD.
  *
- * Orden: el más reciente primero (`created_at`), y el id como desempate para que la paginación
- * sea estable cuando dos productos comparten fecha.
+ * Filtra con `catalogConditions`. Orden: el más reciente primero (`created_at`), y el id como
+ * desempate para que la paginación sea estable cuando dos productos comparten fecha.
  *
  * El `groupBy` incluye todas las columnas que se piden sin agregar (no solo `products.id`): así
  * es válido con `ONLY_FULL_GROUP_BY` aunque el motor (MySQL o TiDB) no deduzca las dependencias
  * funcionales, y el resultado es el mismo.
  *
- * @param params - Página (desde 1) y productos por página.
+ * @param params - Página (desde 1), productos por página y filtros.
  * @returns La consulta, lista para ejecutar con `await`.
  */
-export function catalogItemsQuery({ page, pageSize }: CatalogPageParams) {
+export function catalogItemsQuery({ page, pageSize, filters }: CatalogPageParams) {
     const size = toPositiveInt(pageSize);
+    const { where, having } = catalogConditions(filters);
     return catalogRowsQuery()
-        .where(visibleProductsCondition())
+        .where(where)
         .groupBy(...catalogGroupBy())
+        .having(having)
         .orderBy(desc(products.createdAt), desc(products.id))
         .limit(size)
         .offset((toPositiveInt(page) - 1) * size);
 }
 
 /**
- * Consulta del total de productos del listado, con las mismas uniones y condiciones que
- * `catalogItemsQuery` pero sin paginar. Alimenta la paginación.
+ * Consulta del total de productos del listado, con las mismas uniones y condiciones
+ * (`catalogConditions`) que `catalogItemsQuery` pero sin paginar. Alimenta la paginación.
  *
+ * Cuenta las filas de una subconsulta agrupada por producto, no los productos con `count(distinct)`:
+ * el filtro de precio es un `having` sobre el precio mínimo y solo existe tras agrupar.
+ *
+ * @param filters - Búsqueda y filtros; los mismos que se pasan a `catalogItemsQuery`.
  * @returns La consulta, lista para ejecutar con `await`: una fila con `total`.
  */
-export function catalogCountQuery() {
-    return db
-        .select({ total: countDistinct(products.id) })
+export function catalogCountQuery(filters?: CatalogFilters) {
+    const { where, having } = catalogConditions(filters);
+    const matching = db
+        .select({ id: products.id })
         .from(products)
         .innerJoin(wineries, joinWinery)
         .innerJoin(guaranteesOfOrigin, joinOrigin)
         .innerJoin(productVariants, joinSellableVariant)
-        .where(visibleProductsCondition());
+        .where(where)
+        .groupBy(products.id)
+        .having(having)
+        .as('matching');
+    return db.select({ total: count() }).from(matching);
 }
 
 /**
- * Una página del listado de productos (RF4): solo los visibles (`visibleProductsCondition`) y con
- * alguna presentación a la venta, del más reciente al más antiguo.
+ * Una página del listado de productos (RF4, RF5): solo los visibles (`visibleProductsCondition`) y
+ * con alguna presentación a la venta que cumplan la búsqueda y los filtros, del más reciente al
+ * más antiguo.
  *
- * @param params - Página (desde 1) y productos por página.
+ * @param params - Página (desde 1), productos por página y filtros.
  * @returns `items` con los productos de la página y sus agregados, y `total` con todos los
- *   productos del listado, para calcular las páginas.
+ *   productos que cumplen los filtros, para calcular las páginas.
  *
  * @example
- * const { items, total } = await getCatalogPage({ page: 1, pageSize: 12 });
+ * const { items, total } = await getCatalogPage({ page: 1, pageSize: 12, filters: { tipologia: 1 } });
  */
 export async function getCatalogPage(params: CatalogPageParams) {
     const [items, [{ total }]] = await Promise.all([
         catalogItemsQuery(params),
-        catalogCountQuery(),
+        catalogCountQuery(params.filters),
     ]);
     return { items, total };
 }

@@ -1,6 +1,8 @@
+import type { SQL } from 'drizzle-orm';
 import { MySqlDialect } from 'drizzle-orm/mysql-core';
 import { describe, expect, it, vi } from 'vitest';
 import {
+    catalogConditions,
     catalogCountQuery,
     catalogItemsQuery,
     featuredProductsQuery,
@@ -92,16 +94,206 @@ describe('catalogItemsQuery', () => {
 describe('catalogCountQuery', () => {
     const { sql, params } = catalogCountQuery().toSQL();
 
-    it('cuenta productos distintos con las mismas uniones y condiciones, sin paginar', () => {
-        expect(sql).toContain('count(distinct `products`.`product_id`)');
+    it('cuenta las filas de una subconsulta agrupada por producto, sin paginar', () => {
+        expect(sql).toMatch(/^select count\(\*\) from \(select `products`\.`product_id` from /);
+        expect(sql).toMatch(/group by `products`\.`product_id`\) `matching`$/);
+        expect(sql).not.toMatch(/limit|offset|order by/);
+    });
+
+    it('lleva las mismas uniones y la misma regla de visibilidad que el listado', () => {
         expect(sql).toContain('inner join `wineries`');
         expect(sql).toContain('inner join `guarantees_of_origin`');
         expect(sql).toContain('inner join `product_variants`');
         expect(sql).toContain(
             'where (`products`.`is_blocked` = ? and `wineries`.`is_blocked` = ? and `guarantees_of_origin`.`is_blocked` = ?)',
         );
-        expect(sql).not.toMatch(/limit|offset|order by|group by/);
         expect(params).toEqual([false, false, false, false]);
+    });
+});
+
+describe('catalogConditions', () => {
+    const dialect = new MySqlDialect();
+    /** El SQL y los parámetros de una condición (sin los `typings` que añade el dialecto). */
+    const render = (condition: SQL) => {
+        const { sql, params } = dialect.sqlToQuery(condition);
+        return { sql, params };
+    };
+    const visible =
+        '(`products`.`is_blocked` = ? and `wineries`.`is_blocked` = ? and `guarantees_of_origin`.`is_blocked` = ?)';
+    const hidden = [false, false, false];
+
+    it('sin filtros, solo la regla de visibilidad y sin having', () => {
+        for (const filters of [
+            undefined,
+            {},
+            { q: undefined, uva: undefined, precio: undefined },
+        ]) {
+            const { where, having } = catalogConditions(filters);
+            expect(render(where)).toEqual({ sql: visible, params: hidden });
+            expect(having).toBeUndefined();
+        }
+    });
+
+    it.each([
+        [
+            'q busca en nombre o descripción, con comodines en los extremos',
+            { q: 'tinto' },
+            '(`products`.`name` like ? or `products`.`description` like ?)',
+            ['%tinto%', '%tinto%'],
+        ],
+        [
+            'q recorta los espacios',
+            { q: '  tinto roble ' },
+            '(`products`.`name` like ? or `products`.`description` like ?)',
+            ['%tinto roble%', '%tinto roble%'],
+        ],
+        [
+            'q escapa los comodines de like',
+            { q: '100%_\\' },
+            '(`products`.`name` like ? or `products`.`description` like ?)',
+            ['%100\\%\\_\\\\%', '%100\\%\\_\\\\%'],
+        ],
+        [
+            'do filtra por la D.O. del producto',
+            { do: 6 },
+            '`products`.`guarantee_of_origin_id` = ?',
+            [6],
+        ],
+        ['bodega filtra por la bodega', { bodega: 2 }, '`products`.`winery_id` = ?', [2]],
+        [
+            'tipologia filtra por la tipología',
+            { tipologia: 5 },
+            '`products`.`typology_id` = ?',
+            [5],
+        ],
+        ['anada filtra por la añada', { anada: 2022 }, '`products`.`vintage` = ?', [2022]],
+        [
+            'uva usa exists sobre product_grapes, correlacionado con el producto',
+            { uva: 8 },
+            'exists (select 1 from `product_grapes` where (`product_grapes`.`product_id` = `products`.`product_id` and `product_grapes`.`grape_id` = ?))',
+            [8],
+        ],
+    ] as const)('%s', (_name, filters, fragment, extraParams) => {
+        const { sql, params } = dialect.sqlToQuery(catalogConditions(filters).where);
+        expect(sql).toBe(`(${visible} and ${fragment})`);
+        expect(params).toEqual([...hidden, ...extraParams]);
+    });
+
+    it.each([[{ q: '' }], [{ q: '   ' }]])('un texto vacío (%j) no añade condición', (filters) => {
+        expect(dialect.sqlToQuery(catalogConditions(filters).where).sql).toBe(visible);
+    });
+
+    it('une todos los filtros con and, tras la visibilidad y en el mismo orden', () => {
+        const { where, having } = catalogConditions({
+            q: 'a',
+            do: 1,
+            bodega: 2,
+            tipologia: 3,
+            anada: 2020,
+            uva: 4,
+            precio: '10-15',
+        });
+        const { sql, params } = dialect.sqlToQuery(where);
+        expect(sql).toBe(
+            `(${visible} and (\`products\`.\`name\` like ? or \`products\`.\`description\` like ?) and \`products\`.\`guarantee_of_origin_id\` = ? and \`products\`.\`winery_id\` = ? and \`products\`.\`typology_id\` = ? and \`products\`.\`vintage\` = ? and exists (select 1 from \`product_grapes\` where (\`product_grapes\`.\`product_id\` = \`products\`.\`product_id\` and \`product_grapes\`.\`grape_id\` = ?)))`,
+        );
+        expect(params).toEqual([...hidden, '%a%', '%a%', 1, 2, 3, 2020, 4]);
+        expect(having).toBeDefined();
+    });
+
+    it.each([
+        ['hasta-10', 'min(`product_variants`.`price`) < ?', [10]],
+        [
+            '10-15',
+            '(min(`product_variants`.`price`) >= ? and min(`product_variants`.`price`) < ?)',
+            [10, 15],
+        ],
+        [
+            '15-25',
+            '(min(`product_variants`.`price`) >= ? and min(`product_variants`.`price`) < ?)',
+            [15, 25],
+        ],
+        ['mas-25', 'min(`product_variants`.`price`) >= ?', [25]],
+    ] as const)(
+        'precio %s va en having, sobre el precio mínimo',
+        (precio, expectedSql, expectedParams) => {
+            const { where, having } = catalogConditions({ precio });
+            expect(render(having!)).toEqual({
+                sql: expectedSql,
+                params: expectedParams,
+            });
+            // el agregado no puede ir en where: solo existe tras agrupar
+            expect(dialect.sqlToQuery(where).sql).toBe(visible);
+        },
+    );
+});
+
+describe('catalogItemsQuery con filtros', () => {
+    const filters = { q: 'roble', uva: 1, tipologia: 1, precio: '15-25' } as const;
+    const { sql, params } = catalogItemsQuery({ page: 2, pageSize: 12, filters }).toSQL();
+
+    it('aplica los filtros de fila en where y el precio en having, entre group by y order by', () => {
+        expect(sql).toMatch(
+            / where \(\(.*\) and \(`products`\.`name` like \? or .*exists \(select 1 from `product_grapes`.*\)\) group by .* having \(min\(`product_variants`\.`price`\) >= \? and min\(`product_variants`\.`price`\) < \?\) order by /,
+        );
+    });
+
+    it('no une product_grapes: la uva se filtra con exists y no multiplica las filas', () => {
+        expect(sql.match(/inner join/g)).toHaveLength(3);
+        expect(sql).not.toMatch(/join `product_grapes`/);
+    });
+
+    it('los parámetros de los filtros van antes de limit y offset', () => {
+        // presentación sin bloquear, 3 bloqueos, q ×2, tipología, uva, precio ×2, limit, offset
+        expect(params).toEqual([
+            false,
+            false,
+            false,
+            false,
+            '%roble%',
+            '%roble%',
+            1,
+            1,
+            15,
+            25,
+            12,
+            12,
+        ]);
+    });
+
+    it('sin precio no hay having', () => {
+        expect(
+            catalogItemsQuery({ page: 1, pageSize: 12, filters: { bodega: 1 } }).toSQL().sql,
+        ).not.toContain('having');
+    });
+
+    it('sin filtros, la misma consulta de antes', () => {
+        const base = catalogItemsQuery({ page: 1, pageSize: 12 }).toSQL();
+        expect(catalogItemsQuery({ page: 1, pageSize: 12, filters: {} }).toSQL()).toEqual(base);
+        expect(base.sql).not.toMatch(/having|exists|like/);
+    });
+});
+
+describe('catalogCountQuery con filtros', () => {
+    const filters = { q: 'roble', uva: 1, bodega: 2, precio: 'hasta-10' } as const;
+
+    it('usa exactamente las mismas condiciones que la consulta de productos', () => {
+        const items = catalogItemsQuery({ page: 2, pageSize: 12, filters }).toSQL();
+        const total = catalogCountQuery(filters).toSQL();
+        const conditions = (sql: string) => ({
+            where: sql.match(/ where (.*?) group by /)?.[1],
+            having: sql.match(/ having (.*?)(?: order by |\) `matching`)/)?.[1],
+        });
+
+        expect(conditions(total.sql)).toEqual(conditions(items.sql));
+        expect(conditions(total.sql).where).toContain('exists (select 1 from `product_grapes`');
+        expect(conditions(total.sql).having).toBe('min(`product_variants`.`price`) < ?');
+        // mismos parámetros, salvo limit y offset, que no tiene
+        expect(total.params).toEqual(items.params.slice(0, -2));
+    });
+
+    it('sin precio no lleva having', () => {
+        expect(catalogCountQuery({ bodega: 1 }).toSQL().sql).not.toContain('having');
     });
 });
 

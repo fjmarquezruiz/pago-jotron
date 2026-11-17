@@ -93,3 +93,6 @@ export const catalogSearchParamsSchema = z.object({
 
 /** Parámetros del listado ya validados. */
 export type CatalogSearchParams = z.infer<typeof catalogSearchParamsSchema>;
+
+/** Los filtros del listado: los parámetros que reducen el conjunto de productos, sin `page` ni `orden`. */
+export type CatalogFilters = Omit<CatalogSearchParams, 'page' | 'orden'>;
