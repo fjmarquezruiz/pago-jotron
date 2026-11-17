@@ -75,8 +75,12 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
                         />
                         {total > 0 ? (
                             <>
-                                {/* Sin diseño para tablet ni móvil: 2 columnas por debajo de `lg`. */}
-                                <ul className="grid grid-cols-2 gap-6 lg:grid-cols-4 lg:gap-8">
+                                {/*
+                                 * Sin diseño propio del listado por debajo de escritorio: se reparte como los
+                                 * bloques de la home (Figma, 480-1024 px): 1 columna, 2 desde 640 px, 3 desde
+                                 * 1024 px y 4 desde 1280 px.
+                                 */}
+                                <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:gap-8">
                                     {items.map((product, index) => (
                                         <li key={product.id} className="grid min-w-0">
                                             <ProductCard product={product} priority={index < 4} />

@@ -1,6 +1,6 @@
 import { ProductCard } from '@/components/shop/product-card';
+import { ShopCarousel } from '@/components/shop/shop-carousel';
 import { getRelatedProducts, type ProductDetail } from '@/lib/db/queries';
-import { cn } from '@/lib/utils';
 
 /** Cuántos productos recomienda la ficha. */
 const RELATED_COUNT = 4;
@@ -16,9 +16,10 @@ interface ProductRelatedProps {
  * del catálogo (`getRelatedProducts`). Nunca incluye el producto de la ficha. Si no hay ningún
  * otro producto a la venta, no pinta nada.
  *
- * Cuatro tarjetas desde `lg` (1024 px) y dos por debajo, como el diseño móvil: a 1024 px cada
- * tarjeta mide unos 220 px, justo para que los nombres largos pasen a tres líneas sin romperse.
- * Es `w-full`: la página la coloca en un contenedor de 1440 px como máximo.
+ * Es el mismo carrusel que "Nuestros favoritos" (`ShopCarousel`): cuántas tarjetas se ven a la
+ * vez depende del ancho (1 por debajo de 640 px, 2 hasta 1023, 3 hasta 1279 y las 4 repartiéndose
+ * el ancho desde 1280). Las flechas solo salen cuando no caben las 4, así que en escritorio no
+ * hay flechas. Ocupa todo el ancho de su contenedor, de 1440 px como máximo.
  *
  * @example
  * <ProductRelated product={product} />
@@ -33,25 +34,10 @@ export async function ProductRelated({ product }: ProductRelatedProps) {
     if (related.length === 0) return null;
 
     return (
-        <section aria-labelledby="related-title" className="flex w-full flex-col gap-8 lg:gap-12">
-            <div className="flex min-h-9 items-center lg:min-h-12 lg:items-baseline">
-                <h2
-                    id="related-title"
-                    className="font-display text-3xl font-medium lg:text-4xl lg:font-normal"
-                >
-                    También te puede gustar
-                </h2>
-            </div>
-            <ul className="flex items-stretch gap-6 lg:gap-8">
-                {related.map((item, index) => (
-                    <li
-                        key={item.id}
-                        className={cn('min-w-0 flex-1', index >= 2 ? 'hidden lg:flex' : 'flex')}
-                    >
-                        <ProductCard product={item} className="w-full" />
-                    </li>
-                ))}
-            </ul>
-        </section>
+        <ShopCarousel title="También te puede gustar" itemClassName="xl:w-[calc((100%-6rem)/4)]">
+            {related.map((item) => (
+                <ProductCard key={item.id} product={item} className="w-full" />
+            ))}
+        </ShopCarousel>
     );
 }

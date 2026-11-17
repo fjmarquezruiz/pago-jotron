@@ -8,23 +8,44 @@ import { cn } from '@/lib/utils';
 export interface ShopCarouselProps {
     /** Título de la sección (un `h2`). */
     title: string;
-    /** Acción junto al título, por ejemplo el botón "Ver todo". */
+    /**
+     * Acción junto al título, por ejemplo el botón "Ver todo". Su visibilidad según el ancho la
+     * decide quien la pasa (en el diseño, el botón no sale por debajo de 640 px).
+     */
     action?: React.ReactNode;
     /** Los elementos de la fila (tarjetas). Cada uno va dentro de su `<li>`. */
     children: React.ReactNode;
     className?: string;
+    /**
+     * Clases del `<li>` de cada elemento, para cambiar su ancho. Por defecto, desde 1280 px miden
+     * 336 px y la siguiente asoma; un bloque con pocos elementos puede repartir el ancho
+     * (`xl:w-[calc((100%-6rem)/4)]`) para que se vean todos.
+     */
+    itemClassName?: string;
+}
+
+/** Hasta dónde se puede desplazar la fila y si hay algo que desplazar. */
+interface ScrollEdges {
+    /** `true` si hay más contenido que ancho: solo entonces tienen sentido las flechas. */
+    overflows: boolean;
+    canPrevious: boolean;
+    canNext: boolean;
 }
 
 /**
- * Indica si la fila se puede desplazar hacia cada lado, para habilitar o no las flechas. Se
- * recalcula al hacer scroll y cuando cambia el tamaño de la fila.
+ * Indica si la fila se puede desplazar y hacia qué lado, para pintar o no las flechas y habilitar
+ * cada una. Se recalcula al hacer scroll y cuando cambia el tamaño de la fila. Antes de medir (en
+ * el servidor y en el primer pintado) no hay flechas: sin JavaScript tampoco funcionarían.
  *
  * @param ref - Referencia a la fila que se desplaza.
- * @returns `canPrevious` y `canNext`.
+ * @returns `overflows`, `canPrevious` y `canNext`.
  */
-function useScrollEdges(ref: React.RefObject<HTMLElement>) {
-    const [canPrevious, setCanPrevious] = React.useState(false);
-    const [canNext, setCanNext] = React.useState(true);
+function useScrollEdges(ref: React.RefObject<HTMLElement>): ScrollEdges {
+    const [edges, setEdges] = React.useState<ScrollEdges>({
+        overflows: false,
+        canPrevious: false,
+        canNext: false,
+    });
 
     React.useEffect(() => {
         const element = ref.current;
@@ -32,8 +53,18 @@ function useScrollEdges(ref: React.RefObject<HTMLElement>) {
 
         const update = () => {
             const maxScroll = element.scrollWidth - element.clientWidth;
-            setCanPrevious(element.scrollLeft > 1);
-            setCanNext(element.scrollLeft < maxScroll - 1);
+            const next = {
+                overflows: maxScroll > 1,
+                canPrevious: element.scrollLeft > 1,
+                canNext: element.scrollLeft < maxScroll - 1,
+            };
+            setEdges((current) =>
+                current.overflows === next.overflows &&
+                current.canPrevious === next.canPrevious &&
+                current.canNext === next.canNext
+                    ? current
+                    : next,
+            );
         };
 
         update();
@@ -46,31 +77,49 @@ function useScrollEdges(ref: React.RefObject<HTMLElement>) {
         };
     }, [ref]);
 
-    return { canPrevious, canNext };
+    return edges;
 }
 
 /**
- * Sección con una fila de tarjetas que se desplaza en horizontal (Figma: section-bestsellers):
- * título a la izquierda, una acción opcional ("Ver todo") y dos flechas, y debajo la fila con
- * 32 px entre tarjetas, recortada al ancho del contenedor para que la última se vea cortada.
+ * Sección con una fila de tarjetas que se desplaza en horizontal (Figma: section-bestsellers, y
+ * los bloques de la home en 480, 640, 768 y 1024 px). Título a la izquierda, una acción opcional
+ * ("Ver todo") y dos flechas, y debajo la fila.
  *
- * - Las flechas desplazan una tarjeta y se deshabilitan en los extremos. Respetan
+ * Cuántas tarjetas se ven a la vez y cómo es la cabecera cambian con el ancho, como en Figma:
+ *
+ * | Ancho            | Tarjetas por vista   | Cabecera                                | Hueco |
+ * | ---------------- | -------------------- | --------------------------------------- | ----- |
+ * | < 640 px         | 1                    | 36 px, flechas de 36 px                 | 32 px |
+ * | 640 – 1023 px    | 2                    | 40 px, flechas de 40 px                 | 32 px |
+ * | 1024 – 1279 px   | 3                    | 40 px, flechas de 40 px                 | 40 px |
+ * | >= 1280 px       | tarjetas de 336 px   | 48 px, flechas negras de 48 px          | 48 px |
+ *
+ * Desde 1280 px las tarjetas miden 336 px con 32 px entre ellas y la siguiente asoma cortada;
+ * por debajo se reparten el ancho con 24 px entre ellas.
+ *
+ * - Las flechas desplazan una tarjeta y se deshabilitan en los extremos. Solo se pintan si hay
+ *   algo que desplazar: una fila a la que le caben todas las tarjetas no las lleva. Respetan
  *   `prefers-reduced-motion`.
  * - Con ratón o con el dedo se desplaza igual, con el ajuste (`scroll-snap`) a cada tarjeta, y
  *   con teclado basta tabular por los enlaces de las tarjetas: el navegador las lleva a la vista.
- * - Hasta `lg` se ven 2 tarjetas por pantalla y las flechas no se pintan (el diseño móvil no las
- *   trae; se desplaza con el dedo). Desde `lg`, tarjetas de 336 px.
+ * - Si el título es largo y las flechas no caben a su lado, bajan a una segunda línea.
  *
  * @example
  * <ShopCarousel title="Nuestros favoritos">
  *     {items.map((item) => <ProductCard key={item.id} product={item} />)}
  * </ShopCarousel>
  */
-export function ShopCarousel({ title, action, children, className }: ShopCarouselProps) {
+export function ShopCarousel({
+    title,
+    action,
+    children,
+    className,
+    itemClassName,
+}: ShopCarouselProps) {
     const titleId = React.useId();
     const listId = React.useId();
     const listRef = React.useRef<HTMLUListElement>(null);
-    const { canPrevious, canNext } = useScrollEdges(listRef);
+    const { overflows, canPrevious, canNext } = useScrollEdges(listRef);
 
     /** Desplaza la fila una tarjeta (su ancho más el hueco) hacia un lado. */
     function scrollByCard(direction: 1 | -1) {
@@ -82,49 +131,76 @@ export function ShopCarousel({ title, action, children, className }: ShopCarouse
         list.scrollBy({ left: direction * step, behavior: reduceMotion ? 'auto' : 'smooth' });
     }
 
-    return (
-        <section
-            aria-labelledby={titleId}
-            className={cn('flex w-full flex-col gap-8 lg:gap-12', className)}
-        >
-            <div className="flex min-h-9 items-center gap-4 lg:min-h-12">
-                <h2
-                    id={titleId}
-                    className="min-w-0 flex-1 font-display text-3xl font-medium lg:text-4xl lg:font-normal"
-                >
-                    {title}
-                </h2>
-                {action}
+    /**
+     * Las dos flechas en una de las dos versiones del diseño: contorno de 36 px (40 desde 640 px)
+     * con icono de 16 px hasta 1279 px, y negras de 48 px con icono de 20 px desde 1280 px. Cada
+     * versión se oculta con CSS en el otro rango (`display: none` también la saca de la
+     * accesibilidad), así no hay que medir el ancho en JavaScript.
+     */
+    function arrows(version: 'compact' | 'wide') {
+        const compact = version === 'compact';
+        const common = {
+            'aria-controls': listId,
+            size: compact ? ('sm' as const) : ('lg' as const),
+            variant: compact ? ('outline' as const) : undefined,
+            className: compact
+                ? 'sm:size-control-md xl:hidden [&_svg]:size-4'
+                : 'hidden xl:inline-flex [&_svg]:size-5',
+        };
+        return (
+            <>
                 <IconButton
+                    {...common}
                     aria-label="Anterior"
-                    aria-controls={listId}
-                    size="lg"
-                    className="hidden lg:inline-flex [&_svg]:size-5"
                     disabled={!canPrevious}
                     onClick={() => scrollByCard(-1)}
                 >
                     <ArrowLeft />
                 </IconButton>
                 <IconButton
+                    {...common}
                     aria-label="Siguiente"
-                    aria-controls={listId}
-                    size="lg"
-                    className="hidden lg:inline-flex [&_svg]:size-5"
                     disabled={!canNext}
                     onClick={() => scrollByCard(1)}
                 >
                     <ArrowRight />
                 </IconButton>
+            </>
+        );
+    }
+
+    return (
+        <section
+            aria-labelledby={titleId}
+            className={cn('flex w-full flex-col gap-8 lg:gap-10 xl:gap-12', className)}
+        >
+            <div className="flex min-h-9 flex-wrap items-center gap-3 sm:min-h-10 sm:flex-nowrap sm:gap-4 xl:min-h-12">
+                <h2
+                    id={titleId}
+                    className="min-w-64 flex-1 font-display text-3xl font-medium sm:min-w-0 xl:text-4xl xl:font-normal"
+                >
+                    {title}
+                </h2>
+                {action}
+                {overflows && (
+                    <div className="ml-auto flex items-center gap-3 sm:ml-0 sm:gap-4">
+                        {arrows('compact')}
+                        {arrows('wide')}
+                    </div>
+                )}
             </div>
             <ul
                 id={listId}
                 ref={listRef}
-                className="relative flex snap-x snap-mandatory [scrollbar-width:none] gap-6 overflow-x-auto lg:gap-8 [&::-webkit-scrollbar]:hidden"
+                className="relative flex snap-x snap-mandatory scrollbar-none gap-6 overflow-x-auto xl:gap-8 [&::-webkit-scrollbar]:hidden"
             >
                 {React.Children.toArray(children).map((child, index) => (
                     <li
                         key={React.isValidElement(child) && child.key !== null ? child.key : index}
-                        className="flex w-[calc((100%-1.5rem)/2)] shrink-0 snap-start lg:w-84"
+                        className={cn(
+                            'flex w-full shrink-0 snap-start sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)] xl:w-84',
+                            itemClassName,
+                        )}
                     >
                         {child}
                     </li>

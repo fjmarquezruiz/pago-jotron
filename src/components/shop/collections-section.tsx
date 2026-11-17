@@ -15,7 +15,9 @@ const COLLECTIONS = [
 ];
 
 /**
- * "Nuestras colecciones": carrusel de tarjetas de categoría con el botón "Ver todo".
+ * "Nuestras colecciones": carrusel de tarjetas de categoría con el botón "Ver todo". Como en el
+ * diseño, el botón no sale por debajo de 640 px; de 640 a 1279 px es un botón sin borde de 40 px y
+ * desde 1280 px, el botón con borde de 48 px.
  *
  * MAQUETA: los datos y las fotos son de ejemplo, copiados del diseño; no vienen de la BD (la tabla
  * `categories` no tiene imagen ni slug). La versión real será el catálogo filtrado por categoría,
@@ -29,7 +31,12 @@ export function CollectionsSection() {
         <ShopCarousel
             title="Nuestras colecciones"
             action={
-                <Button asChild variant="outline" size="lg">
+                <Button
+                    asChild
+                    variant="outline"
+                    size="lg"
+                    className="hidden h-control-md border-transparent px-inset-lg text-sm sm:inline-flex xl:h-control-lg xl:border-input xl:px-inset-xl xl:text-base"
+                >
                     {/* TODO: ruta pendiente (slug ficticio) */}
                     <Link href="/colecciones">Ver todo</Link>
                 </Button>
