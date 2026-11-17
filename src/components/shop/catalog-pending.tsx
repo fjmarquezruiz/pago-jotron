@@ -97,8 +97,8 @@ type CatalogLinkProps = Omit<React.ComponentProps<typeof Link>, 'href'> & { href
 
 /**
  * Enlace a otra página del listado (paginación, "Borrar todo", "Quitar filtros") que cuenta como
- * carga pendiente. Es un `Link` normal, con su `href` real: se abre en otra pestaña, se copia y
- * funciona sin JavaScript; solo un clic simple se encarga `router.push` dentro de la transición.
+ * carga pendiente. Es un `Link` normal, con su `href` real: se abre en otra pestaña y se copia;
+ * solo un clic simple se encarga `router.push` dentro de la transición.
  *
  * @example
  * <CatalogLink href="/productos?page=2" scroll={false}>Siguiente</CatalogLink>

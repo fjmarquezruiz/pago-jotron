@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeFilters, toVintageOptions } from './filter-options';
+import { sameFilters, sanitizeFilters, toVintageOptions } from './filter-options';
 
 describe('toVintageOptions', () => {
     it.each([
@@ -98,5 +98,65 @@ describe('sanitizeFilters', () => {
         const filters = Object.freeze({ bodega: 999 });
         sanitizeFilters(filters, options);
         expect(filters).toEqual({ bodega: 999 });
+    });
+});
+
+describe('sameFilters', () => {
+    it.each([
+        [{}, {}],
+        [{ bodega: 1 }, { bodega: 1 }],
+        [{ bodega: 1 }, { bodega: 1, uva: undefined }], // ausente y undefined son lo mismo
+        [
+            { q: 'roble', precio: '10-15' as const },
+            { precio: '10-15' as const, q: 'roble' },
+        ],
+        [
+            {
+                q: 'a',
+                do: 1,
+                bodega: 2,
+                uva: 3,
+                tipologia: 4,
+                precio: 'mas-25' as const,
+                anada: 2020,
+            },
+            {
+                q: 'a',
+                do: 1,
+                bodega: 2,
+                uva: 3,
+                tipologia: 4,
+                precio: 'mas-25' as const,
+                anada: 2020,
+            },
+        ],
+    ])('%j y %j son el mismo conjunto', (a, b) => {
+        expect(sameFilters(a, b)).toBe(true);
+    });
+
+    it.each([
+        [{}, { bodega: 1 }],
+        [{ bodega: 1 }, { bodega: 2 }],
+        [{ bodega: 1 }, {}],
+        [{ q: 'a' }, { q: 'b' }],
+        [{ precio: '10-15' as const }, { precio: '15-25' as const }],
+        [{ anada: 2022 }, { anada: 2023 }],
+        [{ uva: 0 }, {}], // 0 no es "ausente"
+    ])('%j y %j son distintos', (a, b) => {
+        expect(sameFilters(a, b)).toBe(false);
+    });
+
+    it('detecta lo que sanitizeFilters descarta', () => {
+        const options = {
+            origins: [],
+            wineries: [{ id: 1, name: 'A' }],
+            grapes: [],
+            typologies: [],
+            vintages: [],
+        };
+        const valid = { bodega: 1 };
+        const invalid = { bodega: 999 };
+        expect(sameFilters(sanitizeFilters(valid, options), valid)).toBe(true);
+        expect(sameFilters(sanitizeFilters(invalid, options), invalid)).toBe(false);
     });
 });

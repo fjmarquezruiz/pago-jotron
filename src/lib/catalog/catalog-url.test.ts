@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { catalogPageHref } from './catalog-url';
+import { CATALOG_RESULTS_ID, catalogPageHref, catalogResultsHref } from './catalog-url';
 
 describe('catalogPageHref', () => {
     it.each([
@@ -93,5 +93,30 @@ describe('catalogPageHref', () => {
 
     it('un filtro con valor 0 no se pierde (no es "vacío")', () => {
         expect(catalogPageHref(1, { filters: { uva: 0 } })).toBe('/productos?uva=0');
+    });
+});
+
+describe('catalogResultsHref', () => {
+    it('el ancla apunta al id de la sección de resultados', () => {
+        expect(CATALOG_RESULTS_ID).toBe('resultados');
+    });
+
+    it.each([
+        [1, {}, '/productos#resultados'],
+        [2, {}, '/productos?page=2#resultados'],
+        [3, { filters: { tipologia: 1 } }, '/productos?tipologia=1&page=3#resultados'],
+        [
+            2,
+            { filters: { q: 'roble', precio: '10-15' as const }, orden: 'nombre' as const },
+            '/productos?q=roble&precio=10-15&orden=nombre&page=2#resultados',
+        ],
+        [0, {}, '/productos#resultados'], // página inválida: la primera, con ancla
+    ])('página %s con %j → %s', (page, state, expected) => {
+        expect(catalogResultsHref(page, state)).toBe(expected);
+    });
+
+    it('es la misma URL que catalogPageHref más el ancla', () => {
+        const state = { filters: { bodega: 2, uva: 3 }, orden: 'precio-asc' as const };
+        expect(catalogResultsHref(4, state)).toBe(`${catalogPageHref(4, state)}#resultados`);
     });
 });

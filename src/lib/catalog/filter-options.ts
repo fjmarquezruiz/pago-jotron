@@ -74,3 +74,22 @@ export function sanitizeFilters(
         anada: knownId(filters.anada, options.vintages),
     };
 }
+
+/**
+ * Si dos conjuntos de filtros son el mismo (cada filtro con el mismo valor o ausente en los dos).
+ * La página lo usa para saber si `sanitizeFilters` descartó algo.
+ *
+ * @example
+ * sameFilters({ bodega: 1 }, { bodega: 1, uva: undefined }); // true
+ */
+export function sameFilters(a: CatalogFilters, b: CatalogFilters): boolean {
+    return (
+        a.q === b.q &&
+        a.do === b.do &&
+        a.bodega === b.bodega &&
+        a.uva === b.uva &&
+        a.tipologia === b.tipologia &&
+        a.precio === b.precio &&
+        a.anada === b.anada
+    );
+}

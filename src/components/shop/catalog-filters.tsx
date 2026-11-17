@@ -67,11 +67,14 @@ interface CatalogFiltersProps {
  * selects, los chips de los filtros activos con "Borrar todo", el buscador y "Ordenar por" a la
  * derecha, y "Mostrando N productos".
  *
- * El estado vive en la URL: cada cambio hace `router.push` a la URL nueva, sin `page` (al filtrar
- * se vuelve a la primera página) y sin saltar al principio de la página. La navegación va dentro de
- * la transición de `CatalogPendingProvider`: mientras llega la página nueva, "Mostrando N
- * productos" pasa a "Cargando…". Desde `lg` los 6 selects están en la barra; por debajo, los
- * sustituye el botón "Filtros (n)" con su Drawer.
+ * El estado vive en la URL: cada cambio navega a la URL nueva, sin `page` (al filtrar se vuelve a
+ * la primera página) y sin saltar al principio de la página. Los selects, los chips y el orden son
+ * decisiones y añaden una entrada al historial (`router.push`); el buscador solo la reescribe
+ * mientras se afina una búsqueda (`router.replace`, ver `CatalogSearch`).
+ *
+ * La navegación va dentro de la transición de `CatalogPendingProvider`: mientras llega la página
+ * nueva, "Mostrando N productos" pasa a "Cargando…". Desde `lg` los 6 selects están en la barra;
+ * por debajo, los sustituye el botón "Filtros (n)" con su Drawer.
  *
  * @example
  * <CatalogFilters options={options} filters={filters} orden={orden} total={total} />
@@ -81,9 +84,12 @@ export function CatalogFilters({ options, filters, orden, total }: CatalogFilter
     const { slow, start } = useCatalogPending();
     const filterLabelId = useId();
 
-    const go = (next: { filters?: CatalogFiltersState; orden?: CatalogSort }) =>
+    const go = (
+        next: { filters?: CatalogFiltersState; orden?: CatalogSort },
+        mode: 'push' | 'replace' = 'push',
+    ) =>
         start(() =>
-            router.push(
+            router[mode](
                 catalogPageHref(1, {
                     filters: next.filters ?? filters,
                     orden: next.orden ?? orden,
@@ -151,7 +157,7 @@ export function CatalogFilters({ options, filters, orden, total }: CatalogFilter
                 <div className="order-1 lg:order-2">
                     <CatalogSearch
                         q={filters.q}
-                        onSearch={(q) => go({ filters: setFilter(filters, 'q', q) })}
+                        onSearch={(q, mode) => go({ filters: setFilter(filters, 'q', q) }, mode)}
                     />
                 </div>
             </div>

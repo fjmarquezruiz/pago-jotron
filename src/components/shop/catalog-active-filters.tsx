@@ -14,7 +14,7 @@ interface CatalogActiveFiltersProps {
 
 /**
  * Chips de los filtros activos con su × y el enlace "Borrar todo" (Figma: Tag cerrable + Link). Es
- * un enlace, no un botón: lleva al listado sin filtros y funciona aunque falle el JavaScript.
+ * un enlace, no un botón: lleva al listado sin filtros y se puede abrir en otra pestaña.
  *
  * @example
  * <CatalogActiveFilters filters={active} onRemove={remove} clearAllHref="/productos" />

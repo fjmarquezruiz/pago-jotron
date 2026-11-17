@@ -12,8 +12,8 @@ import { ProductCard } from '@/components/shop/product-card';
 import { ShopCarouselSkeleton } from '@/components/shop/shop-carousel-skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { hasActiveFilters } from '@/lib/catalog/active-filters';
-import { catalogPageHref } from '@/lib/catalog/catalog-url';
-import { sanitizeFilters } from '@/lib/catalog/filter-options';
+import { CATALOG_RESULTS_ID, catalogPageHref } from '@/lib/catalog/catalog-url';
+import { sameFilters, sanitizeFilters } from '@/lib/catalog/filter-options';
 import { CATALOG_PAGE_SIZE, getPagination } from '@/lib/catalog/pagination';
 import { getCatalogFilterOptions, getCatalogPage } from '@/lib/db/queries';
 import { catalogSearchParamsSchema } from '@/lib/validations/catalog';
@@ -53,14 +53,27 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
         orden,
         ...requestedFilters
     } = catalogSearchParamsSchema.parse(searchParams);
-    const options = await getCatalogFilterOptions();
+    // Las opciones y el listado se piden a la vez. El listado va con los filtros tal como llegan de
+    // la URL, y solo si `sanitizeFilters` descarta alguno (un id que no se puede elegir, algo poco
+    // habitual) se repite con los filtros saneados.
+    const [options, requestedPageData] = await Promise.all([
+        getCatalogFilterOptions(),
+        getCatalogPage({
+            page: requestedPage,
+            pageSize: CATALOG_PAGE_SIZE,
+            filters: requestedFilters,
+            orden,
+        }),
+    ]);
     const filters = sanitizeFilters(requestedFilters, options);
-    const { items, total } = await getCatalogPage({
-        page: requestedPage,
-        pageSize: CATALOG_PAGE_SIZE,
-        filters,
-        orden,
-    });
+    const { items, total } = sameFilters(filters, requestedFilters)
+        ? requestedPageData
+        : await getCatalogPage({
+              page: requestedPage,
+              pageSize: CATALOG_PAGE_SIZE,
+              filters,
+              orden,
+          });
 
     const pagination = getPagination({
         page: requestedPage,
@@ -75,7 +88,11 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
             <div className="px-6 py-16 lg:py-40">
                 <div className="mx-auto flex w-full max-w-9xl flex-col gap-16 lg:gap-40">
                     <CatalogPendingProvider>
-                        <section aria-label="Productos" className="flex flex-col gap-12">
+                        <section
+                            id={CATALOG_RESULTS_ID}
+                            aria-label="Productos"
+                            className="flex scroll-mt-6 flex-col gap-12"
+                        >
                             <CatalogFilters
                                 options={options}
                                 filters={filters}

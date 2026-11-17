@@ -9,7 +9,7 @@ import {
     PaginationPrevious,
     PaginationSummary,
 } from '@/components/ui/pagination';
-import { catalogPageHref, type CatalogUrlState } from '@/lib/catalog/catalog-url';
+import { catalogResultsHref, type CatalogUrlState } from '@/lib/catalog/catalog-url';
 import { getPageWindow } from '@/lib/catalog/pagination';
 
 interface CatalogPaginationProps extends CatalogUrlState {
@@ -21,14 +21,15 @@ interface CatalogPaginationProps extends CatalogUrlState {
 
 /**
  * Paginación del listado (Figma: Pagination, talla lg de 48 px). Cada página es un enlace
- * `?page=N`, no un botón: se puede navegar sin JavaScript, los buscadores la recorren y el botón
+ * `?page=N`, no un botón: se abre en otra pestaña, los buscadores la recorren y el botón
  * Atrás funciona. Desde `md` es la variante `full` (Anterior, números con `…` y Siguiente); por
  * debajo, la `mobile` (Anterior, "Página X de Y" y Siguiente, solo con las flechas). En la primera
  * y la última página, Anterior y Siguiente quedan deshabilitados, sin enlace. No pinta nada si
  * hay una sola página.
  *
  * Los enlaces conservan la búsqueda, los filtros y el orden (`filters` y `orden`): pasar de página
- * no los pierde. Son `CatalogLink`: al pulsarlos, el listado se marca como cargando mientras llega
+ * no los pierde, y llevan el ancla `#resultados`: al cambiar de página se baja a los resultados
+ * en vez de volver al inicio de la página, por encima del hero. Son `CatalogLink`: al pulsarlos, el listado se marca como cargando mientras llega
  * la página nueva (hay que usarla dentro de `CatalogPendingProvider`).
  *
  * @example
@@ -37,7 +38,7 @@ interface CatalogPaginationProps extends CatalogUrlState {
 export function CatalogPagination({ page, totalPages, filters, orden }: CatalogPaginationProps) {
     if (totalPages <= 1) return null;
 
-    const href = (target: number) => catalogPageHref(target, { filters, orden });
+    const href = (target: number) => catalogResultsHref(target, { filters, orden });
 
     const hasPrevious = page > 1;
     const hasNext = page < totalPages;

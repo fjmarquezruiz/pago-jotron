@@ -9,7 +9,7 @@ import { buttonVariants } from '@/components/ui/button';
  * Variantes de Figma: `full` (números y elipsis), `compact` (pocas páginas, sin elipsis)
  * y `mobile` (anterior, `PaginationSummary` y siguiente).
  *
- * Para que cada página sea un enlace de verdad (navegable sin JS, indexable y con el botón Atrás),
+ * Para que cada página sea un enlace de verdad (se abre en otra pestaña, es indexable y funciona con el botón Atrás),
  * usa `asChild` con el `Link` de Next. La página de la primera o la última, sin destino, va con
  * `disabled`.
  *

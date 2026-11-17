@@ -5,6 +5,9 @@ import type { CatalogFilters } from '@/lib/validations/catalog';
 /** Ruta del listado de productos. */
 export const CATALOG_PATH = '/productos';
 
+/** `id` de la sección de resultados del listado: el destino del ancla de la paginación. */
+export const CATALOG_RESULTS_ID = 'resultados';
+
 /** Búsqueda, filtros y orden que se conservan en la URL del listado. */
 export interface CatalogUrlState {
     filters?: CatalogFilters;
@@ -50,4 +53,21 @@ export function catalogPageHref(
 
     const query = params.toString();
     return query ? `${CATALOG_PATH}?${query}` : CATALOG_PATH;
+}
+
+/**
+ * URL de una página del listado con el ancla de los resultados (`#resultados`). Es la de la
+ * paginación: al pasar de página el navegador baja a los resultados en vez de volver al inicio,
+ * por encima del hero. Es un ancla normal: también baja a los resultados al abrir el enlace en otra
+ * pestaña o al recargar la página.
+ *
+ * @param page - Número de página (desde 1).
+ * @param state - Búsqueda, filtros y orden activos.
+ * @returns Lo mismo que `catalogPageHref`, terminado en `#resultados`.
+ *
+ * @example
+ * catalogResultsHref(2, { filters: { tipologia: 1 } }); // '/productos?tipologia=1&page=2#resultados'
+ */
+export function catalogResultsHref(page: number, state: CatalogUrlState = {}): string {
+    return `${catalogPageHref(page, state)}#${CATALOG_RESULTS_ID}`;
 }

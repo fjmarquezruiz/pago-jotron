@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Field, FieldControl, FieldLabel } from '@/components/ui/field';
 import { SearchInput } from '@/components/ui/search-input';
 import { SEARCH_MAX_LENGTH } from '@/lib/catalog/filter-constants';
@@ -8,11 +8,18 @@ import { SEARCH_MAX_LENGTH } from '@/lib/catalog/filter-constants';
 /** Lo que se espera tras dejar de escribir antes de buscar. */
 const SEARCH_DEBOUNCE_MS = 400;
 
+/** Cómo entra un cambio de la búsqueda en el historial del navegador. */
+export type SearchHistoryMode = 'push' | 'replace';
+
 interface CatalogSearchProps {
     /** Texto de la búsqueda activa en la URL. */
     q: string | undefined;
-    /** Aplica la búsqueda (`undefined` = quitarla). */
-    onSearch: (q: string | undefined) => void;
+    /**
+     * Aplica la búsqueda (`undefined` = quitarla). `mode` es `'replace'` cuando solo se afina una
+     * búsqueda que ya estaba (la entrada del historial se reescribe) y `'push'` cuando se empieza
+     * o se quita (entrada nueva).
+     */
+    onSearch: (q: string | undefined, mode: SearchHistoryMode) => void;
 }
 
 /**
@@ -21,8 +28,13 @@ interface CatalogSearchProps {
  * por cada letra. Si la búsqueda cambia desde fuera (el chip, "Borrar todo", el botón Atrás), el
  * campo la refleja.
  *
+ * Historial: buscar es una sola decisión, no una por cada pausa al escribir. Empezar la búsqueda
+ * y quitarla añaden una entrada (`'push'`); afinar una que ya estaba ("tin" → "tinto" → "tinto
+ * roble") reescribe la suya (`'replace'`). Así Atrás vuelve al listado de antes de buscar, sin
+ * recorrer los textos intermedios.
+ *
  * @example
- * <CatalogSearch q={filters.q} onSearch={(q) => apply(setFilter(filters, 'q', q))} />
+ * <CatalogSearch q={filters.q} onSearch={(q, mode) => apply(setFilter(filters, 'q', q), mode)} />
  */
 export function CatalogSearch({ q, onSearch }: CatalogSearchProps) {
     const [value, setValue] = useState(q ?? '');
@@ -37,27 +49,30 @@ export function CatalogSearch({ q, onSearch }: CatalogSearchProps) {
         setValue(fromUrl);
     }, [q]);
 
+    const apply = useCallback(
+        (text: string) => {
+            // Afinar una búsqueda ya aplicada reescribe su entrada del historial; empezarla o
+            // quitarla es una decisión y añade una nueva.
+            const refining = applied.current !== '' && text !== '';
+            applied.current = text;
+            onSearch(text || undefined, refining ? 'replace' : 'push');
+        },
+        [onSearch],
+    );
+
     useEffect(() => {
         const text = value.trim();
         if (text === applied.current) return;
-        const timer = setTimeout(() => {
-            applied.current = text;
-            onSearch(text || undefined);
-        }, SEARCH_DEBOUNCE_MS);
+        const timer = setTimeout(() => apply(text), SEARCH_DEBOUNCE_MS);
         return () => clearTimeout(timer);
-    }, [value, onSearch]);
-
-    const search = (text: string) => {
-        applied.current = text;
-        onSearch(text || undefined);
-    };
+    }, [value, apply]);
 
     return (
         <form
             role="search"
             onSubmit={(event) => {
                 event.preventDefault();
-                search(value.trim());
+                apply(value.trim());
             }}
         >
             <Field>
@@ -66,13 +81,13 @@ export function CatalogSearch({ q, onSearch }: CatalogSearchProps) {
                     <SearchInput
                         name="q"
                         autoComplete="off"
-                        placeholder="Buscar por"
+                        placeholder="Nombre o descripción"
                         maxLength={SEARCH_MAX_LENGTH}
                         value={value}
                         onChange={(event) => setValue(event.target.value)}
                         onClear={() => {
                             setValue('');
-                            search('');
+                            apply('');
                         }}
                     />
                 </FieldControl>
