@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { CatalogFilterSelect } from '@/components/shop/catalog-filter-select';
+import { CatalogLink } from '@/components/shop/catalog-pending';
 import { Button } from '@/components/ui/button';
 import {
     Drawer,
@@ -76,9 +76,9 @@ export function CatalogFiltersDrawer({
                     </DrawerClose>
                     {clearAllHref && (
                         <Button asChild variant="outline">
-                            <Link href={clearAllHref} scroll={false}>
+                            <CatalogLink href={clearAllHref} scroll={false}>
                                 Borrar todo
-                            </Link>
+                            </CatalogLink>
                         </Button>
                     )}
                 </DrawerFooter>

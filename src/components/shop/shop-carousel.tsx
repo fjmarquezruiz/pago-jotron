@@ -2,6 +2,13 @@
 
 import * as React from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
+import {
+    CAROUSEL_GAP_CLASS,
+    CAROUSEL_HEADER_CLASS,
+    CAROUSEL_ITEM_CLASS,
+    CAROUSEL_SECTION_CLASS,
+    CAROUSEL_TITLE_CLASS,
+} from '@/components/shop/carousel-layout';
 import { IconButton } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -170,15 +177,9 @@ export function ShopCarousel({
     }
 
     return (
-        <section
-            aria-labelledby={titleId}
-            className={cn('flex w-full flex-col gap-8 lg:gap-10 xl:gap-12', className)}
-        >
-            <div className="flex min-h-9 flex-wrap items-center gap-3 sm:min-h-10 sm:flex-nowrap sm:gap-4 xl:min-h-12">
-                <h2
-                    id={titleId}
-                    className="min-w-64 flex-1 font-display text-3xl font-medium sm:min-w-0 xl:text-4xl xl:font-normal"
-                >
+        <section aria-labelledby={titleId} className={cn(CAROUSEL_SECTION_CLASS, className)}>
+            <div className={CAROUSEL_HEADER_CLASS}>
+                <h2 id={titleId} className={CAROUSEL_TITLE_CLASS}>
                     {title}
                 </h2>
                 {action}
@@ -192,15 +193,15 @@ export function ShopCarousel({
             <ul
                 id={listId}
                 ref={listRef}
-                className="relative flex snap-x snap-mandatory scrollbar-none gap-6 overflow-x-auto xl:gap-8 [&::-webkit-scrollbar]:hidden"
+                className={cn(
+                    'relative flex snap-x snap-mandatory scrollbar-none overflow-x-auto [&::-webkit-scrollbar]:hidden',
+                    CAROUSEL_GAP_CLASS,
+                )}
             >
                 {React.Children.toArray(children).map((child, index) => (
                     <li
                         key={React.isValidElement(child) && child.key !== null ? child.key : index}
-                        className={cn(
-                            'flex w-full shrink-0 snap-start sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)] xl:w-84',
-                            itemClassName,
-                        )}
+                        className={cn(CAROUSEL_ITEM_CLASS, itemClassName)}
                     >
                         {child}
                     </li>

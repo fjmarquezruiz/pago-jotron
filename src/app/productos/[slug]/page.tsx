@@ -1,10 +1,11 @@
-import { cache } from 'react';
+import { Suspense, cache } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ProductHeader } from '@/components/shop/product-header';
 import { ProductImage } from '@/components/shop/product-image';
 import { ProductPurchase } from '@/components/shop/product-purchase';
 import { ProductRelated } from '@/components/shop/product-related';
+import { ProductRelatedSkeleton } from '@/components/shop/product-skeleton';
 import { ProductShippingInfo } from '@/components/shop/product-shipping-info';
 import { SiteHeader } from '@/components/shop/site-header';
 import { ProductSpecSheet } from '@/components/shop/product-spec-sheet';
@@ -50,6 +51,9 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 /**
  * Ficha de producto (RF4): foto, cabecera, compra, envío y devoluciones, notas de cata y ficha
  * técnica. Es un Server Component; lo único con estado es `ProductPurchase`.
+ *
+ * Mientras se carga el producto (`loading.tsx`) se ve un esqueleto de la ficha. "También te puede
+ * gustar" va en un `Suspense`: carga aparte y la ficha se ve sin esperar a las recomendaciones.
  *
  * Si el producto no existe o no se puede mostrar (bloqueado él, su bodega, su D.O. o sin
  * presentaciones a la venta), responde con `not-found.tsx`.
@@ -97,7 +101,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
                         </div>
                     </div>
 
-                    <ProductRelated product={product} />
+                    {/* Su consulta es aparte y al azar: la ficha se ve sin esperar a las recomendaciones. */}
+                    <Suspense fallback={<ProductRelatedSkeleton />}>
+                        <ProductRelated product={product} />
+                    </Suspense>
                 </div>
             </main>
         </>

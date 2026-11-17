@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { CatalogLink } from '@/components/shop/catalog-pending';
 import { Tag } from '@/components/ui/tag';
 import { TextLink } from '@/components/ui/link';
 import type { ActiveFilter, FilterKey } from '@/lib/catalog/active-filters';
@@ -33,9 +33,9 @@ export function CatalogActiveFilters({
             ))}
             <li className="flex">
                 <TextLink asChild size="sm" className="min-h-control-xxs">
-                    <Link href={clearAllHref} scroll={false}>
+                    <CatalogLink href={clearAllHref} scroll={false}>
                         Borrar todo
-                    </Link>
+                    </CatalogLink>
                 </TextLink>
             </li>
         </ul>

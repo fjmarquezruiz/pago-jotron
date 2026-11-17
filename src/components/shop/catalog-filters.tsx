@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { CatalogActiveFilters } from '@/components/shop/catalog-active-filters';
 import { CatalogFilterSelect } from '@/components/shop/catalog-filter-select';
 import { CatalogFiltersDrawer } from '@/components/shop/catalog-filters-drawer';
+import { useCatalogPending } from '@/components/shop/catalog-pending';
 import { CatalogSearch } from '@/components/shop/catalog-search';
 import { Field, FieldControl, FieldLabel } from '@/components/ui/field';
 import {
@@ -67,20 +68,28 @@ interface CatalogFiltersProps {
  * derecha, y "Mostrando N productos".
  *
  * El estado vive en la URL: cada cambio hace `router.push` a la URL nueva, sin `page` (al filtrar
- * se vuelve a la primera página) y sin saltar al principio de la página. Desde `lg` los 6 selects
- * están en la barra; por debajo, los sustituye el botón "Filtros (n)" con su Drawer.
+ * se vuelve a la primera página) y sin saltar al principio de la página. La navegación va dentro de
+ * la transición de `CatalogPendingProvider`: mientras llega la página nueva, "Mostrando N
+ * productos" pasa a "Cargando…". Desde `lg` los 6 selects están en la barra; por debajo, los
+ * sustituye el botón "Filtros (n)" con su Drawer.
  *
  * @example
  * <CatalogFilters options={options} filters={filters} orden={orden} total={total} />
  */
 export function CatalogFilters({ options, filters, orden, total }: CatalogFiltersProps) {
     const router = useRouter();
+    const { slow, start } = useCatalogPending();
     const filterLabelId = useId();
 
     const go = (next: { filters?: CatalogFiltersState; orden?: CatalogSort }) =>
-        router.push(
-            catalogPageHref(1, { filters: next.filters ?? filters, orden: next.orden ?? orden }),
-            { scroll: false },
+        start(() =>
+            router.push(
+                catalogPageHref(1, {
+                    filters: next.filters ?? filters,
+                    orden: next.orden ?? orden,
+                }),
+                { scroll: false },
+            ),
         );
     const change = (key: FilterKey, value: string | undefined) =>
         go({ filters: setFilter(filters, key, value) });
@@ -152,7 +161,7 @@ export function CatalogFilters({ options, filters, orden, total }: CatalogFilter
                     role="status"
                     className="order-2 flex h-10 items-center text-sm text-muted-foreground lg:order-1"
                 >
-                    {resultsSummary(total)}
+                    {slow ? 'Cargando…' : resultsSummary(total)}
                 </p>
                 <Field className="order-1 lg:order-2">
                     <FieldLabel className="text-muted-foreground">Ordenar por</FieldLabel>

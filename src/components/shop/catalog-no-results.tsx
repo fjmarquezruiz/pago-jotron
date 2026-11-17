@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { CatalogLink } from '@/components/shop/catalog-pending';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { catalogPageHref } from '@/lib/catalog/catalog-url';
@@ -29,7 +29,7 @@ export function CatalogNoResults({ q, orden }: CatalogNoResultsProps) {
             description={description}
             action={
                 <Button asChild variant="outline">
-                    <Link href={catalogPageHref(1, { orden })}>Quitar filtros</Link>
+                    <CatalogLink href={catalogPageHref(1, { orden })}>Quitar filtros</CatalogLink>
                 </Button>
             }
         />

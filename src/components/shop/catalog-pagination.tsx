@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { CatalogLink } from '@/components/shop/catalog-pending';
 import {
     Pagination,
     PaginationContent,
@@ -28,7 +28,8 @@ interface CatalogPaginationProps extends CatalogUrlState {
  * hay una sola página.
  *
  * Los enlaces conservan la búsqueda, los filtros y el orden (`filters` y `orden`): pasar de página
- * no los pierde.
+ * no los pierde. Son `CatalogLink`: al pulsarlos, el listado se marca como cargando mientras llega
+ * la página nueva (hay que usarla dentro de `CatalogPendingProvider`).
  *
  * @example
  * <CatalogPagination page={3} totalPages={10} filters={{ tipologia: 1 }} orden="nombre" />
@@ -43,12 +44,12 @@ export function CatalogPagination({ page, totalPages, filters, orden }: CatalogP
 
     const previous = (
         <PaginationPrevious size="lg" variant="ghost" disabled={!hasPrevious} asChild>
-            <Link href={href(page - 1)} rel="prev" />
+            <CatalogLink href={href(page - 1)} rel="prev" />
         </PaginationPrevious>
     );
     const next = (
         <PaginationNext size="lg" variant="ghost" disabled={!hasNext} asChild>
-            <Link href={href(page + 1)} rel="next" />
+            <CatalogLink href={href(page + 1)} rel="next" />
         </PaginationNext>
     );
 
@@ -70,7 +71,7 @@ export function CatalogPagination({ page, totalPages, filters, orden }: CatalogP
                                     isActive={item === page}
                                     aria-label={`Página ${item}`}
                                 >
-                                    <Link href={href(item)}>{item}</Link>
+                                    <CatalogLink href={href(item)}>{item}</CatalogLink>
                                 </PaginationLink>
                             </PaginationItem>
                         ),
