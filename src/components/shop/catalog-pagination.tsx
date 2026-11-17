@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { CatalogLink } from '@/components/shop/catalog-pending';
 import {
     Pagination,
     PaginationContent,
@@ -9,10 +9,10 @@ import {
     PaginationPrevious,
     PaginationSummary,
 } from '@/components/ui/pagination';
-import { catalogPageHref } from '@/lib/catalog/catalog-url';
+import { catalogResultsHref, type CatalogUrlState } from '@/lib/catalog/catalog-url';
 import { getPageWindow } from '@/lib/catalog/pagination';
 
-interface CatalogPaginationProps {
+interface CatalogPaginationProps extends CatalogUrlState {
     /** Página actual, ya ajustada al rango (`getPagination`). */
     page: number;
     /** Número total de páginas. */
@@ -21,29 +21,36 @@ interface CatalogPaginationProps {
 
 /**
  * Paginación del listado (Figma: Pagination, talla lg de 48 px). Cada página es un enlace
- * `?page=N`, no un botón: se puede navegar sin JavaScript, los buscadores la recorren y el botón
+ * `?page=N`, no un botón: se abre en otra pestaña, los buscadores la recorren y el botón
  * Atrás funciona. Desde `md` es la variante `full` (Anterior, números con `…` y Siguiente); por
  * debajo, la `mobile` (Anterior, "Página X de Y" y Siguiente, solo con las flechas). En la primera
  * y la última página, Anterior y Siguiente quedan deshabilitados, sin enlace. No pinta nada si
  * hay una sola página.
  *
+ * Los enlaces conservan la búsqueda, los filtros y el orden (`filters` y `orden`): pasar de página
+ * no los pierde, y llevan el ancla `#resultados`: al cambiar de página se baja a los resultados
+ * en vez de volver al inicio de la página, por encima del hero. Son `CatalogLink`: al pulsarlos, el listado se marca como cargando mientras llega
+ * la página nueva (hay que usarla dentro de `CatalogPendingProvider`).
+ *
  * @example
- * <CatalogPagination page={3} totalPages={10} />
+ * <CatalogPagination page={3} totalPages={10} filters={{ tipologia: 1 }} orden="nombre" />
  */
-export function CatalogPagination({ page, totalPages }: CatalogPaginationProps) {
+export function CatalogPagination({ page, totalPages, filters, orden }: CatalogPaginationProps) {
     if (totalPages <= 1) return null;
+
+    const href = (target: number) => catalogResultsHref(target, { filters, orden });
 
     const hasPrevious = page > 1;
     const hasNext = page < totalPages;
 
     const previous = (
         <PaginationPrevious size="lg" variant="ghost" disabled={!hasPrevious} asChild>
-            <Link href={catalogPageHref(page - 1)} rel="prev" />
+            <CatalogLink href={href(page - 1)} rel="prev" />
         </PaginationPrevious>
     );
     const next = (
         <PaginationNext size="lg" variant="ghost" disabled={!hasNext} asChild>
-            <Link href={catalogPageHref(page + 1)} rel="next" />
+            <CatalogLink href={href(page + 1)} rel="next" />
         </PaginationNext>
     );
 
@@ -65,7 +72,7 @@ export function CatalogPagination({ page, totalPages }: CatalogPaginationProps) 
                                     isActive={item === page}
                                     aria-label={`Página ${item}`}
                                 >
-                                    <Link href={catalogPageHref(item)}>{item}</Link>
+                                    <CatalogLink href={href(item)}>{item}</CatalogLink>
                                 </PaginationLink>
                             </PaginationItem>
                         ),

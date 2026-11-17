@@ -2,25 +2,41 @@ import {
     and,
     asc,
     count,
-    countDistinct,
     desc,
     eq,
+    exists,
+    gte,
+    isNotNull,
+    lt,
     min,
     ne,
     not,
+    or,
     sql,
     sum,
     type SQL,
+    type SQLWrapper,
 } from 'drizzle-orm';
+import type { MySqlSelect } from 'drizzle-orm/mysql-core';
 import { db } from '@/db';
 import { NEW_PRODUCT_DAYS } from '@/lib/catalog/novelty';
 import { toPositiveInt } from '@/lib/catalog/pagination';
+import { priceRangeBounds } from '@/lib/catalog/price-range';
+import { toVintageOptions, type CatalogFilterOptions } from '@/lib/catalog/filter-options';
+import { LIKE_ESCAPE, searchPattern } from '@/lib/catalog/search';
 import {
+    DEFAULT_CATALOG_SORT,
+    type CatalogFilters,
+    type CatalogSort,
+} from '@/lib/validations/catalog';
+import {
+    grapes,
     guaranteesOfOrigin,
     productGrapes,
     productVariants,
     products,
     shippingTypes,
+    typologies,
     users,
     wineries,
 } from '@/db/schema';
@@ -110,10 +126,14 @@ export async function getShippingTypes() {
         .orderBy(asc(shippingTypes.id));
 }
 
-/** Parámetros del listado: página (desde 1) y productos por página. */
+/** Parámetros del listado: página (desde 1), productos por página, filtros y orden (RF5). */
 export interface CatalogPageParams {
     page: number;
     pageSize: number;
+    /** Búsqueda y filtros ya validados (`catalogSearchParamsSchema`). Sin ellos, el catálogo entero. */
+    filters?: CatalogFilters;
+    /** Criterio de orden ya validado. Por defecto, los más recientes primero. */
+    orden?: CatalogSort;
 }
 
 // Uniones del listado. Las comparten la consulta de productos y la del total, para que cuenten
@@ -181,61 +201,179 @@ function catalogRowsQuery() {
 }
 
 /**
+ * `columna like patrón escape '!'`. Drizzle no deja declarar el `escape` en su `like()`, y no se
+ * usa la barra por defecto para no depender del `sql_mode` (ver `LIKE_ESCAPE`).
+ */
+function likeEscaped(column: SQLWrapper, pattern: string): SQL {
+    return sql`${column} like ${pattern} escape ${sql.raw(`'${LIKE_ESCAPE}'`)}`;
+}
+
+/** Condiciones SQL del listado: las que van en `where` y la que va en `having`. */
+export interface CatalogConditions {
+    where: SQL;
+    having: SQL | undefined;
+}
+
+/**
+ * Las condiciones del listado en un solo sitio (RF4, RF5): la consulta de productos y la del total
+ * las usan tal cual, así no pueden contar cosas distintas.
+ *
+ * `where` lleva la regla de visibilidad (`visibleProductsCondition`) y los filtros que se evalúan
+ * por fila de producto, todos unidos con `and`:
+ * - `q`: `like` sin distinguir mayúsculas ni acentos (lo hace la collation de las columnas) sobre
+ *   el nombre o la descripción. Los comodines de `like` que escriba la persona se escapan, y la
+ *   consulta declara el carácter de escape (`escape '!'`) para no depender del `sql_mode`.
+ * - `do`, `bodega`, `tipologia` y `anada`: igualdad con `guarantee_of_origin_id`, `winery_id`,
+ *   `typology_id` y `vintage`.
+ * - `uva`: `exists` sobre `product_grapes`, en vez de otro `join`, que repetiría el producto
+ *   (y su precio y su stock) una vez por cada uva.
+ *
+ * `having` lleva `precio` porque se mide sobre un agregado: el precio mínimo de las presentaciones
+ * a la venta, el mismo que enseña la tarjeta ("Desde X €"). No existe sin `group by`.
+ *
+ * @param filters - Filtros ya validados; vacío o sin campos = ningún filtro.
+ * @returns `where`, y `having` solo si hay filtro de precio.
+ *
+ * @example
+ * const { where, having } = catalogConditions({ tipologia: 1, precio: '10-15' });
+ */
+export function catalogConditions(filters: CatalogFilters = {}): CatalogConditions {
+    const { q, do: guaranteeOfOriginId, bodega, uva, tipologia, precio, anada } = filters;
+
+    const pattern = searchPattern(q);
+    const conditions: (SQL | undefined)[] = [
+        visibleProductsCondition(),
+        pattern
+            ? or(likeEscaped(products.name, pattern), likeEscaped(products.description, pattern))
+            : undefined,
+        guaranteeOfOriginId === undefined
+            ? undefined
+            : eq(products.guaranteeOfOriginId, guaranteeOfOriginId),
+        bodega === undefined ? undefined : eq(products.wineryId, bodega),
+        tipologia === undefined ? undefined : eq(products.typologyId, tipologia),
+        anada === undefined ? undefined : eq(products.vintage, anada),
+        uva === undefined
+            ? undefined
+            : exists(
+                  db
+                      .select({ one: sql`1` })
+                      .from(productGrapes)
+                      .where(
+                          and(
+                              eq(productGrapes.productId, products.id),
+                              eq(productGrapes.grapeId, uva),
+                          ),
+                      ),
+              ),
+    ];
+
+    const { from, to } = precio ? priceRangeBounds(precio) : {};
+    const minPrice = min(productVariants.price);
+    const having = and(
+        from === undefined ? undefined : gte(minPrice, from),
+        to === undefined ? undefined : lt(minPrice, to),
+    );
+
+    return { where: and(...conditions) as SQL, having };
+}
+
+/**
+ * Cláusulas `order by` del listado para un criterio de `?orden=`. Todas terminan en el id del
+ * producto como desempate: sin él, dos productos con el mismo precio, nombre o fecha podrían
+ * cambiar de orden entre una consulta y otra y repetirse o saltarse al paginar.
+ *
+ * - `recientes`: `created_at` descendente (el más nuevo primero) y id descendente.
+ * - `precio-asc` y `precio-desc`: el precio mínimo de sus presentaciones a la venta
+ *   (`min(price)`, el mismo que enseña la tarjeta y que filtra `precio`) y id ascendente.
+ * - `nombre`: A→Z según la collation de la columna y id ascendente.
+ *
+ * @param orden - Criterio ya validado; si no es ninguno de los conocidos, vale `recientes`.
+ * @returns Las expresiones, en orden, para `orderBy(...catalogOrderBy(orden))`.
+ *
+ * @example
+ * query.orderBy(...catalogOrderBy('precio-asc'));
+ */
+export function catalogOrderBy(orden: CatalogSort = DEFAULT_CATALOG_SORT): SQL[] {
+    switch (orden) {
+        case 'precio-asc':
+            return [asc(min(productVariants.price)), asc(products.id)];
+        case 'precio-desc':
+            return [desc(min(productVariants.price)), asc(products.id)];
+        case 'nombre':
+            return [asc(products.name), asc(products.id)];
+        default:
+            return [desc(products.createdAt), desc(products.id)];
+    }
+}
+
+/**
  * Consulta de los productos de una página del listado, con sus datos agregados: precio mínimo,
  * número de presentaciones y stock total. Se separa de `getCatalogPage` para poder comprobar su
  * SQL sin conectar a la BD.
  *
- * Orden: el más reciente primero (`created_at`), y el id como desempate para que la paginación
- * sea estable cuando dos productos comparten fecha.
+ * Filtra con `catalogConditions` y ordena con `catalogOrderBy`; el id va siempre como desempate
+ * para que la paginación sea estable.
  *
  * El `groupBy` incluye todas las columnas que se piden sin agregar (no solo `products.id`): así
  * es válido con `ONLY_FULL_GROUP_BY` aunque el motor (MySQL o TiDB) no deduzca las dependencias
  * funcionales, y el resultado es el mismo.
  *
- * @param params - Página (desde 1) y productos por página.
+ * @param params - Página (desde 1), productos por página, filtros y orden.
  * @returns La consulta, lista para ejecutar con `await`.
  */
-export function catalogItemsQuery({ page, pageSize }: CatalogPageParams) {
+export function catalogItemsQuery({ page, pageSize, filters, orden }: CatalogPageParams) {
     const size = toPositiveInt(pageSize);
+    const { where, having } = catalogConditions(filters);
     return catalogRowsQuery()
-        .where(visibleProductsCondition())
+        .where(where)
         .groupBy(...catalogGroupBy())
-        .orderBy(desc(products.createdAt), desc(products.id))
+        .having(having)
+        .orderBy(...catalogOrderBy(orden))
         .limit(size)
         .offset((toPositiveInt(page) - 1) * size);
 }
 
 /**
- * Consulta del total de productos del listado, con las mismas uniones y condiciones que
- * `catalogItemsQuery` pero sin paginar. Alimenta la paginación.
+ * Consulta del total de productos del listado, con las mismas uniones y condiciones
+ * (`catalogConditions`) que `catalogItemsQuery` pero sin paginar. Alimenta la paginación.
  *
+ * Cuenta las filas de una subconsulta agrupada por producto, no los productos con `count(distinct)`:
+ * el filtro de precio es un `having` sobre el precio mínimo y solo existe tras agrupar.
+ *
+ * @param filters - Búsqueda y filtros; los mismos que se pasan a `catalogItemsQuery`.
  * @returns La consulta, lista para ejecutar con `await`: una fila con `total`.
  */
-export function catalogCountQuery() {
-    return db
-        .select({ total: countDistinct(products.id) })
+export function catalogCountQuery(filters?: CatalogFilters) {
+    const { where, having } = catalogConditions(filters);
+    const matching = db
+        .select({ id: products.id })
         .from(products)
         .innerJoin(wineries, joinWinery)
         .innerJoin(guaranteesOfOrigin, joinOrigin)
         .innerJoin(productVariants, joinSellableVariant)
-        .where(visibleProductsCondition());
+        .where(where)
+        .groupBy(products.id)
+        .having(having)
+        .as('matching');
+    return db.select({ total: count() }).from(matching);
 }
 
 /**
- * Una página del listado de productos (RF4): solo los visibles (`visibleProductsCondition`) y con
- * alguna presentación a la venta, del más reciente al más antiguo.
+ * Una página del listado de productos (RF4, RF5): solo los visibles (`visibleProductsCondition`) y
+ * con alguna presentación a la venta que cumplan la búsqueda y los filtros, en el orden pedido
+ * (por defecto, del más reciente al más antiguo).
  *
- * @param params - Página (desde 1) y productos por página.
+ * @param params - Página (desde 1), productos por página, filtros y orden.
  * @returns `items` con los productos de la página y sus agregados, y `total` con todos los
- *   productos del listado, para calcular las páginas.
+ *   productos que cumplen los filtros, para calcular las páginas.
  *
  * @example
- * const { items, total } = await getCatalogPage({ page: 1, pageSize: 12 });
+ * const { items, total } = await getCatalogPage({ page: 1, pageSize: 12, filters: { tipologia: 1 } });
  */
 export async function getCatalogPage(params: CatalogPageParams) {
     const [items, [{ total }]] = await Promise.all([
         catalogItemsQuery(params),
-        catalogCountQuery(),
+        catalogCountQuery(params.filters),
     ]);
     return { items, total };
 }
@@ -245,6 +383,108 @@ export type CatalogPage = Awaited<ReturnType<typeof getCatalogPage>>;
 
 /** Un producto del listado, con su precio mínimo, número de presentaciones y stock total. */
 export type CatalogItem = CatalogPage['items'][number];
+
+/**
+ * Deja la consulta de una lista de opciones con las mismas uniones y la misma regla que el
+ * listado: bodega, D.O. y solo las presentaciones a la venta, más `visibleProductsCondition`. Así
+ * una opción solo aparece si al elegirla el listado devuelve algún producto.
+ *
+ * Es genérica sobre la consulta en modo dinámico (`$dynamic()`) para no repetir las uniones en
+ * cada lista.
+ *
+ * @param query - Consulta `from(products)` en modo dinámico.
+ * @param extra - Condición adicional que se une a la de visibilidad con `and`.
+ */
+function withVisibleProducts<T extends MySqlSelect>(query: T, extra?: SQL) {
+    return query
+        .innerJoin(wineries, joinWinery)
+        .innerJoin(guaranteesOfOrigin, joinOrigin)
+        .innerJoin(productVariants, joinSellableVariant)
+        .where(and(visibleProductsCondition(), extra));
+}
+
+/**
+ * Las cinco consultas de las opciones de los selects, sin ejecutar. Se separan de
+ * `getCatalogFilterOptions` para poder comprobar su SQL sin conectar a la BD.
+ *
+ * Todas son `select distinct` sobre los productos visibles (`withVisibleProducts`), así que solo
+ * salen valores con al menos un producto visible y a la venta. Las uvas y las tipologías añaden su
+ * `join` (con `product_grapes` y `grapes`, y con `typologies`): aquí solo se pide la lista, sin
+ * agregados que un `join` multiplicaría, así que no hace falta un `exists`.
+ *
+ * El `order by` va siempre sobre columnas que están en el `select`, que `distinct` exige.
+ *
+ * @returns Una consulta por lista; `typologies` trae además `filterOrder` y `vintages` trae `year`.
+ */
+export function catalogFilterOptionsQueries() {
+    return {
+        origins: withVisibleProducts(
+            db
+                .selectDistinct({ id: guaranteesOfOrigin.id, name: guaranteesOfOrigin.name })
+                .from(products)
+                .$dynamic(),
+        ).orderBy(asc(guaranteesOfOrigin.name), asc(guaranteesOfOrigin.id)),
+
+        wineries: withVisibleProducts(
+            db.selectDistinct({ id: wineries.id, name: wineries.name }).from(products).$dynamic(),
+        ).orderBy(asc(wineries.name), asc(wineries.id)),
+
+        grapes: withVisibleProducts(
+            db
+                .selectDistinct({ id: grapes.id, name: grapes.name })
+                .from(products)
+                .innerJoin(productGrapes, eq(productGrapes.productId, products.id))
+                .innerJoin(grapes, eq(grapes.id, productGrapes.grapeId))
+                .$dynamic(),
+        ).orderBy(asc(grapes.name), asc(grapes.id)),
+
+        typologies: withVisibleProducts(
+            db
+                .selectDistinct({
+                    id: typologies.id,
+                    name: typologies.name,
+                    filterOrder: typologies.filterOrder,
+                })
+                .from(products)
+                .innerJoin(typologies, eq(typologies.id, products.typologyId))
+                .$dynamic(),
+        ).orderBy(asc(typologies.filterOrder), asc(typologies.name), asc(typologies.id)),
+
+        vintages: withVisibleProducts(
+            db.selectDistinct({ year: products.vintage }).from(products).$dynamic(),
+            isNotNull(products.vintage),
+        ).orderBy(desc(products.vintage)),
+    };
+}
+
+/**
+ * Opciones de los selects de filtro del listado (RF5): denominaciones de origen, bodegas, uvas,
+ * tipologías y añadas. Solo valores que tengan al menos un producto visible y a la venta, es
+ * decir, los que al elegirlos no dejan el listado vacío. No dependen de los filtros activos.
+ *
+ * @returns Cada lista con `{ id, name }`: por nombre, salvo las tipologías (por `filter_order`)
+ *   y las añadas (la más reciente primero; `id` es el año y `name` el año como texto).
+ *
+ * @example
+ * const { origins, wineries, grapes, typologies, vintages } = await getCatalogFilterOptions();
+ */
+export async function getCatalogFilterOptions(): Promise<CatalogFilterOptions> {
+    const queries = catalogFilterOptionsQueries();
+    const [origins, wineryRows, grapeRows, typologyRows, vintageRows] = await Promise.all([
+        queries.origins,
+        queries.wineries,
+        queries.grapes,
+        queries.typologies,
+        queries.vintages,
+    ]);
+    return {
+        origins,
+        wineries: wineryRows,
+        grapes: grapeRows,
+        typologies: typologyRows.map(({ id, name }) => ({ id, name })),
+        vintages: toVintageOptions(vintageRows.map(({ year }) => year)),
+    };
+}
 
 /**
  * Consulta de productos al azar para "Nuestros favoritos": los visibles y con alguna presentación
