@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
     catalogConditions,
     catalogCountQuery,
+    catalogFilterOptionsQueries,
     catalogItemsQuery,
     catalogOrderBy,
     featuredProductsQuery,
@@ -443,5 +444,106 @@ describe('relatedProductsQuery', () => {
                 .toSQL()
                 .params.at(-1),
         ).toBe(1);
+    });
+});
+
+describe('catalogFilterOptionsQueries', () => {
+    const queries = catalogFilterOptionsQueries();
+    const sqlOf = (name: keyof typeof queries) => queries[name].toSQL();
+
+    it('devuelve una consulta por lista de opciones', () => {
+        expect(Object.keys(queries)).toEqual([
+            'origins',
+            'wineries',
+            'grapes',
+            'typologies',
+            'vintages',
+        ]);
+    });
+
+    it.each(['origins', 'wineries', 'grapes', 'typologies', 'vintages'] as const)(
+        '%s: select distinct con las uniones y la regla de visibilidad del listado',
+        (name) => {
+            const { sql, params } = sqlOf(name);
+            expect(sql).toMatch(/^select distinct /);
+            expect(sql).toContain(
+                'inner join `wineries` on `wineries`.`winery_id` = `products`.`winery_id`',
+            );
+            expect(sql).toContain(
+                'inner join `guarantees_of_origin` on `guarantees_of_origin`.`guarantee_of_origin_id` = `products`.`guarantee_of_origin_id`',
+            );
+            // solo cuentan las presentaciones a la venta: sin ellas el listado no enseña el producto
+            expect(sql).toContain(
+                'inner join `product_variants` on (`product_variants`.`product_id` = `products`.`product_id` and `product_variants`.`is_blocked` = ?)',
+            );
+            expect(sql).toContain(
+                '(`products`.`is_blocked` = ? and `wineries`.`is_blocked` = ? and `guarantees_of_origin`.`is_blocked` = ?)',
+            );
+            // presentación sin bloquear + producto, bodega y D.O. sin bloquear
+            expect(params).toEqual([false, false, false, false]);
+            // distinct: sin agregados ni group by, y sin paginar
+            expect(sql).not.toMatch(/group by|limit|offset|count\(|min\(/);
+        },
+    );
+
+    it.each([
+        [
+            'origins',
+            'select distinct `guarantees_of_origin`.`guarantee_of_origin_id`, `guarantees_of_origin`.`name` from',
+            'order by `guarantees_of_origin`.`name` asc, `guarantees_of_origin`.`guarantee_of_origin_id` asc',
+        ],
+        [
+            'wineries',
+            'select distinct `wineries`.`winery_id`, `wineries`.`name` from',
+            'order by `wineries`.`name` asc, `wineries`.`winery_id` asc',
+        ],
+        [
+            'grapes',
+            'select distinct `grapes`.`grape_id`, `grapes`.`name` from',
+            'order by `grapes`.`name` asc, `grapes`.`grape_id` asc',
+        ],
+    ] as const)('%s: id y nombre, ordenados por nombre', (name, select, order) => {
+        const { sql } = sqlOf(name);
+        expect(sql).toContain(select);
+        expect(sql.endsWith(order)).toBe(true);
+    });
+
+    it('grapes: une product_grapes y grapes (aquí solo se pide la lista, sin agregados)', () => {
+        const { sql } = sqlOf('grapes');
+        expect(sql).toContain(
+            'inner join `product_grapes` on `product_grapes`.`product_id` = `products`.`product_id`',
+        );
+        expect(sql).toContain(
+            'inner join `grapes` on `grapes`.`grape_id` = `product_grapes`.`grape_id`',
+        );
+        expect(sql).not.toContain('exists');
+    });
+
+    it('typologies: por filter_order y después por nombre, con filter_order en el select (lo exige distinct)', () => {
+        const { sql } = sqlOf('typologies');
+        expect(sql).toContain(
+            'select distinct `typologies`.`typology_id`, `typologies`.`name`, `typologies`.`filter_order` from',
+        );
+        expect(sql).toContain(
+            'inner join `typologies` on `typologies`.`typology_id` = `products`.`typology_id`',
+        );
+        expect(
+            sql.endsWith(
+                'order by `typologies`.`filter_order` asc, `typologies`.`name` asc, `typologies`.`typology_id` asc',
+            ),
+        ).toBe(true);
+    });
+
+    it('vintages: solo los productos con añada, de la más reciente a la más antigua', () => {
+        const { sql } = sqlOf('vintages');
+        expect(sql).toContain('select distinct `products`.`vintage` from');
+        expect(sql).toContain('and `products`.`vintage` is not null)');
+        expect(sql.endsWith('order by `products`.`vintage` desc')).toBe(true);
+    });
+
+    it('wineries y origins no unen más tablas de las que el listado ya une', () => {
+        for (const name of ['origins', 'wineries'] as const) {
+            expect(sqlOf(name).sql.match(/inner join/g)).toHaveLength(3);
+        }
     });
 });

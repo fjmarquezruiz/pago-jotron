@@ -6,6 +6,7 @@ import {
     eq,
     exists,
     gte,
+    isNotNull,
     lt,
     min,
     ne,
@@ -16,10 +17,12 @@ import {
     type SQL,
     type SQLWrapper,
 } from 'drizzle-orm';
+import type { MySqlSelect } from 'drizzle-orm/mysql-core';
 import { db } from '@/db';
 import { NEW_PRODUCT_DAYS } from '@/lib/catalog/novelty';
 import { toPositiveInt } from '@/lib/catalog/pagination';
 import { priceRangeBounds } from '@/lib/catalog/price-range';
+import { toVintageOptions, type FilterOption } from '@/lib/catalog/filter-options';
 import { LIKE_ESCAPE, searchPattern } from '@/lib/catalog/search';
 import {
     DEFAULT_CATALOG_SORT,
@@ -27,11 +30,13 @@ import {
     type CatalogSort,
 } from '@/lib/validations/catalog';
 import {
+    grapes,
     guaranteesOfOrigin,
     productGrapes,
     productVariants,
     products,
     shippingTypes,
+    typologies,
     users,
     wineries,
 } from '@/db/schema';
@@ -378,6 +383,122 @@ export type CatalogPage = Awaited<ReturnType<typeof getCatalogPage>>;
 
 /** Un producto del listado, con su precio mínimo, número de presentaciones y stock total. */
 export type CatalogItem = CatalogPage['items'][number];
+
+/** Las opciones de los selects del listado, cada lista con sus valores ya ordenados. */
+export interface CatalogFilterOptions {
+    /** Denominaciones de origen (`?do=`), por nombre. */
+    origins: FilterOption[];
+    /** Bodegas (`?bodega=`), por nombre. */
+    wineries: FilterOption[];
+    /** Uvas (`?uva=`), por nombre. */
+    grapes: FilterOption[];
+    /** Tipologías (`?tipologia=`), en el orden pensado para el filtro (`filter_order`). */
+    typologies: FilterOption[];
+    /** Añadas (`?anada=`): `id` es el año y `name` el año como texto; la más reciente primero. */
+    vintages: FilterOption[];
+}
+
+/**
+ * Deja la consulta de una lista de opciones con las mismas uniones y la misma regla que el
+ * listado: bodega, D.O. y solo las presentaciones a la venta, más `visibleProductsCondition`. Así
+ * una opción solo aparece si al elegirla el listado devuelve algún producto.
+ *
+ * Es genérica sobre la consulta en modo dinámico (`$dynamic()`) para no repetir las uniones en
+ * cada lista.
+ *
+ * @param query - Consulta `from(products)` en modo dinámico.
+ * @param extra - Condición adicional que se une a la de visibilidad con `and`.
+ */
+function withVisibleProducts<T extends MySqlSelect>(query: T, extra?: SQL) {
+    return query
+        .innerJoin(wineries, joinWinery)
+        .innerJoin(guaranteesOfOrigin, joinOrigin)
+        .innerJoin(productVariants, joinSellableVariant)
+        .where(and(visibleProductsCondition(), extra));
+}
+
+/**
+ * Las cinco consultas de las opciones de los selects, sin ejecutar. Se separan de
+ * `getCatalogFilterOptions` para poder comprobar su SQL sin conectar a la BD.
+ *
+ * Todas son `select distinct` sobre los productos visibles (`withVisibleProducts`), así que solo
+ * salen valores con al menos un producto visible y a la venta. Las uvas y las tipologías añaden su
+ * `join` (con `product_grapes` y `grapes`, y con `typologies`): aquí solo se pide la lista, sin
+ * agregados que un `join` multiplicaría, así que no hace falta un `exists`.
+ *
+ * El `order by` va siempre sobre columnas que están en el `select`, que `distinct` exige.
+ *
+ * @returns Una consulta por lista; `typologies` trae además `filterOrder` y `vintages` trae `year`.
+ */
+export function catalogFilterOptionsQueries() {
+    return {
+        origins: withVisibleProducts(
+            db
+                .selectDistinct({ id: guaranteesOfOrigin.id, name: guaranteesOfOrigin.name })
+                .from(products)
+                .$dynamic(),
+        ).orderBy(asc(guaranteesOfOrigin.name), asc(guaranteesOfOrigin.id)),
+
+        wineries: withVisibleProducts(
+            db.selectDistinct({ id: wineries.id, name: wineries.name }).from(products).$dynamic(),
+        ).orderBy(asc(wineries.name), asc(wineries.id)),
+
+        grapes: withVisibleProducts(
+            db
+                .selectDistinct({ id: grapes.id, name: grapes.name })
+                .from(products)
+                .innerJoin(productGrapes, eq(productGrapes.productId, products.id))
+                .innerJoin(grapes, eq(grapes.id, productGrapes.grapeId))
+                .$dynamic(),
+        ).orderBy(asc(grapes.name), asc(grapes.id)),
+
+        typologies: withVisibleProducts(
+            db
+                .selectDistinct({
+                    id: typologies.id,
+                    name: typologies.name,
+                    filterOrder: typologies.filterOrder,
+                })
+                .from(products)
+                .innerJoin(typologies, eq(typologies.id, products.typologyId))
+                .$dynamic(),
+        ).orderBy(asc(typologies.filterOrder), asc(typologies.name), asc(typologies.id)),
+
+        vintages: withVisibleProducts(
+            db.selectDistinct({ year: products.vintage }).from(products).$dynamic(),
+            isNotNull(products.vintage),
+        ).orderBy(desc(products.vintage)),
+    };
+}
+
+/**
+ * Opciones de los selects de filtro del listado (RF5): denominaciones de origen, bodegas, uvas,
+ * tipologías y añadas. Solo valores que tengan al menos un producto visible y a la venta, es
+ * decir, los que al elegirlos no dejan el listado vacío. No dependen de los filtros activos.
+ *
+ * @returns Cada lista con `{ id, name }`: por nombre, salvo las tipologías (por `filter_order`)
+ *   y las añadas (la más reciente primero; `id` es el año y `name` el año como texto).
+ *
+ * @example
+ * const { origins, wineries, grapes, typologies, vintages } = await getCatalogFilterOptions();
+ */
+export async function getCatalogFilterOptions(): Promise<CatalogFilterOptions> {
+    const queries = catalogFilterOptionsQueries();
+    const [origins, wineryRows, grapeRows, typologyRows, vintageRows] = await Promise.all([
+        queries.origins,
+        queries.wineries,
+        queries.grapes,
+        queries.typologies,
+        queries.vintages,
+    ]);
+    return {
+        origins,
+        wineries: wineryRows,
+        grapes: grapeRows,
+        typologies: typologyRows.map(({ id, name }) => ({ id, name })),
+        vintages: toVintageOptions(vintageRows.map(({ year }) => year)),
+    };
+}
 
 /**
  * Consulta de productos al azar para "Nuestros favoritos": los visibles y con alguna presentación
