@@ -1,10 +1,11 @@
-import type { SQL } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import { MySqlDialect } from 'drizzle-orm/mysql-core';
 import { describe, expect, it, vi } from 'vitest';
 import {
     catalogConditions,
     catalogCountQuery,
     catalogItemsQuery,
+    catalogOrderBy,
     featuredProductsQuery,
     isNewCondition,
     relatedProductsQuery,
@@ -138,20 +139,20 @@ describe('catalogConditions', () => {
         [
             'q busca en nombre o descripción, con comodines en los extremos',
             { q: 'tinto' },
-            '(`products`.`name` like ? or `products`.`description` like ?)',
+            "(`products`.`name` like ? escape '!' or `products`.`description` like ? escape '!')",
             ['%tinto%', '%tinto%'],
         ],
         [
             'q recorta los espacios',
             { q: '  tinto roble ' },
-            '(`products`.`name` like ? or `products`.`description` like ?)',
+            "(`products`.`name` like ? escape '!' or `products`.`description` like ? escape '!')",
             ['%tinto roble%', '%tinto roble%'],
         ],
         [
-            'q escapa los comodines de like',
-            { q: '100%_\\' },
-            '(`products`.`name` like ? or `products`.`description` like ?)',
-            ['%100\\%\\_\\\\%', '%100\\%\\_\\\\%'],
+            'q escapa los comodines de like con !, no con la barra',
+            { q: '100%_!\\' },
+            "(`products`.`name` like ? escape '!' or `products`.`description` like ? escape '!')",
+            ['%100!%!_!!\\%', '%100!%!_!!\\%'],
         ],
         [
             'do filtra por la D.O. del producto',
@@ -195,7 +196,7 @@ describe('catalogConditions', () => {
         });
         const { sql, params } = dialect.sqlToQuery(where);
         expect(sql).toBe(
-            `(${visible} and (\`products\`.\`name\` like ? or \`products\`.\`description\` like ?) and \`products\`.\`guarantee_of_origin_id\` = ? and \`products\`.\`winery_id\` = ? and \`products\`.\`typology_id\` = ? and \`products\`.\`vintage\` = ? and exists (select 1 from \`product_grapes\` where (\`product_grapes\`.\`product_id\` = \`products\`.\`product_id\` and \`product_grapes\`.\`grape_id\` = ?)))`,
+            `(${visible} and (\`products\`.\`name\` like ? escape '!' or \`products\`.\`description\` like ? escape '!') and \`products\`.\`guarantee_of_origin_id\` = ? and \`products\`.\`winery_id\` = ? and \`products\`.\`typology_id\` = ? and \`products\`.\`vintage\` = ? and exists (select 1 from \`product_grapes\` where (\`product_grapes\`.\`product_id\` = \`products\`.\`product_id\` and \`product_grapes\`.\`grape_id\` = ?)))`,
         );
         expect(params).toEqual([...hidden, '%a%', '%a%', 1, 2, 3, 2020, 4]);
         expect(having).toBeDefined();
@@ -234,7 +235,7 @@ describe('catalogItemsQuery con filtros', () => {
 
     it('aplica los filtros de fila en where y el precio en having, entre group by y order by', () => {
         expect(sql).toMatch(
-            / where \(\(.*\) and \(`products`\.`name` like \? or .*exists \(select 1 from `product_grapes`.*\)\) group by .* having \(min\(`product_variants`\.`price`\) >= \? and min\(`product_variants`\.`price`\) < \?\) order by /,
+            / where \(\(.*\) and \(`products`\.`name` like \? escape '!' or .*exists \(select 1 from `product_grapes`.*\)\) group by .* having \(min\(`product_variants`\.`price`\) >= \? and min\(`product_variants`\.`price`\) < \?\) order by /,
         );
     });
 
@@ -271,6 +272,74 @@ describe('catalogItemsQuery con filtros', () => {
         const base = catalogItemsQuery({ page: 1, pageSize: 12 }).toSQL();
         expect(catalogItemsQuery({ page: 1, pageSize: 12, filters: {} }).toSQL()).toEqual(base);
         expect(base.sql).not.toMatch(/having|exists|like/);
+    });
+});
+
+describe('catalogOrderBy', () => {
+    const render = (orden?: Parameters<typeof catalogOrderBy>[0]) =>
+        new MySqlDialect().sqlToQuery(sql.join(catalogOrderBy(orden), sql`, `)).sql;
+
+    it.each([
+        ['recientes', '`products`.`created_at` desc, `products`.`product_id` desc'],
+        ['precio-asc', 'min(`product_variants`.`price`) asc, `products`.`product_id` asc'],
+        ['precio-desc', 'min(`product_variants`.`price`) desc, `products`.`product_id` asc'],
+        ['nombre', '`products`.`name` asc, `products`.`product_id` asc'],
+    ] as const)('%s → %s', (orden, expected) => {
+        expect(render(orden)).toBe(expected);
+    });
+
+    it('sin criterio, o con uno desconocido, ordena por los más recientes', () => {
+        const recientes = render('recientes');
+        expect(render()).toBe(recientes);
+        expect(render('otro' as never)).toBe(recientes);
+    });
+
+    it.each(['recientes', 'precio-asc', 'precio-desc', 'nombre'] as const)(
+        '%s termina siempre en el id del producto, para paginar con estabilidad',
+        (orden) => {
+            const clauses = catalogOrderBy(orden);
+            const last = new MySqlDialect().sqlToQuery(clauses.at(-1)!).sql;
+            expect(clauses.length).toBeGreaterThan(1);
+            expect(last).toMatch(/^`products`\.`product_id` (asc|desc)$/);
+        },
+    );
+});
+
+describe('catalogItemsQuery con orden', () => {
+    it.each([
+        ['recientes', 'order by `products`.`created_at` desc, `products`.`product_id` desc limit'],
+        [
+            'precio-asc',
+            'group by .* order by min(`product_variants`.`price`) asc, `products`.`product_id` asc limit',
+        ],
+        [
+            'precio-desc',
+            'order by min(`product_variants`.`price`) desc, `products`.`product_id` asc limit',
+        ],
+        ['nombre', 'order by `products`.`name` asc, `products`.`product_id` asc limit'],
+    ] as const)('aplica %s', (orden, fragment) => {
+        const { sql } = catalogItemsQuery({ page: 1, pageSize: 12, orden }).toSQL();
+        expect(sql).toMatch(new RegExp(fragment.replaceAll('`', '`').replace(/[()]/g, '\\$&')));
+    });
+
+    it('sin orden, el de siempre (más recientes primero)', () => {
+        expect(catalogItemsQuery({ page: 1, pageSize: 12 }).toSQL()).toEqual(
+            catalogItemsQuery({ page: 1, pageSize: 12, orden: 'recientes' }).toSQL(),
+        );
+    });
+
+    it('el orden no añade parámetros ni cambia los filtros', () => {
+        const filters = { tipologia: 1, precio: '10-15' } as const;
+        const base = catalogItemsQuery({ page: 2, pageSize: 12, filters }).toSQL();
+        for (const orden of ['precio-asc', 'precio-desc', 'nombre'] as const) {
+            expect(
+                catalogItemsQuery({ page: 2, pageSize: 12, filters, orden }).toSQL().params,
+            ).toEqual(base.params);
+        }
+    });
+
+    it('el total no depende del orden: no lleva order by', () => {
+        expect(catalogCountQuery().toSQL().sql).not.toContain('order by');
     });
 });
 

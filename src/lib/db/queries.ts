@@ -6,7 +6,6 @@ import {
     eq,
     exists,
     gte,
-    like,
     lt,
     min,
     ne,
@@ -15,13 +14,18 @@ import {
     sql,
     sum,
     type SQL,
+    type SQLWrapper,
 } from 'drizzle-orm';
 import { db } from '@/db';
 import { NEW_PRODUCT_DAYS } from '@/lib/catalog/novelty';
 import { toPositiveInt } from '@/lib/catalog/pagination';
 import { priceRangeBounds } from '@/lib/catalog/price-range';
-import { searchPattern } from '@/lib/catalog/search';
-import type { CatalogFilters } from '@/lib/validations/catalog';
+import { LIKE_ESCAPE, searchPattern } from '@/lib/catalog/search';
+import {
+    DEFAULT_CATALOG_SORT,
+    type CatalogFilters,
+    type CatalogSort,
+} from '@/lib/validations/catalog';
 import {
     guaranteesOfOrigin,
     productGrapes,
@@ -117,12 +121,14 @@ export async function getShippingTypes() {
         .orderBy(asc(shippingTypes.id));
 }
 
-/** Parámetros del listado: página (desde 1), productos por página y filtros (RF5). */
+/** Parámetros del listado: página (desde 1), productos por página, filtros y orden (RF5). */
 export interface CatalogPageParams {
     page: number;
     pageSize: number;
     /** Búsqueda y filtros ya validados (`catalogSearchParamsSchema`). Sin ellos, el catálogo entero. */
     filters?: CatalogFilters;
+    /** Criterio de orden ya validado. Por defecto, los más recientes primero. */
+    orden?: CatalogSort;
 }
 
 // Uniones del listado. Las comparten la consulta de productos y la del total, para que cuenten
@@ -189,6 +195,14 @@ function catalogRowsQuery() {
         .innerJoin(productVariants, joinSellableVariant);
 }
 
+/**
+ * `columna like patrón escape '!'`. Drizzle no deja declarar el `escape` en su `like()`, y no se
+ * usa la barra por defecto para no depender del `sql_mode` (ver `LIKE_ESCAPE`).
+ */
+function likeEscaped(column: SQLWrapper, pattern: string): SQL {
+    return sql`${column} like ${pattern} escape ${sql.raw(`'${LIKE_ESCAPE}'`)}`;
+}
+
 /** Condiciones SQL del listado: las que van en `where` y la que va en `having`. */
 export interface CatalogConditions {
     where: SQL;
@@ -202,7 +216,8 @@ export interface CatalogConditions {
  * `where` lleva la regla de visibilidad (`visibleProductsCondition`) y los filtros que se evalúan
  * por fila de producto, todos unidos con `and`:
  * - `q`: `like` sin distinguir mayúsculas ni acentos (lo hace la collation de las columnas) sobre
- *   el nombre o la descripción. Los comodines de `like` que escriba la persona se escapan.
+ *   el nombre o la descripción. Los comodines de `like` que escriba la persona se escapan, y la
+ *   consulta declara el carácter de escape (`escape '!'`) para no depender del `sql_mode`.
  * - `do`, `bodega`, `tipologia` y `anada`: igualdad con `guarantee_of_origin_id`, `winery_id`,
  *   `typology_id` y `vintage`.
  * - `uva`: `exists` sobre `product_grapes`, en vez de otro `join`, que repetiría el producto
@@ -223,7 +238,9 @@ export function catalogConditions(filters: CatalogFilters = {}): CatalogConditio
     const pattern = searchPattern(q);
     const conditions: (SQL | undefined)[] = [
         visibleProductsCondition(),
-        pattern ? or(like(products.name, pattern), like(products.description, pattern)) : undefined,
+        pattern
+            ? or(likeEscaped(products.name, pattern), likeEscaped(products.description, pattern))
+            : undefined,
         guaranteeOfOriginId === undefined
             ? undefined
             : eq(products.guaranteeOfOriginId, guaranteeOfOriginId),
@@ -256,28 +273,57 @@ export function catalogConditions(filters: CatalogFilters = {}): CatalogConditio
 }
 
 /**
+ * Cláusulas `order by` del listado para un criterio de `?orden=`. Todas terminan en el id del
+ * producto como desempate: sin él, dos productos con el mismo precio, nombre o fecha podrían
+ * cambiar de orden entre una consulta y otra y repetirse o saltarse al paginar.
+ *
+ * - `recientes`: `created_at` descendente (el más nuevo primero) y id descendente.
+ * - `precio-asc` y `precio-desc`: el precio mínimo de sus presentaciones a la venta
+ *   (`min(price)`, el mismo que enseña la tarjeta y que filtra `precio`) y id ascendente.
+ * - `nombre`: A→Z según la collation de la columna y id ascendente.
+ *
+ * @param orden - Criterio ya validado; si no es ninguno de los conocidos, vale `recientes`.
+ * @returns Las expresiones, en orden, para `orderBy(...catalogOrderBy(orden))`.
+ *
+ * @example
+ * query.orderBy(...catalogOrderBy('precio-asc'));
+ */
+export function catalogOrderBy(orden: CatalogSort = DEFAULT_CATALOG_SORT): SQL[] {
+    switch (orden) {
+        case 'precio-asc':
+            return [asc(min(productVariants.price)), asc(products.id)];
+        case 'precio-desc':
+            return [desc(min(productVariants.price)), asc(products.id)];
+        case 'nombre':
+            return [asc(products.name), asc(products.id)];
+        default:
+            return [desc(products.createdAt), desc(products.id)];
+    }
+}
+
+/**
  * Consulta de los productos de una página del listado, con sus datos agregados: precio mínimo,
  * número de presentaciones y stock total. Se separa de `getCatalogPage` para poder comprobar su
  * SQL sin conectar a la BD.
  *
- * Filtra con `catalogConditions`. Orden: el más reciente primero (`created_at`), y el id como
- * desempate para que la paginación sea estable cuando dos productos comparten fecha.
+ * Filtra con `catalogConditions` y ordena con `catalogOrderBy`; el id va siempre como desempate
+ * para que la paginación sea estable.
  *
  * El `groupBy` incluye todas las columnas que se piden sin agregar (no solo `products.id`): así
  * es válido con `ONLY_FULL_GROUP_BY` aunque el motor (MySQL o TiDB) no deduzca las dependencias
  * funcionales, y el resultado es el mismo.
  *
- * @param params - Página (desde 1), productos por página y filtros.
+ * @param params - Página (desde 1), productos por página, filtros y orden.
  * @returns La consulta, lista para ejecutar con `await`.
  */
-export function catalogItemsQuery({ page, pageSize, filters }: CatalogPageParams) {
+export function catalogItemsQuery({ page, pageSize, filters, orden }: CatalogPageParams) {
     const size = toPositiveInt(pageSize);
     const { where, having } = catalogConditions(filters);
     return catalogRowsQuery()
         .where(where)
         .groupBy(...catalogGroupBy())
         .having(having)
-        .orderBy(desc(products.createdAt), desc(products.id))
+        .orderBy(...catalogOrderBy(orden))
         .limit(size)
         .offset((toPositiveInt(page) - 1) * size);
 }
@@ -309,10 +355,10 @@ export function catalogCountQuery(filters?: CatalogFilters) {
 
 /**
  * Una página del listado de productos (RF4, RF5): solo los visibles (`visibleProductsCondition`) y
- * con alguna presentación a la venta que cumplan la búsqueda y los filtros, del más reciente al
- * más antiguo.
+ * con alguna presentación a la venta que cumplan la búsqueda y los filtros, en el orden pedido
+ * (por defecto, del más reciente al más antiguo).
  *
- * @param params - Página (desde 1), productos por página y filtros.
+ * @param params - Página (desde 1), productos por página, filtros y orden.
  * @returns `items` con los productos de la página y sus agregados, y `total` con todos los
  *   productos que cumplen los filtros, para calcular las páginas.
  *
