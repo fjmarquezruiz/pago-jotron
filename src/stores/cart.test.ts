@@ -35,8 +35,10 @@ describe('createCartStore', () => {
     });
 
     describe('acciones', () => {
-        it('empieza vacío', () => {
-            expect(createCartStore(storage).getState().items).toEqual([]);
+        it('empieza vacío y sin dueño', () => {
+            const state = createCartStore(storage).getState();
+            expect(state.items).toEqual([]);
+            expect(state.owner).toBeNull();
         });
 
         it('add suma y limita al stock', () => {
@@ -185,6 +187,60 @@ describe('createCartStore', () => {
             expect(store.getState().items).toEqual([]);
         });
 
+        it('clear también deja el carrito sin dueño, en una sola escritura', () => {
+            const store = createCartStore(storage);
+            store.getState().adopt(5, [{ variantId: 4, quantity: 2 }]);
+            let calls = 0;
+            const unsubscribe = store.subscribe(() => (calls += 1));
+            const writesBefore = storage.writes();
+
+            store.getState().clear();
+
+            expect(store.getState().items).toEqual([]);
+            expect(store.getState().owner).toBeNull();
+            expect(calls).toBe(1);
+            expect(storage.writes()).toBe(writesBefore + 1);
+            expect(saved(storage).state).toEqual({ items: [], owner: null });
+            unsubscribe();
+        });
+
+        it('clear quita el dueño aunque el carrito ya estuviera vacío', () => {
+            const store = createCartStore(storage);
+            store.getState().adopt(5, []);
+            expect(store.getState().owner).toBe(5);
+
+            store.getState().clear();
+            expect(store.getState().owner).toBeNull();
+        });
+
+        it('clear sin líneas y sin dueño no escribe ni avisa', () => {
+            const store = createCartStore(storage);
+            store.getState().add(4, 1, 10);
+            store.getState().remove(4);
+            let calls = 0;
+            const unsubscribe = store.subscribe(() => (calls += 1));
+            const writesBefore = storage.writes();
+
+            store.getState().clear();
+
+            expect(calls).toBe(0);
+            expect(storage.writes()).toBe(writesBefore);
+            unsubscribe();
+        });
+
+        it('add, setQuantity, remove, mergeItems y reconcile conservan el dueño', () => {
+            const store = createCartStore(storage);
+            store.getState().adopt(5, [{ variantId: 4, quantity: 2 }]);
+
+            store.getState().add(7, 1, 10);
+            store.getState().setQuantity(7, 3, 10);
+            store.getState().mergeItems([{ variantId: 9, quantity: 1 }], new Map([[9, 5]]));
+            store.getState().reconcile([{ variantId: 4, stock: 1 }]);
+            store.getState().remove(9);
+
+            expect(store.getState().owner).toBe(5);
+        });
+
         it('no avisa a los suscriptores ni escribe si nada cambia', () => {
             const store = createCartStore(storage);
             store.getState().add(4, 2, 10);
@@ -235,22 +291,148 @@ describe('createCartStore', () => {
         });
     });
 
+    describe('adopt', () => {
+        it('pone las líneas y el dueño, en una sola escritura y un solo aviso', () => {
+            const store = createCartStore(storage);
+            store.getState().add(4, 1, 10);
+            let calls = 0;
+            const unsubscribe = store.subscribe(() => (calls += 1));
+            const writesBefore = storage.writes();
+
+            store.getState().adopt(5, [
+                { variantId: 7, quantity: 2 },
+                { variantId: 9, quantity: 1 },
+            ]);
+
+            expect(store.getState().items).toEqual([
+                { variantId: 7, quantity: 2 },
+                { variantId: 9, quantity: 1 },
+            ]);
+            expect(store.getState().owner).toBe(5);
+            expect(calls).toBe(1);
+            expect(storage.writes()).toBe(writesBefore + 1);
+            expect(saved(storage).state).toEqual({
+                items: [
+                    { variantId: 7, quantity: 2 },
+                    { variantId: 9, quantity: 1 },
+                ],
+                owner: 5,
+            });
+            unsubscribe();
+        });
+
+        it('con las mismas líneas pero otro dueño, solo cambia el dueño y conserva el array', () => {
+            const store = createCartStore(storage);
+            store.getState().add(4, 2, 10);
+            const itemsBefore = store.getState().items;
+
+            store.getState().adopt(5, [{ variantId: 4, quantity: 2 }]);
+
+            expect(store.getState().owner).toBe(5);
+            expect(store.getState().items).toBe(itemsBefore);
+        });
+
+        it('con otras líneas y el mismo dueño, cambia las líneas', () => {
+            const store = createCartStore(storage);
+            store.getState().adopt(5, [{ variantId: 4, quantity: 2 }]);
+
+            store.getState().adopt(5, [{ variantId: 4, quantity: 3 }]);
+
+            expect(store.getState().items).toEqual([{ variantId: 4, quantity: 3 }]);
+            expect(store.getState().owner).toBe(5);
+        });
+
+        it('si no cambia nada (mismas líneas, aunque sea otro array, y mismo dueño) no escribe ni avisa', () => {
+            const store = createCartStore(storage);
+            store.getState().adopt(5, [{ variantId: 4, quantity: 2 }]);
+            const itemsBefore = store.getState().items;
+            let calls = 0;
+            const unsubscribe = store.subscribe(() => (calls += 1));
+            const writesBefore = storage.writes();
+
+            store.getState().adopt(5, [{ variantId: 4, quantity: 2 }]);
+
+            expect(calls).toBe(0);
+            expect(storage.writes()).toBe(writesBefore);
+            expect(store.getState().items).toBe(itemsBefore);
+            unsubscribe();
+        });
+
+        it('un carrito vacío de una cuenta nueva sí fija el dueño', () => {
+            const store = createCartStore(storage);
+            store.getState().adopt(5, []);
+            expect(store.getState().owner).toBe(5);
+            expect(store.getState().items).toEqual([]);
+        });
+    });
+
     describe('persistencia', () => {
-        it('guarda solo variantId y quantity, con su versión', () => {
+        it('guarda solo variantId, quantity y el dueño, con su versión', () => {
             const store = createCartStore(storage);
             store.getState().add(4, 2, 10);
 
             expect(saved(storage)).toEqual({
-                state: { items: [{ variantId: 4, quantity: 2 }] },
+                state: { items: [{ variantId: 4, quantity: 2 }], owner: null },
                 version: CART_STORAGE_VERSION,
             });
         });
 
-        it('no guarda las acciones ni nada más que las líneas', () => {
+        it('no guarda las acciones ni nada más que las líneas y el dueño', () => {
             const store = createCartStore(storage);
             store.getState().add(4, 2, 10);
-            expect(Object.keys(saved(storage).state)).toEqual(['items']);
+            expect(Object.keys(saved(storage).state)).toEqual(['items', 'owner']);
         });
+
+        it('guarda y recupera el dueño', async () => {
+            const first = createCartStore(storage);
+            first.getState().adopt(5, [{ variantId: 4, quantity: 2 }]);
+            expect(saved(storage).state.owner).toBe(5);
+
+            const second = createCartStore(storage);
+            expect(second.getState().owner).toBeNull();
+            await second.persist.rehydrate();
+            expect(second.getState().owner).toBe(5);
+            expect(second.getState().items).toEqual([{ variantId: 4, quantity: 2 }]);
+        });
+
+        it('lo guardado sin owner (formato anterior) se recupera como anónimo', async () => {
+            storage.setItem(
+                CART_STORAGE_KEY,
+                JSON.stringify({
+                    state: { items: [{ variantId: 4, quantity: 2 }] },
+                    version: CART_STORAGE_VERSION,
+                }),
+            );
+            const store = createCartStore(storage);
+            await store.persist.rehydrate();
+
+            expect(store.getState().items).toEqual([{ variantId: 4, quantity: 2 }]);
+            expect(store.getState().owner).toBeNull();
+        });
+
+        it.each([
+            ['texto', 'cinco'],
+            ['cero', 0],
+            ['negativo', -3],
+            ['decimal', 1.5],
+            ['un objeto', { id: 5 }],
+        ])(
+            'un owner que es %s no es un id: se recupera como anónimo y se conservan las líneas',
+            async (_, owner) => {
+                storage.setItem(
+                    CART_STORAGE_KEY,
+                    JSON.stringify({
+                        state: { items: [{ variantId: 4, quantity: 2 }], owner },
+                        version: CART_STORAGE_VERSION,
+                    }),
+                );
+                const store = createCartStore(storage);
+                await store.persist.rehydrate();
+
+                expect(store.getState().items).toEqual([{ variantId: 4, quantity: 2 }]);
+                expect(store.getState().owner).toBeNull();
+            },
+        );
 
         it('no se recupera hasta pedirlo: el primer pintado coincide con el del servidor', () => {
             storage.setItem(
@@ -307,6 +489,7 @@ describe('createCartStore', () => {
                 const store = createCartStore(storage);
                 await store.persist.rehydrate();
                 expect(store.getState().items).toEqual([]);
+                expect(store.getState().owner).toBeNull();
                 // Si no se da por recuperado, la página del carrito se queda en el esqueleto para siempre.
                 expect(store.persist.hasHydrated()).toBe(true);
             },

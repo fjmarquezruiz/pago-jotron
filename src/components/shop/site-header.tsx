@@ -1,7 +1,10 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { getServerSession } from 'next-auth';
 import { CartCount } from '@/components/shop/cart-count';
+import { SignOutButton } from '@/components/shop/sign-out-button';
 import { Navbar, NavbarItem } from '@/components/ui/navbar';
+import { authOptions } from '@/lib/auth-options';
 
 /**
  * Enlaces de la izquierda. Salvo `/productos`, ninguna ruta existe todavía: llevan un slug
@@ -20,7 +23,9 @@ const mainLinks = [
 /**
  * Cabecera de la tienda (Figma: Menu): enlaces a la izquierda, logo centrado y cuenta y carrito a
  * la derecha. Por debajo de `lg` los enlaces pasan al menú lateral y solo queda el carrito.
- * "Carrito (n)" cuenta las unidades del carrito (`CartCount`).
+ * "Carrito (n)" cuenta las unidades del carrito (`CartCount`). Con sesión (se comprueba en el
+ * servidor), "Iniciar sesión" pasa a ser "Cerrar sesión" (`SignOutButton`; ese estado no está en
+ * Figma).
  *
  * Con `overlay` se superpone al principio de la página (el hero del listado): se coloca en
  * absoluto arriba, en el tema oscuro del sistema (texto claro) y con el logo blanco. El menú
@@ -32,7 +37,10 @@ const mainLinks = [
  * <SiteHeader />
  * <SiteHeader overlay />
  */
-export function SiteHeader({ overlay = false }: { overlay?: boolean }) {
+export async function SiteHeader({ overlay = false }: { overlay?: boolean }) {
+    // La sesión se comprueba en el servidor: con ella, "Iniciar sesión" pasa a ser "Cerrar sesión".
+    const session = await getServerSession(authOptions);
+
     const header = (
         <Navbar
             layout="centered"
@@ -62,9 +70,13 @@ export function SiteHeader({ overlay = false }: { overlay?: boolean }) {
                         {/* TODO: ruta pendiente (slug ficticio) */}
                         <Link href="/encuentranos">Encuéntranos</Link>
                     </NavbarItem>
-                    <NavbarItem asChild className="hidden lg:inline-flex">
-                        <Link href="/auth/login">Iniciar sesión</Link>
-                    </NavbarItem>
+                    {session ? (
+                        <SignOutButton />
+                    ) : (
+                        <NavbarItem asChild className="hidden lg:inline-flex">
+                            <Link href="/auth/login">Iniciar sesión</Link>
+                        </NavbarItem>
+                    )}
                     <NavbarItem asChild>
                         <Link href="/carrito">
                             Carrito (<CartCount />)

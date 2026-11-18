@@ -15,6 +15,7 @@ import { describeChanges } from '@/lib/cart/notices';
 import { cartSubtotalCents, cartUnits, formatItemCount } from '@/lib/cart/totals';
 import { useCartStore } from '@/stores/cart';
 import { useCartHydrated } from '@/stores/use-cart-hydrated';
+import { useCartSynced } from '@/stores/use-cart-synced';
 
 interface CartViewProps {
     /** El envío más barato con plazo (`cheapestDelivery`), o `null` si no hay ninguno. */
@@ -41,14 +42,19 @@ interface CartViewProps {
  */
 export function CartView({ delivery }: CartViewProps) {
     const hydrated = useCartHydrated();
+    // Con sesión, el carrito de la cuenta puede diferir del local: se espera a la sincronización
+    // para no enseñar un momento un carrito que va a cambiar.
+    const synced = useCartSynced();
+    const ready = hydrated && synced;
     const items = useCartStore((state) => state.items);
     const setQuantity = useCartStore((state) => state.setQuantity);
     const remove = useCartStore((state) => state.remove);
     const reconcile = useCartStore((state) => state.reconcile);
     const [notices, setNotices] = useState<string[]>([]);
 
+    // Hasta que el carrito está listo no se piden líneas: los ids pueden cambiar con la sincronización.
     const { lines, status, retry } = useCartLines(
-        items.map((item) => item.variantId),
+        ready ? items.map((item) => item.variantId) : [],
         (loaded) => {
             // Se acumulan: una recarga posterior que no cambie nada no debe borrar un aviso sin leer.
             const messages = describeChanges(reconcile(loaded), loaded);
@@ -65,7 +71,7 @@ export function CartView({ delivery }: CartViewProps) {
         <CartNotices messages={notices} onClose={() => setNotices([])} />
     );
 
-    if (!hydrated) return <CartSkeleton />;
+    if (!ready) return <CartSkeleton />;
 
     if (items.length === 0) {
         return (

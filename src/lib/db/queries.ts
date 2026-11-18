@@ -12,6 +12,7 @@ import {
     min,
     ne,
     not,
+    notInArray,
     or,
     sql,
     sum,
@@ -20,6 +21,7 @@ import {
 } from 'drizzle-orm';
 import type { MySqlSelect } from 'drizzle-orm/mysql-core';
 import { db } from '@/db';
+import type { Cart } from '@/lib/cart/cart';
 import { orderLinesByVariantIds } from '@/lib/cart/lines';
 import { NEW_PRODUCT_DAYS } from '@/lib/catalog/novelty';
 import { toPositiveInt } from '@/lib/catalog/pagination';
@@ -32,6 +34,7 @@ import {
     type CatalogSort,
 } from '@/lib/validations/catalog';
 import {
+    cartProducts,
     grapes,
     guaranteesOfOrigin,
     productGrapes,
@@ -649,3 +652,109 @@ export async function getCartLines(variantIds: readonly number[]) {
 
 /** Una línea del carrito con su producto, su precio y su stock actuales. */
 export type CartLine = Awaited<ReturnType<typeof getCartLines>>[number];
+
+/**
+ * Consulta de las líneas guardadas del carrito de un usuario (`cart_products`), de la más antigua
+ * a la más reciente: `added_at` y, de desempate, `variant_id`, para que el orden sea estable.
+ * Se separa de `getUserCart` para poder comprobar su SQL sin conectar a la BD.
+ *
+ * @param userId - Id del usuario (`users.user_id`).
+ * @returns La consulta, lista para ejecutar con `await`: filas `{ variantId, quantity }`.
+ */
+export function userCartQuery(userId: number) {
+    return db
+        .select({ variantId: cartProducts.variantId, quantity: cartProducts.quantity })
+        .from(cartProducts)
+        .where(eq(cartProducts.userId, userId))
+        .orderBy(asc(cartProducts.addedAt), asc(cartProducts.variantId));
+}
+
+/**
+ * Carrito guardado de un usuario (RF6), tal como está en `cart_products`: sin comprobar si las
+ * presentaciones siguen a la venta ni si hay stock. Para eso, `getCartLines` o `mergeWithSaved`.
+ *
+ * @param userId - Id del usuario (`users.user_id`).
+ * @returns Sus líneas `{ variantId, quantity }`, de la más antigua a la más reciente; vacío si no tiene carrito.
+ *
+ * @example
+ * const saved = await getUserCart(12);
+ * // [{ variantId: 4, quantity: 2 }, { variantId: 9, quantity: 1 }]
+ */
+export async function getUserCart(userId: number): Promise<Cart> {
+    return userCartQuery(userId);
+}
+
+/**
+ * Lo que necesitan las consultas de escritura del carrito: `insert` y `delete` del cliente de BD
+ * o de una transacción (`db.transaction`). Así se construyen con el ejecutor que toque y se
+ * pueden comprobar sin conectar.
+ */
+type CartWriter = Pick<typeof db, 'insert' | 'delete'>;
+
+/**
+ * Consulta que guarda las líneas de un carrito: un solo `insert` con todas, que si la línea ya
+ * existe (clave `(user_id, variant_id)`) solo le cambia la cantidad (`on duplicate key update
+ * quantity = values(quantity)`). Así `added_at` de las que ya estaban se conserva, y el orden del
+ * carrito con él. `values()` es válido en MySQL y en TiDB.
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param userId - Id del usuario (`users.user_id`).
+ * @param items - Líneas a guardar; no puede estar vacío (un `insert` sin filas no es SQL válido).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function upsertCartItemsQuery(writer: CartWriter, userId: number, items: Cart) {
+    return writer
+        .insert(cartProducts)
+        .values(items.map(({ variantId, quantity }) => ({ userId, variantId, quantity })))
+        .onDuplicateKeyUpdate({
+            // Sin tabla (`values(quantity)`), la forma canónica en MySQL y TiDB: con la columna
+            // dentro de `sql`, Drizzle escribiría `values(cart_products.quantity)`.
+            set: { quantity: sql`values(${sql.identifier(cartProducts.quantity.name)})` },
+        });
+}
+
+/**
+ * Consulta que borra las líneas guardadas de un usuario que ya no están en su carrito. Con
+ * `items` vacío borra todas, sin `not in ()` (SQL inválido con la lista vacía).
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param userId - Id del usuario (`users.user_id`).
+ * @param items - El carrito que debe quedar; solo importan sus `variantId`.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function deleteMissingCartItemsQuery(writer: CartWriter, userId: number, items: Cart) {
+    const keep = Array.from(new Set(items.map(({ variantId }) => variantId)));
+    return writer
+        .delete(cartProducts)
+        .where(
+            and(
+                eq(cartProducts.userId, userId),
+                keep.length > 0 ? notInArray(cartProducts.variantId, keep) : undefined,
+            ),
+        );
+}
+
+/**
+ * Reemplaza el carrito guardado de un usuario por `items` (RF6), en una sola transacción: guarda
+ * cada línea (las que ya estaban solo cambian de cantidad y conservan `added_at`) y borra las que
+ * ya no están. Si algo falla no cambia nada: el carrito guardado queda como estaba. Con `items`
+ * vacío, borra el carrito.
+ *
+ * El llamador debe haber saneado `items`: presentaciones que existan, se puedan comprar y con
+ * cantidades dentro del stock (`normalizeCart` en `src/lib/cart/server.ts`). Aquí no se comprueba:
+ * la clave foránea `fk_cartproduct_variant` rechaza los ids que no existen (la transacción falla y
+ * no se guarda nada), pero no el stock ni el bloqueo.
+ *
+ * @param userId - Id del usuario (`users.user_id`).
+ * @param items - El carrito que debe quedar guardado: sin presentaciones repetidas y con cantidades >= 1.
+ *
+ * @example
+ * await saveUserCart(12, [{ variantId: 4, quantity: 3 }]);
+ * // deja en `cart_products` solo la 4 (con 3 unidades) y borra el resto de líneas del usuario 12
+ */
+export async function saveUserCart(userId: number, items: Cart): Promise<void> {
+    await db.transaction(async (tx) => {
+        if (items.length > 0) await upsertCartItemsQuery(tx, userId, items);
+        await deleteMissingCartItemsQuery(tx, userId, items);
+    });
+}

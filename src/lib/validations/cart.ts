@@ -23,11 +23,25 @@ export const cartSchema = z
     });
 
 /**
- * Lo que el almacén guarda en `localStorage` (`partialize` de `src/stores/cart.ts`): solo las
- * líneas. Se valida al recuperarlo, porque el usuario (o una versión antigua) puede haberlo
- * cambiado: un precio o un stock guardado ahí no se lee nunca.
+ * Lo que el almacén guarda en `localStorage` (`partialize` de `src/stores/cart.ts`): las líneas y
+ * de quién es el carrito (`owner`: el id de la cuenta con la que se sincronizó por última vez, o
+ * `null` si es anónimo). Se valida al recuperarlo, porque el usuario (o una versión antigua) puede
+ * haberlo cambiado: un precio o un stock guardado ahí no se lee nunca. Sin `owner` (lo guardado
+ * antes de que existiera) o con uno que no es un id, el carrito se trata como anónimo.
  */
-export const persistedCartSchema = z.object({ items: cartSchema });
+export const persistedCartSchema = z.object({
+    items: cartSchema,
+    owner: variantIdSchema.nullable().default(null).catch(null),
+});
+
+/**
+ * Cuerpo de `PUT /api/carrito` y de `POST /api/carrito/fusionar`: las líneas del carrito (como
+ * mucho `CART_MAX_LINES`, sin presentaciones repetidas). Las que no se pueden vender o pasan del
+ * stock las corrige el servidor.
+ */
+export const cartItemsRequestSchema = z.object({ items: cartSchema });
+
+export type CartItemsRequest = z.infer<typeof cartItemsRequestSchema>;
 
 /**
  * Cuerpo de `POST /api/carrito/lineas`: los ids de las presentaciones del carrito (como mucho

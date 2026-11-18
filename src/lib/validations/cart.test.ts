@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CART_MAX_LINES } from '@/lib/cart/cart';
 import {
     cartItemSchema,
+    cartItemsRequestSchema,
     cartLinesRequestSchema,
     cartSchema,
     persistedCartSchema,
@@ -89,13 +90,30 @@ describe('cartSchema', () => {
 });
 
 describe('persistedCartSchema', () => {
-    it('acepta { items } y descarta el resto de claves (un precio guardado no se lee)', () => {
+    it('acepta { items, owner } y descarta el resto de claves (un precio guardado no se lee)', () => {
         expect(
             persistedCartSchema.parse({
                 items: [{ variantId: 4, quantity: 2 }],
+                owner: 7,
                 prices: { 4: '9.99' },
             }),
-        ).toEqual({ items: [{ variantId: 4, quantity: 2 }] });
+        ).toEqual({ items: [{ variantId: 4, quantity: 2 }], owner: 7 });
+    });
+
+    it.each([
+        ['sin owner (lo guardado antes de que existiera)', {}],
+        ['owner nulo', { owner: null }],
+        ['owner que no es un id', { owner: 'admin' }],
+        ['owner 0', { owner: 0 }],
+        ['owner decimal', { owner: 1.5 }],
+        ['owner por encima del int de MySQL', { owner: MAX_ID + 1 }],
+    ])('%s: el carrito se trata como anónimo (owner null) sin perder las líneas', (_, extra) => {
+        expect(
+            persistedCartSchema.parse({ items: [{ variantId: 4, quantity: 2 }], ...extra }),
+        ).toEqual({
+            items: [{ variantId: 4, quantity: 2 }],
+            owner: null,
+        });
     });
 
     it.each([
@@ -105,6 +123,42 @@ describe('persistedCartSchema', () => {
         ['texto', 'carrito'],
     ])('rechaza %s', (_, value) => {
         expect(persistedCartSchema.safeParse(value).success).toBe(false);
+    });
+});
+
+describe('cartItemsRequestSchema', () => {
+    it('acepta { items } con líneas y vacío, y descarta el resto de claves', () => {
+        expect(
+            cartItemsRequestSchema.parse({ items: [{ variantId: 4, quantity: 2 }], userId: 9 }),
+        ).toEqual({ items: [{ variantId: 4, quantity: 2 }] });
+        expect(cartItemsRequestSchema.parse({ items: [] })).toEqual({ items: [] });
+    });
+
+    it.each([
+        ['sin items', {}],
+        ['items que no es una lista', { items: 4 }],
+        ['una línea con cantidad 0', { items: [{ variantId: 4, quantity: 0 }] }],
+        [
+            'una presentación repetida',
+            {
+                items: [
+                    { variantId: 4, quantity: 1 },
+                    { variantId: 4, quantity: 2 },
+                ],
+            },
+        ],
+        [
+            'más de 50 líneas',
+            {
+                items: Array.from({ length: CART_MAX_LINES + 1 }, (_, i) => ({
+                    variantId: i + 1,
+                    quantity: 1,
+                })),
+            },
+        ],
+        ['cuerpo nulo', null],
+    ])('rechaza %s', (_, body) => {
+        expect(cartItemsRequestSchema.safeParse(body).success).toBe(false);
     });
 });
 
