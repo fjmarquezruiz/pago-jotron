@@ -415,6 +415,8 @@ describe('featuredProductsQuery', () => {
         expect(sql).toContain('inner join `product_variants`');
         expect(sql).toContain('min(`product_variants`.`price`)');
         expect(sql).toContain('sum(`product_variants`.`stock`)');
+        // el id de la presentación, para el botón "Añadir" de la tarjeta cuando solo hay una
+        expect(sql).toContain('min(`product_variants`.`variant_id`)');
     });
 });
 

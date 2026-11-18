@@ -2,17 +2,14 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import { addToCartWithFeedback } from '@/components/shop/add-to-cart';
 import { Button } from '@/components/ui/button';
 import { Field, FieldControl, FieldLabel } from '@/components/ui/field';
 import { NumberInput } from '@/components/ui/number-input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { toast } from '@/components/ui/toast';
-import { describeAdd } from '@/lib/cart/add-feedback';
-import { CART_MAX_LINES } from '@/lib/cart/cart';
 import { formatPresentation, pickDefaultVariant, soldOutMessage } from '@/lib/catalog/presentation';
 import { formatEuros } from '@/lib/utils';
 import type { ProductDetail } from '@/lib/db/queries';
-import { cartStore, useCartStore } from '@/stores/cart';
 
 export interface ProductPurchaseProps {
     /** Presentaciones a la venta del producto (`product.variants`), de menor a mayor capacidad. */
@@ -46,7 +43,6 @@ export function ProductPurchase({ variants, children }: ProductPurchaseProps) {
     const [variantId, setVariantId] = React.useState(() => pickDefaultVariant(variants)?.id);
     const [quantity, setQuantity] = React.useState(1);
     const router = useRouter();
-    const addToCart = useCartStore((state) => state.add);
 
     const variant = variants.find((item) => item.id === variantId) ?? pickDefaultVariant(variants);
     if (!variant) return null;
@@ -63,19 +59,11 @@ export function ProductPurchase({ variants, children }: ProductPurchaseProps) {
     /** Añade al carrito y avisa de lo que ha entrado, que el stock puede limitar. */
     function handleAdd() {
         if (!variant) return;
-        const unitsInCart = () =>
-            cartStore.getState().items.find((item) => item.variantId === variant.id)?.quantity ?? 0;
-
-        const before = unitsInCart();
-        addToCart(variant.id, quantity, variant.stock);
-        const { type, message } = describeAdd({
-            requested: quantity,
-            before,
-            after: unitsInCart(),
-            cartIsFull: cartStore.getState().items.length >= CART_MAX_LINES,
-        });
-        toast[type](message, {
-            action: { label: 'Ver carrito', onClick: () => router.push('/carrito') },
+        addToCartWithFeedback({
+            variantId: variant.id,
+            quantity,
+            stock: variant.stock,
+            onViewCart: () => router.push('/carrito'),
         });
     }
 

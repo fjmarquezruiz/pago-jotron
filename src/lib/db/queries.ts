@@ -177,6 +177,11 @@ function catalogColumns() {
         minPrice: min(productVariants.price) as SQL<string>,
         /** Número de presentaciones a la venta: con más de una, el precio lleva "Desde". */
         variantCount: count(productVariants.id),
+        /**
+         * Id de la presentación si el producto solo tiene una (`variantCount` 1): es la que añade el
+         * botón "Añadir" de la tarjeta. Con varias es la de menor id y no se usa: hay que elegir.
+         */
+        firstVariantId: min(productVariants.id) as SQL<number>,
         /** Stock sumado de todas sus presentaciones: 0 = agotado. */
         totalStock: sum(productVariants.stock).mapWith(Number),
     };
