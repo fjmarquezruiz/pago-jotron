@@ -44,6 +44,9 @@ interface CartSummaryProps {
  * de esa modalidad. La modalidad se elige en el paso de Datos, así que el total es el subtotal (IVA
  * incluido) y el envío se suma allí.
  *
+ * El total es una región en vivo (`aria-live="polite"`): el cambio se anuncia al modificar
+ * cantidades o quitar líneas.
+ *
  * "Continuar" lleva a `/checkout`. No comprueba la sesión: el middleware manda a quien no la tiene a
  * `/auth/login?callbackUrl=/checkout`, y el login lo devuelve aquí.
  *
@@ -77,7 +80,12 @@ export function CartSummary({ subtotalCents, delivery }: CartSummaryProps) {
             {time && <SummaryRow label="Entrega estimada" value={time} />}
             <SummaryRow label="IVA" value="Incluido" />
             <Separator />
-            <div className="flex items-center justify-between text-xl font-medium whitespace-nowrap">
+            {/* Región en vivo: al cambiar una cantidad o quitar una línea, el lector anuncia "Total …". */}
+            <div
+                aria-live="polite"
+                aria-atomic="true"
+                className="flex items-center justify-between text-xl font-medium whitespace-nowrap"
+            >
                 <p>Total</p>
                 <p>{formatCents(subtotalCents)}</p>
             </div>

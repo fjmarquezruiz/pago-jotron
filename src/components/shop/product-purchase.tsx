@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Field, FieldControl, FieldLabel } from '@/components/ui/field';
 import { NumberInput } from '@/components/ui/number-input';
@@ -27,8 +28,8 @@ export interface ProductPurchaseProps {
  * - Al abrir queda elegida la primera presentación con stock (`pickDefaultVariant`).
  * - La cantidad va de 1 al stock de la presentación y vuelve a 1 al cambiar de presentación.
  * - "Añadir al carrito" mete la cantidad elegida de esa presentación en el carrito, limitada al
- *   stock con el que se cargó la ficha (el servidor lo vuelve a comprobar). Un toast confirma, o
- *   avisa de que el stock ha limitado lo añadido (`describeAdd`).
+ *   stock con el que se cargó la ficha (el servidor lo vuelve a comprobar). Un toast con la acción
+ *   "Ver carrito" confirma, o avisa de que el stock ha limitado lo añadido (`describeAdd`).
  * - Si la presentación elegida está agotada, el botón dice "Agotado", la cantidad se desactiva y
  *   un aviso invita a elegir otro formato, o dice que no queda nada si todas están agotadas
  *   (`soldOutMessage`).
@@ -44,6 +45,7 @@ export interface ProductPurchaseProps {
 export function ProductPurchase({ variants, children }: ProductPurchaseProps) {
     const [variantId, setVariantId] = React.useState(() => pickDefaultVariant(variants)?.id);
     const [quantity, setQuantity] = React.useState(1);
+    const router = useRouter();
     const addToCart = useCartStore((state) => state.add);
 
     const variant = variants.find((item) => item.id === variantId) ?? pickDefaultVariant(variants);
@@ -72,7 +74,9 @@ export function ProductPurchase({ variants, children }: ProductPurchaseProps) {
             after: unitsInCart(),
             cartIsFull: cartStore.getState().items.length >= CART_MAX_LINES,
         });
-        toast[type](message);
+        toast[type](message, {
+            action: { label: 'Ver carrito', onClick: () => router.push('/carrito') },
+        });
     }
 
     return (

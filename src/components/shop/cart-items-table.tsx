@@ -66,7 +66,7 @@ export function CartItemsTable({ rows, onQuantityChange, onRemove }: CartItemsTa
                         Precio
                     </TableHead>
                     <TableHead role="columnheader" className="w-28 px-inset-2xl py-inset-sm">
-                        <span className="sr-only">Quitar</span>
+                        <span className="sr-only">Eliminar</span>
                     </TableHead>
                 </TableRow>
             </TableHeader>
@@ -151,7 +151,7 @@ export function CartItemsTable({ rows, onQuantityChange, onRemove }: CartItemsTa
                                 <IconButton
                                     variant="outline"
                                     size="lg"
-                                    aria-label={`Quitar ${line.name} (${presentation}) del carrito`}
+                                    aria-label={`Eliminar ${line.name} (${presentation})`}
                                     onClick={() => onRemove(line)}
                                     className="[&_svg]:size-5"
                                 >
