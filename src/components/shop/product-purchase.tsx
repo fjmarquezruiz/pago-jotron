@@ -5,9 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldControl, FieldLabel } from '@/components/ui/field';
 import { NumberInput } from '@/components/ui/number-input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { toast } from '@/components/ui/toast';
+import { describeAdd } from '@/lib/cart/add-feedback';
+import { CART_MAX_LINES } from '@/lib/cart/cart';
 import { formatPresentation, pickDefaultVariant, soldOutMessage } from '@/lib/catalog/presentation';
 import { formatEuros } from '@/lib/utils';
 import type { ProductDetail } from '@/lib/db/queries';
+import { cartStore, useCartStore } from '@/stores/cart';
 
 export interface ProductPurchaseProps {
     /** Presentaciones a la venta del producto (`product.variants`), de menor a mayor capacidad. */
@@ -22,6 +26,9 @@ export interface ProductPurchaseProps {
  *
  * - Al abrir queda elegida la primera presentación con stock (`pickDefaultVariant`).
  * - La cantidad va de 1 al stock de la presentación y vuelve a 1 al cambiar de presentación.
+ * - "Añadir al carrito" mete la cantidad elegida de esa presentación en el carrito, limitada al
+ *   stock con el que se cargó la ficha (el servidor lo vuelve a comprobar). Un toast confirma, o
+ *   avisa de que el stock ha limitado lo añadido (`describeAdd`).
  * - Si la presentación elegida está agotada, el botón dice "Agotado", la cantidad se desactiva y
  *   un aviso invita a elegir otro formato, o dice que no queda nada si todas están agotadas
  *   (`soldOutMessage`).
@@ -37,6 +44,7 @@ export interface ProductPurchaseProps {
 export function ProductPurchase({ variants, children }: ProductPurchaseProps) {
     const [variantId, setVariantId] = React.useState(() => pickDefaultVariant(variants)?.id);
     const [quantity, setQuantity] = React.useState(1);
+    const addToCart = useCartStore((state) => state.add);
 
     const variant = variants.find((item) => item.id === variantId) ?? pickDefaultVariant(variants);
     if (!variant) return null;
@@ -48,6 +56,23 @@ export function ProductPurchase({ variants, children }: ProductPurchaseProps) {
     function selectVariant(id: string) {
         setVariantId(Number(id));
         setQuantity(1);
+    }
+
+    /** Añade al carrito y avisa de lo que ha entrado, que el stock puede limitar. */
+    function handleAdd() {
+        if (!variant) return;
+        const unitsInCart = () =>
+            cartStore.getState().items.find((item) => item.variantId === variant.id)?.quantity ?? 0;
+
+        const before = unitsInCart();
+        addToCart(variant.id, quantity, variant.stock);
+        const { type, message } = describeAdd({
+            requested: quantity,
+            before,
+            after: unitsInCart(),
+            cartIsFull: cartStore.getState().items.length >= CART_MAX_LINES,
+        });
+        toast[type](message);
     }
 
     return (
@@ -104,8 +129,13 @@ export function ProductPurchase({ variants, children }: ProductPurchaseProps) {
                 </div>
 
                 <div className="flex flex-col gap-4">
-                    {/* TODO(A8): añadir al carrito. Hasta entonces el botón queda deshabilitado. */}
-                    <Button variant="brand" size="lg" className="w-full" disabled>
+                    <Button
+                        variant="brand"
+                        size="lg"
+                        className="w-full"
+                        disabled={soldOut}
+                        onClick={handleAdd}
+                    >
                         {soldOut ? 'Agotado' : 'Añadir al carrito'}
                     </Button>
                     {soldOut && (

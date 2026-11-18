@@ -1,6 +1,7 @@
 import { createStore, useStore } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import { addItem, mergeCarts, removeItem, setQuantity, type Cart } from '@/lib/cart/cart';
+import { reconcileCart, type CartChange, type StockInfo } from '@/lib/cart/reconcile';
 import { persistedCartSchema } from '@/lib/validations/cart';
 
 /** Clave de `localStorage` donde se guarda el carrito. */
@@ -45,6 +46,34 @@ function browserStorage(): StateStorage {
 }
 
 /**
+ * Envuelve un almacenamiento para que `getItem` devuelva `null` si lo guardado no es JSON. Sin
+ * esto, `JSON.parse` lanza dentro de `persist` y la recuperación termina en su `catch`, que ni
+ * marca el carrito como recuperado (`hasHydrated`) ni avisa a quien espera: la página del carrito
+ * se quedaría para siempre en el esqueleto.
+ */
+function withValidJson(storage: StateStorage): StateStorage {
+    const valid = (raw: string | null): string | null => {
+        if (raw === null) return null;
+        try {
+            JSON.parse(raw);
+            return raw;
+        } catch {
+            return null;
+        }
+    };
+    return {
+        getItem: (name) => {
+            const value = storage.getItem(name);
+            return typeof value === 'string' || value === null
+                ? valid(value)
+                : Promise.resolve(value).then(valid);
+        },
+        setItem: (name, value) => storage.setItem(name, value),
+        removeItem: (name) => storage.removeItem(name),
+    };
+}
+
+/**
  * Estado del carrito y sus acciones. Cada acción aplica la función pura de `src/lib/cart/` que le
  * corresponde, así que las reglas (límite de stock, una línea por presentación…) no se repiten aquí.
  */
@@ -59,6 +88,12 @@ export interface CartState {
     remove: (variantId: number) => void;
     /** Une otro carrito, por ejemplo el de la cuenta, con el actual (`mergeCarts`). */
     mergeItems: (other: Cart, stockByVariant: ReadonlyMap<number, number>) => void;
+    /**
+     * Pone el carrito al día con lo que el servidor devuelve ahora (`reconcileCart`): quita lo
+     * agotado o no disponible y limita las cantidades al stock. Devuelve los cambios hechos, para
+     * avisar al usuario; sin cambios, no escribe ni avisa.
+     */
+    reconcile: (lines: readonly StockInfo[]) => CartChange[];
     /** Vacía el carrito. */
     clear: () => void;
 }
@@ -68,8 +103,8 @@ export interface CartState {
  *
  * - **Solo guarda `variantId` y `quantity`.** El precio y el stock salen siempre del servidor
  *   (`getCartLines`); lo que `localStorage` tenga además de `items` no se lee nunca.
- * - **Lo recuperado se valida** (`persistedCartSchema`): si `localStorage` está estropeado o lo
- *   han manipulado, el carrito empieza vacío en vez de romper la página.
+ * - **Lo recuperado se valida** (`persistedCartSchema`, y `withValidJson` si ni siquiera es JSON): si
+ *   `localStorage` está estropeado o lo han manipulado, el carrito empieza vacío en vez de romper la página.
  * - **No se recupera solo** (`skipHydration`). En el servidor no hay `localStorage` y el primer
  *   pintado del cliente debe ser igual que el del servidor; si no, React avisa de que no
  *   coinciden. Quien lo use debe llamar a `store.persist.rehydrate()` una vez montado (en un
@@ -108,13 +143,21 @@ export function createCartStore(storage?: StateStorage) {
                     remove: (variantId) => update((items) => removeItem(items, variantId)),
                     mergeItems: (other, stockByVariant) =>
                         update((items) => mergeCarts(items, other, stockByVariant)),
+                    reconcile: (lines) => {
+                        const { items } = get();
+                        const result = reconcileCart(items, lines);
+                        if (result.cart !== items) set({ items: result.cart });
+                        return result.changes;
+                    },
                     clear: () => update((items) => (items.length === 0 ? items : [])),
                 };
             },
             {
                 name: CART_STORAGE_KEY,
                 version: CART_STORAGE_VERSION,
-                storage: createJSONStorage<PersistedCart>(() => storage ?? browserStorage()),
+                storage: createJSONStorage<PersistedCart>(() =>
+                    withValidJson(storage ?? browserStorage()),
+                ),
                 partialize: ({ items }) => ({ items }),
                 merge: (persisted, current) => {
                     const parsed = persistedCartSchema.safeParse(persisted);

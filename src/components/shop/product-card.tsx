@@ -39,9 +39,11 @@ const imageSizes = '(min-width: 640px) 288px, 240px';
  * nombre del producto y el foco de teclado se dibuja alrededor de toda la tarjeta.
  *
  * Al pasar el ratón aparece sobre el borde inferior de la imagen un botón "Añadir" (como en el
- * diseño). Mientras no exista el carrito (A8) está deshabilitado y es solo decorativo: va en un
- * contenedor `aria-hidden` y sin eventos de puntero para que no se anuncie un botón que no se
- * puede usar ni intercepte el clic del enlace. Un producto agotado no lo lleva.
+ * diseño). Está deshabilitado y es solo decorativo: la tarjeta no sabe qué presentación elegir (un
+ * producto puede tener varias, con su precio y su stock) y el carrito trabaja con presentaciones, así
+ * que se añade desde la ficha. Va en un contenedor `aria-hidden` y sin eventos de puntero para que
+ * no se anuncie un botón que no se puede usar ni intercepte el clic del enlace. Un producto
+ * agotado no lo lleva.
  *
  * @example
  * <ProductCard product={item} priority={index < 4} />
@@ -92,7 +94,7 @@ export function ProductCard({ product, priority, className }: ProductCardProps) 
                         aria-hidden="true"
                         className="pointer-events-none absolute right-0 bottom-0 left-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
                     >
-                        {/* TODO(A8): añadir al carrito desde la tarjeta */}
+                        {/* TODO: activarlo cuando se decida cómo elegir la presentación desde la tarjeta (el carrito se llena desde la ficha). */}
                         <Button variant="brand" size="lg" className="w-full" tabIndex={-1} disabled>
                             Añadir
                         </Button>

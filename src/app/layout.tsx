@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
+import { CartHydrator } from '@/components/shop/cart-hydrator';
 import { Toaster } from '@/components/ui/toast';
 import './globals.css';
 
@@ -19,8 +20,8 @@ export const metadata: Metadata = {
 };
 
 /**
- * Layout raíz: carga las tres familias tipográficas del sistema de diseño
- * y monta el contenedor de toasts.
+ * Layout raíz: carga las tres familias tipográficas del sistema de diseño, recupera el carrito
+ * guardado en el navegador (`CartHydrator`) y monta el contenedor de toasts.
  */
 export default function RootLayout({
     children,
@@ -34,6 +35,7 @@ export default function RootLayout({
         >
             <body className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}>
                 {children}
+                <CartHydrator />
                 <Toaster />
             </body>
         </html>

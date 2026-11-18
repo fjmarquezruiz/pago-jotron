@@ -585,6 +585,9 @@ function cartLineColumns() {
         slug: products.slug,
         name: products.name,
         image: products.image,
+        vintage: products.vintage,
+        /** Nombre de la D.O.: el carrito lo pinta bajo el nombre, como la tarjeta del listado. */
+        originName: guaranteesOfOrigin.name,
         /** Formato, capacidad y unidad: `formatPresentation` los convierte en "Botella 75 cl". */
         format: productVariants.format,
         capacity: productVariants.capacity,

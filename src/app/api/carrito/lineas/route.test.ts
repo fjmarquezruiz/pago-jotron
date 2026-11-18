@@ -17,6 +17,8 @@ const line = {
     slug: 'tinto-roble-2023',
     name: 'Tinto Roble',
     image: 'pago-jotron/tinto-roble',
+    vintage: 2023,
+    originName: 'Sierras de Málaga',
     format: 'Botella',
     capacity: 750,
     capacityUnit: 'ml',

@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { CartCount } from '@/components/shop/cart-count';
 import { Navbar, NavbarItem } from '@/components/ui/navbar';
 
 /**
@@ -19,6 +20,7 @@ const mainLinks = [
 /**
  * Cabecera de la tienda (Figma: Menu): enlaces a la izquierda, logo centrado y cuenta y carrito a
  * la derecha. Por debajo de `lg` los enlaces pasan al menú lateral y solo queda el carrito.
+ * "Carrito (n)" cuenta las unidades del carrito (`CartCount`).
  *
  * Con `overlay` se superpone al principio de la página (el hero del listado): se coloca en
  * absoluto arriba, en el tema oscuro del sistema (texto claro) y con el logo blanco. El menú
@@ -31,9 +33,6 @@ const mainLinks = [
  * <SiteHeader overlay />
  */
 export function SiteHeader({ overlay = false }: { overlay?: boolean }) {
-    // TODO(A8): contador real del carrito.
-    const cartCount = 0;
-
     const header = (
         <Navbar
             layout="centered"
@@ -67,8 +66,9 @@ export function SiteHeader({ overlay = false }: { overlay?: boolean }) {
                         <Link href="/auth/login">Iniciar sesión</Link>
                     </NavbarItem>
                     <NavbarItem asChild>
-                        {/* TODO(A8): ruta del carrito (slug ficticio) */}
-                        <Link href="/carrito">Carrito ({cartCount})</Link>
+                        <Link href="/carrito">
+                            Carrito (<CartCount />)
+                        </Link>
                     </NavbarItem>
                 </>
             }

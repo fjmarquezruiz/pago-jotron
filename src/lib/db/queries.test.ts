@@ -581,6 +581,8 @@ describe('cartLinesQuery', () => {
             '`products`.`slug`',
             '`products`.`name`',
             '`products`.`image`',
+            '`products`.`vintage`',
+            '`guarantees_of_origin`.`name`',
             '`product_variants`.`format`',
             '`product_variants`.`capacity`',
             '`product_variants`.`capacity_unit`',

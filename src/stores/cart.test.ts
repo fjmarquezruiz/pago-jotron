@@ -97,6 +97,87 @@ describe('createCartStore', () => {
             ]);
         });
 
+        it('reconcile limita al stock, quita lo agotado o no disponible y devuelve los cambios', () => {
+            const store = createCartStore(storage);
+            store.getState().add(4, 5, 10);
+            store.getState().add(7, 1, 10);
+            store.getState().add(9, 2, 10);
+            store.getState().add(11, 3, 10);
+
+            const changes = store.getState().reconcile([
+                { variantId: 4, stock: 3 },
+                { variantId: 7, stock: 0 },
+                { variantId: 11, stock: 3 },
+            ]);
+
+            expect(changes).toEqual([
+                { type: 'clamped', variantId: 4, from: 5, to: 3 },
+                { type: 'removed', variantId: 7, reason: 'sold-out' },
+                { type: 'removed', variantId: 9, reason: 'unavailable' },
+            ]);
+            expect(store.getState().items).toEqual([
+                { variantId: 4, quantity: 3 },
+                { variantId: 11, quantity: 3 },
+            ]);
+        });
+
+        it('reconcile persiste y avisa una sola vez cuando cambia algo', () => {
+            const store = createCartStore(storage);
+            store.getState().add(4, 5, 10);
+            store.getState().add(7, 1, 10);
+            let calls = 0;
+            const unsubscribe = store.subscribe(() => (calls += 1));
+            const writesBefore = storage.writes();
+
+            store.getState().reconcile([{ variantId: 4, stock: 2 }]);
+
+            expect(calls).toBe(1);
+            expect(storage.writes()).toBe(writesBefore + 1);
+            expect(saved(storage).state.items).toEqual([{ variantId: 4, quantity: 2 }]);
+            unsubscribe();
+        });
+
+        it('reconcile sin cambios no escribe, no avisa y devuelve una lista vacía', () => {
+            const store = createCartStore(storage);
+            store.getState().add(4, 2, 10);
+            const itemsBefore = store.getState().items;
+            let calls = 0;
+            const unsubscribe = store.subscribe(() => (calls += 1));
+            const writesBefore = storage.writes();
+
+            expect(store.getState().reconcile([{ variantId: 4, stock: 2 }])).toEqual([]);
+            expect(store.getState().reconcile([{ variantId: 4, stock: 99 }])).toEqual([]);
+
+            expect(calls).toBe(0);
+            expect(storage.writes()).toBe(writesBefore);
+            expect(store.getState().items).toBe(itemsBefore);
+            unsubscribe();
+        });
+
+        it('reconcile con el carrito vacío no escribe ni avisa', () => {
+            const store = createCartStore(storage);
+            let calls = 0;
+            const unsubscribe = store.subscribe(() => (calls += 1));
+
+            expect(store.getState().reconcile([{ variantId: 4, stock: 9 }])).toEqual([]);
+            expect(store.getState().reconcile([])).toEqual([]);
+
+            expect(calls).toBe(0);
+            expect(storage.writes()).toBe(0);
+            unsubscribe();
+        });
+
+        it('reconcile sin líneas del servidor vacía el carrito por no disponible', () => {
+            const store = createCartStore(storage);
+            store.getState().add(4, 2, 10);
+
+            expect(store.getState().reconcile([])).toEqual([
+                { type: 'removed', variantId: 4, reason: 'unavailable' },
+            ]);
+            expect(store.getState().items).toEqual([]);
+            expect(saved(storage).state.items).toEqual([]);
+        });
+
         it('clear vacía el carrito', () => {
             const store = createCartStore(storage);
             store.getState().add(4, 2, 10);
@@ -117,6 +198,7 @@ describe('createCartStore', () => {
             store.getState().setQuantity(4, 2, 10); // misma cantidad
             store.getState().mergeItems([{ variantId: 4, quantity: 2 }], new Map([[4, 10]])); // igual
             store.getState().mergeItems([], new Map([[4, 10]])); // otro carrito vacío
+            store.getState().reconcile([{ variantId: 4, stock: 10 }]); // nada que ajustar
 
             expect(calls).toBe(0);
             expect(storage.writes()).toBe(writesBefore);
@@ -218,11 +300,25 @@ describe('createCartStore', () => {
                 }),
             ],
             ['un array en vez de un objeto', JSON.stringify([1, 2, 3])],
-        ])('si lo guardado tiene %s, el carrito queda vacío', async (_, raw) => {
-            storage.setItem(CART_STORAGE_KEY, raw);
+        ])(
+            'si lo guardado tiene %s, el carrito queda vacío y se da por recuperado',
+            async (_, raw) => {
+                storage.setItem(CART_STORAGE_KEY, raw);
+                const store = createCartStore(storage);
+                await store.persist.rehydrate();
+                expect(store.getState().items).toEqual([]);
+                // Si no se da por recuperado, la página del carrito se queda en el esqueleto para siempre.
+                expect(store.persist.hasHydrated()).toBe(true);
+            },
+        );
+
+        it('avisa a quien espera la recuperación aunque lo guardado esté roto', async () => {
+            storage.setItem(CART_STORAGE_KEY, '{no es json');
             const store = createCartStore(storage);
+            let finished = 0;
+            store.persist.onFinishHydration(() => (finished += 1));
             await store.persist.rehydrate();
-            expect(store.getState().items).toEqual([]);
+            expect(finished).toBe(1);
         });
 
         it('un precio o un stock escritos a mano en lo guardado no llegan al estado', async () => {
