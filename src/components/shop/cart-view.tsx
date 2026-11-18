@@ -77,7 +77,7 @@ export function CartView({ delivery }: CartViewProps) {
                     title="Tu carrito está vacío"
                     description={
                         <span className="text-xl font-medium text-foreground">
-                            Parece que todavía no has agregado nada a tu carrito.
+                            Parece que todavía no has añadido nada a tu carrito.
                         </span>
                     }
                     action={
