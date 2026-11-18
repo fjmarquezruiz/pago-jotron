@@ -6,6 +6,9 @@ const PUBLIC_PREFIXES = [
     '/auth',
     '/api/auth',
     '/api/verificar-edad',
+    // Las líneas del carrito (precio y stock de las presentaciones): lo mismo que enseña el
+    // catálogo, y el invitado también tiene carrito.
+    '/api/carrito',
     '/acceso-denegado',
     '/verificar-edad',
     '/condiciones',

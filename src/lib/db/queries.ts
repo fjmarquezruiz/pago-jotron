@@ -6,6 +6,7 @@ import {
     eq,
     exists,
     gte,
+    inArray,
     isNotNull,
     lt,
     min,
@@ -19,6 +20,7 @@ import {
 } from 'drizzle-orm';
 import type { MySqlSelect } from 'drizzle-orm/mysql-core';
 import { db } from '@/db';
+import { orderLinesByVariantIds } from '@/lib/cart/lines';
 import { NEW_PRODUCT_DAYS } from '@/lib/catalog/novelty';
 import { toPositiveInt } from '@/lib/catalog/pagination';
 import { priceRangeBounds } from '@/lib/catalog/price-range';
@@ -574,3 +576,73 @@ export function relatedProductsQuery({
 export async function getRelatedProducts(params: RelatedProductsParams) {
     return relatedProductsQuery(params);
 }
+
+/** Columnas de una línea del carrito: la presentación con lo mínimo de su producto para pintarla. */
+function cartLineColumns() {
+    return {
+        variantId: productVariants.id,
+        productId: products.id,
+        slug: products.slug,
+        name: products.name,
+        image: products.image,
+        /** Formato, capacidad y unidad: `formatPresentation` los convierte en "Botella 75 cl". */
+        format: productVariants.format,
+        capacity: productVariants.capacity,
+        capacityUnit: productVariants.capacityUnit,
+        /** Precio vigente, como texto (`decimal`): el carrito no guarda precios, se lee siempre de aquí. */
+        price: productVariants.price,
+        /** Unidades disponibles: 0 = agotada. El carrito limita sus cantidades a este número. */
+        stock: productVariants.stock,
+    };
+}
+
+/**
+ * Consulta de las presentaciones que se pueden comprar de entre unos ids: sin bloquear ellas
+ * (`product_variants.is_blocked`) y con la regla de visibilidad del catálogo
+ * (`visibleProductsCondition`: ni su producto, ni su bodega, ni su D.O. bloqueados). Mismas
+ * uniones que el listado.
+ *
+ * @param variantIds - Ids de presentaciones (`product_variants.variant_id`), sin repetir y no vacío.
+ * @returns La consulta, lista para ejecutar con `await`; sin orden definido.
+ */
+export function cartLinesQuery(variantIds: readonly number[]) {
+    return db
+        .select(cartLineColumns())
+        .from(productVariants)
+        .innerJoin(products, eq(products.id, productVariants.productId))
+        .innerJoin(wineries, joinWinery)
+        .innerJoin(guaranteesOfOrigin, joinOrigin)
+        .where(
+            and(
+                inArray(productVariants.id, [...variantIds]),
+                eq(productVariants.isBlocked, false),
+                visibleProductsCondition(),
+            ) as SQL,
+        );
+}
+
+/**
+ * Líneas del carrito (RF6): para cada presentación pedida, su producto, su precio y su stock de
+ * ahora. El carrito del cliente solo guarda ids y cantidades, así que el precio y el stock salen
+ * siempre de aquí.
+ *
+ * Descarta lo que no se puede comprar (`cartLinesQuery`): presentaciones bloqueadas, de productos,
+ * bodegas o D.O. bloqueados, o que no existen. Las agotadas sí vuelven, con `stock: 0`, para que
+ * el carrito las marque como agotadas. Quien llama debe quitar de su carrito los ids que no
+ * vuelvan.
+ *
+ * @param variantIds - Ids de presentaciones, en el orden del carrito. Los repetidos se juntan.
+ * @returns Las líneas, en el orden de `variantIds`.
+ *
+ * @example
+ * const lines = await getCartLines([4, 7]);
+ * // [{ variantId: 4, name: 'Tinto Roble', format: 'Botella', price: '9.50', stock: 12, ... }]
+ */
+export async function getCartLines(variantIds: readonly number[]) {
+    const ids = Array.from(new Set(variantIds));
+    if (ids.length === 0) return [];
+    return orderLinesByVariantIds(ids, await cartLinesQuery(ids));
+}
+
+/** Una línea del carrito con su producto, su precio y su stock actuales. */
+export type CartLine = Awaited<ReturnType<typeof getCartLines>>[number];

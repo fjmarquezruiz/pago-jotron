@@ -7,7 +7,9 @@ import {
     catalogFilterOptionsQueries,
     catalogItemsQuery,
     catalogOrderBy,
+    cartLinesQuery,
     featuredProductsQuery,
+    getCartLines,
     isNewCondition,
     relatedProductsQuery,
     visibleProductsCondition,
@@ -545,5 +547,57 @@ describe('catalogFilterOptionsQueries', () => {
         for (const name of ['origins', 'wineries'] as const) {
             expect(sqlOf(name).sql.match(/inner join/g)).toHaveLength(3);
         }
+    });
+});
+
+describe('cartLinesQuery', () => {
+    const { sql, params } = cartLinesQuery([4, 7, 9]).toSQL();
+
+    it('parte de las presentaciones y las une con su producto, su bodega y su D.O.', () => {
+        expect(sql).toContain('from `product_variants`');
+        expect(sql).toContain(
+            'inner join `products` on `products`.`product_id` = `product_variants`.`product_id`',
+        );
+        expect(sql).toContain('inner join `wineries`');
+        expect(sql).toContain('inner join `guarantees_of_origin`');
+    });
+
+    it('pide solo los ids del carrito', () => {
+        expect(sql).toContain('`product_variants`.`variant_id` in (?, ?, ?)');
+        expect(params.slice(0, 3)).toEqual([4, 7, 9]);
+    });
+
+    it('descarta las presentaciones bloqueadas y aplica la visibilidad del catálogo', () => {
+        expect(sql).toContain(
+            'where (`product_variants`.`variant_id` in (?, ?, ?) and `product_variants`.`is_blocked` = ? and (`products`.`is_blocked` = ? and `wineries`.`is_blocked` = ? and `guarantees_of_origin`.`is_blocked` = ?))',
+        );
+        // ids, presentación sin bloquear y los 3 bloqueos de la regla de visibilidad
+        expect(params).toEqual([4, 7, 9, false, false, false, false]);
+    });
+
+    it('devuelve el precio y el stock de ahora, y lo necesario para pintar la línea', () => {
+        for (const column of [
+            '`product_variants`.`variant_id`',
+            '`products`.`slug`',
+            '`products`.`name`',
+            '`products`.`image`',
+            '`product_variants`.`format`',
+            '`product_variants`.`capacity`',
+            '`product_variants`.`capacity_unit`',
+            '`product_variants`.`price`',
+            '`product_variants`.`stock`',
+        ]) {
+            expect(sql).toContain(column);
+        }
+    });
+
+    it('no agrega: una fila por presentación', () => {
+        expect(sql).not.toMatch(/group by|sum\(|min\(|count\(/);
+    });
+});
+
+describe('getCartLines', () => {
+    it('sin ids devuelve una lista vacía, sin consultar la BD', async () => {
+        await expect(getCartLines([])).resolves.toEqual([]);
     });
 });

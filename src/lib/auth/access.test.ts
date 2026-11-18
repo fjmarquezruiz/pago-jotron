@@ -6,10 +6,12 @@ describe('isPublicPath', () => {
         expect(isPublicPath('/')).toBe(true);
         expect(isPublicPath('/productos/fino')).toBe(true);
         expect(isPublicPath('/api/auth/session')).toBe(true);
+        expect(isPublicPath('/api/carrito/lineas')).toBe(true);
     });
 
     it('no confunde prefijos parecidos', () => {
         expect(isPublicPath('/productosx')).toBe(false);
+        expect(isPublicPath('/api/carritox')).toBe(false);
         expect(isPublicPath('/admin')).toBe(false);
     });
 });
@@ -30,6 +32,7 @@ describe('checkAccess', () => {
         ['/sistema-diseno', 'Administrador', 'ok'],
         ['/verificar-edad', null, 'ok'],
         ['/api/verificar-edad', null, 'ok'],
+        ['/api/carrito/lineas', null, 'ok'],
         ['/condiciones', null, 'ok'],
         ['/privacidad', null, 'ok'],
         ['/cookies', null, 'ok'],
