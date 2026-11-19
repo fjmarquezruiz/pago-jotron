@@ -28,12 +28,14 @@ import { toPositiveInt } from '@/lib/catalog/pagination';
 import { priceRangeBounds } from '@/lib/catalog/price-range';
 import { toVintageOptions, type CatalogFilterOptions } from '@/lib/catalog/filter-options';
 import { LIKE_ESCAPE, searchPattern } from '@/lib/catalog/search';
+import type { AddressInput } from '@/lib/validations/address';
 import {
     DEFAULT_CATALOG_SORT,
     type CatalogFilters,
     type CatalogSort,
 } from '@/lib/validations/catalog';
 import {
+    addresses,
     cartProducts,
     grapes,
     guaranteesOfOrigin,
@@ -604,6 +606,8 @@ function cartLineColumns() {
         price: productVariants.price,
         /** Unidades disponibles: 0 = agotada. El carrito limita sus cantidades a este número. */
         stock: productVariants.stock,
+        /** IVA en % de la tipología del producto (`typologies.tax_rate`, `'21.00'`): lo usa el presupuesto del pedido. */
+        taxRate: typologies.taxRate,
     };
 }
 
@@ -623,6 +627,7 @@ export function cartLinesQuery(variantIds: readonly number[]) {
         .innerJoin(products, eq(products.id, productVariants.productId))
         .innerJoin(wineries, joinWinery)
         .innerJoin(guaranteesOfOrigin, joinOrigin)
+        .innerJoin(typologies, eq(typologies.id, products.typologyId))
         .where(
             and(
                 inArray(productVariants.id, [...variantIds]),
@@ -766,5 +771,101 @@ export async function saveUserCart(userId: number, items: Cart): Promise<void> {
     await db.transaction(async (tx) => {
         if (items.length > 0) await upsertCartItemsQuery(tx, userId, items);
         await deleteMissingCartItemsQuery(tx, userId, items);
+    });
+}
+
+/** Columnas de una dirección que se devuelven al cliente: todas menos `user_id` y `is_active`. */
+function addressColumns() {
+    return {
+        id: addresses.id,
+        recipientName: addresses.recipientName,
+        phone: addresses.phone,
+        streetType: addresses.streetType,
+        streetName: addresses.streetName,
+        number: addresses.number,
+        floor: addresses.floor,
+        postalCode: addresses.postalCode,
+        city: addresses.city,
+        province: addresses.province,
+        country: addresses.country,
+        addressType: addresses.addressType,
+    };
+}
+
+/**
+ * Consulta de las direcciones vigentes de un usuario (`is_active = true`), de la más antigua a la
+ * más reciente. Las sustituidas (`is_active = false`) siguen en la BD, porque un pedido antiguo
+ * apunta a ellas, pero no se ofrecen. Se separa de `getUserAddresses` para poder comprobar su SQL
+ * sin conectar a la BD.
+ *
+ * @param userId - Id del usuario (`users.user_id`).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function userAddressesQuery(userId: number) {
+    return db
+        .select(addressColumns())
+        .from(addresses)
+        .where(and(eq(addresses.userId, userId), eq(addresses.isActive, true)))
+        .orderBy(asc(addresses.id));
+}
+
+/**
+ * Direcciones vigentes de un usuario (RF3, RF7).
+ *
+ * @param userId - Id del usuario, el de la sesión (`getSessionUserId`).
+ * @returns Sus direcciones, de la más antigua a la más reciente; vacío si no tiene ninguna.
+ *
+ * @example
+ * const list = await getUserAddresses(12);
+ * // [{ id: 3, recipientName: 'Ana García', streetType: 'Calle', ... }]
+ */
+export async function getUserAddresses(userId: number) {
+    return userAddressesQuery(userId);
+}
+
+/** Una dirección vigente tal como se devuelve al cliente. */
+export type UserAddress = Awaited<ReturnType<typeof getUserAddresses>>[number];
+
+/**
+ * Crea una dirección del usuario (RF3, RF7). Con `replaces`, la dirección anterior pasa a
+ * `is_active = false` en la misma transacción: una dirección no se modifica, porque un pedido
+ * antiguo apunta a ella y su dirección no puede cambiar. Si `replaces` no es una dirección
+ * vigente de este usuario, no se crea nada.
+ *
+ * @param userId - Id del usuario, el de la sesión (`getSessionUserId`).
+ * @param input - Los datos ya validados (`addressSchema`).
+ * @param replaces - Id de la dirección vigente a la que sustituye, si se está editando.
+ * @returns La dirección creada, o `null` si `replaces` no existe, es de otro usuario o ya estaba
+ *   sustituida.
+ *
+ * @example
+ * const created = await createUserAddress(12, input, 3); // sustituye a la 3
+ */
+export async function createUserAddress(
+    userId: number,
+    input: AddressInput,
+    replaces?: number,
+): Promise<UserAddress | null> {
+    return db.transaction(async (tx) => {
+        if (replaces !== undefined) {
+            const [result] = await tx
+                .update(addresses)
+                .set({ isActive: false })
+                .where(
+                    and(
+                        eq(addresses.id, replaces),
+                        eq(addresses.userId, userId),
+                        eq(addresses.isActive, true),
+                    ),
+                );
+            if (result.affectedRows === 0) return null;
+        }
+
+        const [{ insertId }] = await tx.insert(addresses).values({ ...input, userId });
+        const [created] = await tx
+            .select(addressColumns())
+            .from(addresses)
+            .where(eq(addresses.id, insertId));
+        return created;
     });
 }

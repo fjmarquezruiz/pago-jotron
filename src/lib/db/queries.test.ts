@@ -12,6 +12,7 @@ import {
     catalogItemsQuery,
     catalogOrderBy,
     cartLinesQuery,
+    userAddressesQuery,
     deleteMissingCartItemsQuery,
     featuredProductsQuery,
     getCartLines,
@@ -573,6 +574,13 @@ describe('cartLinesQuery', () => {
         expect(sql).toContain('inner join `guarantees_of_origin`');
     });
 
+    it('trae el IVA de la tipología del producto, para el presupuesto del pedido', () => {
+        expect(sql).toContain(
+            'inner join `typologies` on `typologies`.`typology_id` = `products`.`typology_id`',
+        );
+        expect(sql).toContain('`typologies`.`tax_rate`');
+    });
+
     it('pide solo los ids del carrito', () => {
         expect(sql).toContain('`product_variants`.`variant_id` in (?, ?, ?)');
         expect(params.slice(0, 3)).toEqual([4, 7, 9]);
@@ -804,5 +812,24 @@ describe('saveUserCart', () => {
         const last = statements.at(-1)?.sql;
         expect(last).toBe('rollback');
         expect(statements.map(({ sql }) => sql)).not.toContain('commit');
+    });
+});
+
+describe('userAddressesQuery', () => {
+    const { sql, params } = userAddressesQuery(12).toSQL();
+
+    it('lee solo las direcciones vigentes del usuario', () => {
+        expect(sql).toContain('from `addresses`');
+        expect(sql).toContain('where (`addresses`.`user_id` = ? and `addresses`.`is_active` = ?)');
+        expect(params).toEqual([12, true]);
+    });
+
+    it('las ordena de la más antigua a la más reciente', () => {
+        expect(sql).toContain('order by `addresses`.`address_id` asc');
+    });
+
+    it('incluye el destinatario y no devuelve el usuario ni si está vigente', () => {
+        expect(sql).toContain('`recipient_name`');
+        expect(sql.split(' from ')[0]).not.toMatch(/user_id|is_active/);
     });
 });
