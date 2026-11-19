@@ -19,8 +19,25 @@ function memoryStorage(): StateStorage {
 }
 
 const item = (variantId: number, quantity: number) => ({ variantId, quantity });
-
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+const networkError = () => Promise.reject(new TypeError('Failed to fetch'));
+
+/** Una promesa que se resuelve a mano: para dejar una petición "en vuelo". */
+function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((done) => {
+        resolve = done;
+    });
+    return { promise, resolve };
+}
+
+/** Respuesta de un servidor que no contesta: solo termina (con error) cuando se aborta la petición. */
+const hangUntilAborted = (init?: RequestInit) =>
+    new Promise<Response>((_, reject) => {
+        init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('Aborted', 'AbortError')),
+        );
+    });
 
 /** Una petición que ha llegado al servidor simulado. */
 interface RecordedRequest {
@@ -31,15 +48,17 @@ interface RecordedRequest {
 }
 
 /**
- * Servidor de `/api/carrito` simulado. `state.session` es la cuenta con sesión (`null`: anónimo),
+ * Servidor de `/api/carrito` simulado. `state.session` es la cuenta con sesión (`null`: sin sesión),
  * `state.saved` el carrito guardado y `state.sanitize` lo que el servidor le hace a lo que recibe
- * en un PUT. Un test puede cambiar la respuesta de una sola llamada con `override`.
+ * en un PUT. Un test puede cambiar la respuesta de una sola llamada con `override`, o dejarla en
+ * vuelo con `hold`.
  */
 function createFakeServer(session: number | null, saved: Cart) {
     const state = { session, saved, sanitize: (items: Cart): Cart => items };
     const requests: RecordedRequest[] = [];
     const overrides: { method: string; respond: (init?: RequestInit) => Promise<Response> }[] = [];
     const holds: { method: string; gate: Promise<void> }[] = [];
+
     const fetchFn = vi.fn<CartFetch>(async (path, init) => {
         const method = init?.method ?? 'GET';
         const items =
@@ -50,7 +69,11 @@ function createFakeServer(session: number | null, saved: Cart) {
 
         const override = overrides.findIndex((candidate) => candidate.method === method);
         if (override >= 0) return overrides.splice(override, 1)[0].respond(init);
-        if (state.session === null) return json(401, { message: 'No has iniciado sesión' });
+        if (state.session === null) {
+            return method === 'GET'
+                ? json(200, { userId: null, items: [] })
+                : json(401, { message: 'No has iniciado sesión' });
+        }
 
         let response: Response;
         if (method === 'GET') {
@@ -73,6 +96,7 @@ function createFakeServer(session: number | null, saved: Cart) {
         if (hold >= 0) await holds.splice(hold, 1)[0].gate;
         return response;
     });
+
     return {
         state,
         requests,
@@ -81,10 +105,7 @@ function createFakeServer(session: number | null, saved: Cart) {
         override: (method: string, respond: (init?: RequestInit) => Promise<Response>) => {
             overrides.push({ method, respond });
         },
-        /**
-         * La próxima petición con ese método se procesa en el servidor, pero la respuesta no sale
-         * hasta llamar a la función que devuelve: la petición queda "en vuelo".
-         */
+        /** La próxima petición con ese método se procesa, pero la respuesta no sale hasta llamar a lo que devuelve. */
         hold: (method: string) => {
             const gate = deferred<void>();
             holds.push({ method, gate: gate.promise });
@@ -95,40 +116,10 @@ function createFakeServer(session: number | null, saved: Cart) {
     };
 }
 
-/** Sustituye `onHide`: guarda la función que el motor registra y permite "ocultar la pestaña". */
-function createHideRegistrar() {
-    let callback: (() => void) | null = null;
-    return {
-        register: (onHide: () => void) => {
-            callback = onHide;
-            return () => {
-                callback = null;
-            };
-        },
-        fire: () => callback?.(),
-        isRegistered: () => callback !== null,
-    };
-}
-
-/** Respuesta de un servidor que no contesta: solo termina (con error) cuando se aborta la petición. */
-const hangUntilAborted = (init?: RequestInit) =>
-    new Promise<Response>((_, reject) => {
-        init?.signal?.addEventListener('abort', () =>
-            reject(new DOMException('Aborted', 'AbortError')),
-        );
-    });
-
-/** Una promesa que se resuelve a mano: para dejar una petición "en vuelo". */
-function deferred<T>() {
-    let resolve!: (value: T) => void;
-    const promise = new Promise<T>((done) => {
-        resolve = done;
-    });
-    return { promise, resolve };
-}
+type FakeServer = ReturnType<typeof createFakeServer>;
 
 interface SetupOptions {
-    /** Cuenta con sesión en el servidor; `null` si es anónimo. */
+    /** Cuenta con sesión en el servidor; `null` si no hay. */
     session?: number | null;
     /** Carrito guardado en el servidor. */
     saved?: Cart;
@@ -153,28 +144,21 @@ function setup({
     else local.forEach((line) => store.getState().add(line.variantId, line.quantity, 99));
 
     const server = createFakeServer(session, saved);
-    const hide = createHideRegistrar();
-    const cartSync = createCartSync({
-        store,
-        fetchFn: server.fetchFn,
-        debounceMs: 300,
-        timeoutMs,
-        onHide: hide.register,
-    });
-    return { store, server, hide, cartSync };
+    const cartSync = createCartSync({ store, fetchFn: server.fetchFn, debounceMs: 300, timeoutMs });
+    return { store, server, cartSync };
 }
 
-/** Como `setup`, pero ya sincronizado (con sesión) y empezado a subir; sin peticiones registradas. */
+/** Como `setup`, pero ya sincronizado y empezado a subir; sin peticiones registradas. */
 async function setupLoggedIn(options: SetupOptions = {}) {
     const context = setup(options);
     await context.cartSync.sync();
-    const stop = context.cartSync.start();
+    context.cartSync.start();
     context.server.requests.length = 0;
     context.server.fetchFn.mockClear();
-    return { ...context, stop };
+    return context;
 }
 
-/** Deja pasar el tiempo (y los microtareas de las peticiones) con los temporizadores simulados. */
+/** Deja pasar el tiempo (y las microtareas de las peticiones) con los temporizadores simulados. */
 const wait = (ms: number) => vi.advanceTimersByTimeAsync(ms);
 
 describe('createCartSync', () => {
@@ -186,47 +170,16 @@ describe('createCartSync', () => {
     });
 
     describe('sync', () => {
-        it('sin sesión (401) deja el carrito local como está y no sube nada', async () => {
-            const { store, server, cartSync } = setup({ session: null, local: [item(4, 2)] });
-            const before = store.getState().items;
+        const noSession = [
+            ['un 200 con userId null', async () => json(200, { userId: null, items: [] })],
+            ['un 401', async () => json(401, { message: 'No has iniciado sesión' })],
+        ] as const;
 
-            await cartSync.sync();
-            cartSync.start();
-            store.getState().add(7, 1, 10);
-            await wait(1000);
-
-            expect(server.requests).toEqual([expect.objectContaining({ method: 'GET' })]);
-            expect(store.getState().items).toEqual([...before, item(7, 1)]);
-            expect(store.getState().owner).toBeNull();
-        });
-
-        it('sin sesión (401) con un carrito de una cuenta (sesión caducada) lo vacía y lo deja anónimo', async () => {
-            const { store, server, cartSync } = setup({
-                session: null,
-                local: [item(4, 2)],
-                owner: 9,
-            });
-            cartSync.start();
-
-            await cartSync.sync();
-
-            expect(store.getState().items).toEqual([]);
-            expect(store.getState().owner).toBeNull();
-            expect(vi.getTimerCount()).toBe(0);
-
-            // Lo que añade la persona anónima siguiente no hereda dueño ni se sube.
-            store.getState().add(7, 1, 10);
-            await wait(1000);
-            expect(store.getState().owner).toBeNull();
-            expect(server.puts()).toHaveLength(0);
-        });
-
-        describe('sin sesión con 200 y userId null', () => {
-            const anonymousReply = async () => json(200, { userId: null, items: [] });
-
-            it('con un carrito sin dueño no toca nada, no sube nada y marca synced', async () => {
+        it.each(noSession)(
+            'sin sesión (%s) y con un carrito sin dueño no toca nada ni sube nada',
+            async (_, respond) => {
                 const { store, server, cartSync } = setup({ local: [item(4, 2)] });
-                server.override('GET', anonymousReply);
+                server.override('GET', respond);
 
                 await cartSync.sync();
                 cartSync.start();
@@ -236,67 +189,58 @@ describe('createCartSync', () => {
                 expect(cartSync.isSynced()).toBe(true);
                 expect(store.getState().items).toEqual([item(4, 2), item(7, 1)]);
                 expect(store.getState().owner).toBeNull();
-                expect(server.posts()).toHaveLength(0);
-                expect(server.puts()).toHaveLength(0);
-            });
+                expect(server.requests).toHaveLength(1);
+            },
+        );
 
-            it('con un carrito de una cuenta (sesión caducada) lo vacía y no provoca ningún PUT', async () => {
+        it.each(noSession)(
+            'sin sesión (%s) y con el carrito de una cuenta (sesión caducada) lo vacía sin subir nada',
+            async (_, respond) => {
                 const { store, server, cartSync } = setup({ local: [item(4, 2)], owner: 9 });
                 cartSync.start();
-                server.override('GET', anonymousReply);
+                server.override('GET', respond);
 
                 await cartSync.sync();
 
-                expect(cartSync.isSynced()).toBe(true);
                 expect(store.getState().items).toEqual([]);
                 expect(store.getState().owner).toBeNull();
                 expect(vi.getTimerCount()).toBe(0);
 
+                // Lo que añade la persona anónima siguiente no hereda dueño ni se sube.
                 store.getState().add(7, 1, 10);
                 await wait(1000);
                 expect(store.getState().owner).toBeNull();
                 expect(server.puts()).toHaveLength(0);
-            });
+            },
+        );
 
-            it('deja de subir si antes había sesión', async () => {
-                const { store, server, cartSync } = await setupLoggedIn({ owner: 5 });
-                server.override('GET', anonymousReply);
+        it.each([
+            ['un error de red', networkError],
+            ['un 500', async () => json(500, { message: 'Error' })],
+            ['un 404', async () => json(404, { message: 'No existe' })],
+            ['un 200 sin cuerpo válido', async () => json(200, { hola: 'mundo' })],
+            ['un 200 que no es JSON', async () => new Response('<html>', { status: 200 })],
+            [
+                'un 200 con presentaciones repetidas',
+                async () => json(200, { userId: 5, items: [item(4, 1), item(4, 2)] }),
+            ],
+        ])(
+            'con %s deja el carrito de una cuenta como está (solo "sin sesión" lo vacía) y no sube nada',
+            async (_, respond) => {
+                const { store, server, cartSync } = setup({ local: [item(4, 2)], owner: 5 });
+                server.override('GET', respond);
 
-                await cartSync.sync();
+                await expect(cartSync.sync()).resolves.toBeUndefined();
+                cartSync.start();
                 store.getState().add(7, 1, 10);
                 await wait(1000);
 
-                expect(server.puts()).toHaveLength(0);
-            });
-        });
-
-        it.each([
-            ['un error de red', () => Promise.reject(new TypeError('Failed to fetch'))],
-            ['un 500', async () => json(500, { message: 'Error' })],
-            ['un 200 sin cuerpo válido', async () => json(200, { hola: 'mundo' })],
-        ])('con %s no vacía el carrito de una cuenta (solo un 401 lo hace)', async (_, respond) => {
-            const { store, server, cartSync } = setup({ local: [item(4, 2)], owner: 5 });
-            server.override('GET', respond);
-
-            await cartSync.sync();
-
-            expect(store.getState().items).toEqual([item(4, 2)]);
-            expect(store.getState().owner).toBe(5);
-        });
-
-        it('con un error de red deja lo local como está y no sube nada', async () => {
-            const { store, server, cartSync } = setup({ local: [item(4, 2)] });
-            server.override('GET', () => Promise.reject(new TypeError('Failed to fetch')));
-
-            await expect(cartSync.sync()).resolves.toBeUndefined();
-            cartSync.start();
-            store.getState().add(7, 1, 10);
-            await wait(1000);
-
-            expect(server.fetchFn).toHaveBeenCalledTimes(1);
-            expect(store.getState().items).toEqual([item(4, 2), item(7, 1)]);
-            expect(store.getState().owner).toBeNull();
-        });
+                expect(cartSync.isSynced()).toBe(true);
+                expect(store.getState().items).toEqual([item(4, 2), item(7, 1)]);
+                expect(store.getState().owner).toBe(5);
+                expect(server.fetchFn).toHaveBeenCalledTimes(1);
+            },
+        );
 
         it('si fetch lanza de forma síncrona, tampoco lanza', async () => {
             const { server, cartSync } = setup();
@@ -307,75 +251,41 @@ describe('createCartSync', () => {
             expect(cartSync.isSynced()).toBe(true);
         });
 
-        it.each([
-            ['un 500', () => json(500, { message: 'Error' })],
-            ['un 404', () => json(404, { message: 'No existe' })],
-            ['un 200 sin cuerpo válido', () => json(200, { hola: 'mundo' })],
-            ['un 200 que no es JSON', () => new Response('<html>', { status: 200 })],
+        it.each<[string, Cart, number | null, Cart, Cart]>([
             [
-                'un 200 con presentaciones repetidas',
-                () => json(200, { userId: 5, items: [item(4, 1), item(4, 2)] }),
+                'local vacío y sin dueño',
+                [],
+                null,
+                [item(4, 2), item(9, 1)],
+                [item(4, 2), item(9, 1)],
             ],
-        ])('con %s deja lo local como está y no sube nada', async (_, response) => {
-            const { store, server, cartSync } = setup({ local: [item(4, 2)] });
-            server.override('GET', async () => response());
+            [
+                'el carrito ya era de esta cuenta',
+                [item(1, 1), item(4, 9)],
+                5,
+                [item(4, 2)],
+                [item(4, 2)],
+            ],
+            [
+                'el carrito es de otra cuenta con líneas',
+                [item(1, 1), item(9, 3)],
+                9,
+                [item(4, 2)],
+                [item(4, 2)],
+            ],
+            ['el carrito es de otra cuenta y el servidor lo tiene vacío', [item(1, 1)], 9, [], []],
+        ])('%s: manda el servidor, sin fusionar', async (_, local, owner, saved, expected) => {
+            const { store, server, cartSync } = setup({ local, owner, saved });
+            cartSync.start();
 
             await cartSync.sync();
-            cartSync.start();
-            store.getState().add(7, 1, 10);
+            expect(vi.getTimerCount()).toBe(0); // ni siquiera se programa una subida
             await wait(1000);
 
-            expect(server.fetchFn).toHaveBeenCalledTimes(1);
-            expect(store.getState().items).toEqual([item(4, 2), item(7, 1)]);
-            expect(store.getState().owner).toBeNull();
-        });
-
-        it('local vacío y sin dueño: manda el servidor', async () => {
-            const { store, server, cartSync } = setup({ saved: [item(4, 2), item(9, 1)] });
-
-            await cartSync.sync();
-
-            expect(store.getState().items).toEqual([item(4, 2), item(9, 1)]);
+            expect(store.getState().items).toEqual(expected);
             expect(store.getState().owner).toBe(5);
             expect(server.posts()).toHaveLength(0);
-        });
-
-        it('el carrito ya era de esta cuenta: manda el servidor, sin fusionar', async () => {
-            const { store, server, cartSync } = setup({
-                saved: [item(4, 2)],
-                local: [item(1, 1), item(4, 9)],
-                owner: 5,
-            });
-
-            await cartSync.sync();
-
-            expect(store.getState().items).toEqual([item(4, 2)]);
-            expect(store.getState().owner).toBe(5);
-            expect(server.posts()).toHaveLength(0);
-        });
-
-        it('el carrito local es de otra cuenta: se descarta, no se fusiona', async () => {
-            const { store, server, cartSync } = setup({
-                saved: [item(4, 2)],
-                local: [item(1, 1), item(9, 3)],
-                owner: 9,
-            });
-
-            await cartSync.sync();
-
-            expect(store.getState().items).toEqual([item(4, 2)]);
-            expect(store.getState().owner).toBe(5);
-            expect(server.posts()).toHaveLength(0);
-            expect(server.state.saved).toEqual([item(4, 2)]);
-        });
-
-        it('el carrito local es de otra cuenta y el servidor lo tiene vacío: queda vacío', async () => {
-            const { store, cartSync } = setup({ local: [item(1, 1)], owner: 9 });
-
-            await cartSync.sync();
-
-            expect(store.getState().items).toEqual([]);
-            expect(store.getState().owner).toBe(5);
+            expect(server.puts()).toHaveLength(0); // sin subida de eco
         });
 
         it('carrito anónimo con líneas: lo fusiona una vez con el de la cuenta y adopta el resultado', async () => {
@@ -383,8 +293,10 @@ describe('createCartSync', () => {
                 saved: [item(4, 2), item(9, 1)],
                 local: [item(4, 1), item(7, 3)],
             });
+            cartSync.start();
 
             await cartSync.sync();
+            await wait(1000);
 
             expect(server.posts()).toEqual([
                 expect.objectContaining({
@@ -393,15 +305,12 @@ describe('createCartSync', () => {
                 }),
             ]);
             expect(store.getState().items).toEqual([item(4, 2), item(9, 1), item(7, 3)]);
-            expect(store.getState().items).toEqual(server.state.saved);
             expect(store.getState().owner).toBe(5);
+            expect(server.puts()).toHaveLength(0); // sin subida de eco
         });
 
         it('después de fusionar, otra sync no vuelve a fusionar: manda el servidor', async () => {
-            const { store, server, cartSync } = setup({
-                saved: [item(4, 2)],
-                local: [item(7, 3)],
-            });
+            const { store, server, cartSync } = setup({ saved: [item(4, 2)], local: [item(7, 3)] });
             await cartSync.sync();
             server.state.saved = [item(4, 2)]; // otro dispositivo borró la línea 7
 
@@ -411,55 +320,37 @@ describe('createCartSync', () => {
             expect(store.getState().items).toEqual([item(4, 2)]);
         });
 
-        it('si la fusión falla, deja lo local sin dueño, no sube nada y la siguiente sync lo reintenta', async () => {
-            const { store, server, cartSync } = setup({
-                saved: [item(4, 2)],
-                local: [item(7, 3)],
-            });
-            cartSync.start();
+        it.each([
+            ['un error de red', networkError],
+            ['un 500', async () => json(500, { message: 'Error' })],
+            ['un 401', async () => json(401, { message: 'Caducada' })],
+        ])(
+            'si la fusión falla (%s), deja lo local sin dueño, no sube nada y la siguiente sync lo reintenta',
+            async (_, respond) => {
+                const { store, server, cartSync } = setup({
+                    saved: [item(4, 2)],
+                    local: [item(7, 3)],
+                });
+                cartSync.start();
+                server.override('POST', respond);
 
-            server.override('POST', () => Promise.reject(new TypeError('Failed to fetch')));
-            await cartSync.sync();
+                await cartSync.sync();
+                expect(store.getState().items).toEqual([item(7, 3)]);
+                expect(store.getState().owner).toBeNull();
+                expect(cartSync.isSynced()).toBe(true);
 
-            expect(store.getState().items).toEqual([item(7, 3)]);
-            expect(store.getState().owner).toBeNull();
-            expect(cartSync.isSynced()).toBe(true);
+                // Con el carrito sin fusionar, los cambios locales no pisan el del servidor.
+                store.getState().add(8, 1, 10);
+                await wait(1000);
+                expect(server.puts()).toHaveLength(0);
 
-            // Con la cuenta ya conocida pero sin fusionar, los cambios locales no pisan el servidor.
-            store.getState().add(8, 1, 10);
-            await wait(1000);
-            expect(server.puts()).toHaveLength(0);
-
-            await cartSync.sync();
-            expect(server.posts()).toHaveLength(2); // la que falló y el reintento
-            expect(server.posts()[1].items).toEqual([item(7, 3), item(8, 1)]);
-            expect(store.getState().owner).toBe(5);
-            expect(store.getState().items).toEqual([item(4, 2), item(7, 3), item(8, 1)]);
-        });
-
-        it('si la fusión responde con un error del servidor, deja lo local como está', async () => {
-            const { store, server, cartSync } = setup({ local: [item(7, 3)], saved: [item(4, 2)] });
-            server.override('POST', async () => json(500, { message: 'Error' }));
-
-            await cartSync.sync();
-
-            expect(store.getState().items).toEqual([item(7, 3)]);
-            expect(store.getState().owner).toBeNull();
-        });
-
-        it('si la sesión caduca durante la fusión (401), no adopta nada ni sube', async () => {
-            const { store, server, cartSync } = setup({ local: [item(7, 3)], saved: [item(4, 2)] });
-            cartSync.start();
-            server.override('POST', async () => json(401, { message: 'Caducada' }));
-
-            await cartSync.sync();
-            store.getState().add(8, 1, 10);
-            await wait(1000);
-
-            expect(store.getState().items).toEqual([item(7, 3), item(8, 1)]);
-            expect(store.getState().owner).toBeNull();
-            expect(server.puts()).toHaveLength(0);
-        });
+                await cartSync.sync();
+                expect(server.posts()).toHaveLength(2); // la que falló y el reintento
+                expect(server.posts()[1].items).toEqual([item(7, 3), item(8, 1)]);
+                expect(store.getState().owner).toBe(5);
+                expect(store.getState().items).toEqual([item(4, 2), item(7, 3), item(8, 1)]);
+            },
+        );
 
         it('dos sync a la vez comparten la misma petición', async () => {
             const { server, cartSync } = setup({ saved: [item(4, 2)] });
@@ -473,6 +364,23 @@ describe('createCartSync', () => {
 
             await cartSync.sync();
             expect(server.requests).toHaveLength(2);
+        });
+
+        it('los PUT llevan keepalive y el GET y el POST no; todas llevan una señal de tiempo máximo', async () => {
+            const { store, server, cartSync } = setup({ local: [item(7, 3)] });
+            await cartSync.sync(); // GET y POST de la fusión
+            cartSync.start();
+            store.getState().add(8, 1, 10);
+            await cartSync.flush(); // PUT
+
+            expect(server.requests.map((r) => `${r.method}:${Boolean(r.keepalive)}`)).toEqual([
+                'GET:false',
+                'POST:false',
+                'PUT:true',
+            ]);
+            expect(
+                server.fetchFn.mock.calls.every(([, init]) => init?.signal instanceof AbortSignal),
+            ).toBe(true);
         });
     });
 
@@ -489,15 +397,14 @@ describe('createCartSync', () => {
             expect(listener).toHaveBeenCalledTimes(1);
         });
 
-        it('pasa a true también sin sesión o con la red caída', async () => {
-            const anonymous = setup({ session: null });
-            await anonymous.cartSync.sync();
-            expect(anonymous.cartSync.isSynced()).toBe(true);
-
-            const offline = setup();
-            offline.server.override('GET', () => Promise.reject(new TypeError('Failed to fetch')));
-            await offline.cartSync.sync();
-            expect(offline.cartSync.isSynced()).toBe(true);
+        it.each([
+            ['sin sesión', (server: FakeServer) => (server.state.session = null)],
+            ['con la red caída', (server: FakeServer) => server.override('GET', networkError)],
+        ])('pasa a true también %s', async (_, breakServer) => {
+            const { server, cartSync } = setup();
+            breakServer(server);
+            await cartSync.sync();
+            expect(cartSync.isSynced()).toBe(true);
         });
 
         it('no avisa antes de que acabe la petición, ni después de darse de baja', async () => {
@@ -512,7 +419,7 @@ describe('createCartSync', () => {
             expect(cartSync.isSynced()).toBe(false);
 
             unsubscribe();
-            pending.resolve(json(401, { message: 'No' }));
+            pending.resolve(json(200, { userId: null, items: [] }));
             await running;
 
             expect(listener).not.toHaveBeenCalled();
@@ -537,57 +444,32 @@ describe('createCartSync', () => {
 
             expect(server.puts()).toHaveLength(1);
             expect(server.puts()[0]).toEqual(
-                expect.objectContaining({
-                    path: '/api/carrito',
-                    items: [item(4, 2), item(7, 1)],
-                }),
+                expect.objectContaining({ path: '/api/carrito', items: [item(4, 2), item(7, 1)] }),
             );
-            expect(server.puts()[0].keepalive).toBeUndefined();
             expect(server.state.saved).toEqual([item(4, 2), item(7, 1)]);
-        });
 
-        it('después de subir, sin más cambios no manda nada', async () => {
-            const { store, server } = await setupLoggedIn();
-            store.getState().add(4, 1, 10);
-            await wait(300);
+            await wait(5000); // sin más cambios no manda nada
             expect(server.puts()).toHaveLength(1);
-
-            await wait(5000);
-            expect(server.puts()).toHaveLength(1);
-            expect(store.getState().owner).toBe(5);
         });
 
-        it('no hay subida de eco tras adoptar el carrito del servidor', async () => {
-            const { store, server, cartSync } = setup({ saved: [item(4, 2)] });
-            cartSync.start();
-
-            await cartSync.sync();
-            expect(vi.getTimerCount()).toBe(0); // ni siquiera se programa una subida
-            await wait(1000);
-
-            expect(store.getState().items).toEqual([item(4, 2)]);
-            expect(server.puts()).toHaveLength(0);
-        });
-
-        it('no hay subida de eco tras fusionar', async () => {
-            const { store, server, cartSync } = setup({
-                saved: [item(4, 2)],
-                local: [item(7, 3)],
-            });
-            cartSync.start();
-
-            await cartSync.sync();
-            await wait(1000);
-
-            expect(store.getState().items).toEqual([item(4, 2), item(7, 3)]);
-            expect(server.puts()).toHaveLength(0);
-        });
-
-        it('una sync que deja el carrito igual que el servidor cancela la subida programada', async () => {
+        it.each([
+            [
+                'deja el carrito igual que el servidor',
+                (server: FakeServer) => {
+                    server.state.saved = [item(4, 1)]; // otro dispositivo ya guardó lo mismo
+                },
+            ],
+            [
+                'cambia de cuenta',
+                (server: FakeServer) => {
+                    server.state.session = 8;
+                },
+            ],
+        ])('una sync que %s cancela la subida programada', async (_, change) => {
             const { store, server, cartSync } = await setupLoggedIn({ owner: 5 });
             store.getState().add(4, 1, 10);
             expect(vi.getTimerCount()).toBe(1); // subida programada
-            server.state.saved = [item(4, 1)]; // otro dispositivo ya guardó lo mismo
+            change(server);
 
             await cartSync.sync();
             // `adopt` no escribe si nada cambia: es `sync` quien tiene que cancelarla.
@@ -595,108 +477,6 @@ describe('createCartSync', () => {
             await wait(1000);
 
             expect(server.puts()).toHaveLength(0);
-        });
-
-        it('una sync que cambia de cuenta cancela la subida programada', async () => {
-            const { store, server, cartSync } = await setupLoggedIn({ owner: 5 });
-            store.getState().add(4, 1, 10);
-            expect(vi.getTimerCount()).toBe(1);
-            server.state.session = 8; // la sesión ahora es de otra cuenta
-
-            await cartSync.sync();
-            expect(vi.getTimerCount()).toBe(0);
-            await wait(1000);
-
-            expect(server.puts()).toHaveLength(0);
-            expect(store.getState().owner).toBe(8);
-        });
-
-        it('si añade y quita la misma línea mientras vuela el PUT, el servidor acaba sin ella', async () => {
-            const { store, server } = await setupLoggedIn();
-            const release = server.hold('PUT');
-
-            store.getState().add(4, 1, 10);
-            await wait(300); // sale el PUT con [4], que se queda en vuelo
-            expect(server.puts()).toHaveLength(1);
-            store.getState().remove(4); // lo local vuelve a ser igual a lo que el servidor sabía antes
-            release();
-            await wait(0);
-            expect(server.state.saved).toEqual([item(4, 1)]);
-
-            await wait(300);
-
-            expect(server.puts()).toHaveLength(2);
-            expect(server.puts()[1].items).toEqual([]);
-            expect(server.state.saved).toEqual([]);
-        });
-
-        it('adopta lo que el servidor sanea si lo local no ha cambiado, sin subir de nuevo', async () => {
-            const { store, server } = await setupLoggedIn();
-            server.state.sanitize = (items) =>
-                items.map((line) => item(line.variantId, Math.min(line.quantity, 3)));
-
-            store.getState().add(4, 5, 10);
-            await wait(300);
-
-            expect(server.puts()).toHaveLength(1);
-            expect(server.puts()[0].items).toEqual([item(4, 5)]);
-            expect(store.getState().items).toEqual([item(4, 3)]);
-            expect(store.getState().owner).toBe(5);
-
-            await wait(5000);
-            expect(server.puts()).toHaveLength(1);
-        });
-
-        it('adopta el saneado de lo que el servidor quita (no vendible)', async () => {
-            const { store, server } = await setupLoggedIn();
-            server.state.sanitize = (items) => items.filter((line) => line.variantId !== 9);
-
-            store.getState().add(4, 1, 10);
-            store.getState().add(9, 1, 10);
-            await wait(300);
-
-            expect(store.getState().items).toEqual([item(4, 1)]);
-            await wait(5000);
-            expect(server.puts()).toHaveLength(1);
-        });
-
-        it('si lo local cambió mientras la petición volaba, no adopta el saneado y manda lo último', async () => {
-            const { store, server } = await setupLoggedIn();
-            const pending = deferred<Response>();
-            server.override('PUT', () => pending.promise);
-
-            store.getState().add(4, 5, 10);
-            await wait(300); // sale el PUT 1, que se queda en vuelo
-            store.getState().add(7, 1, 10);
-            pending.resolve(json(200, { items: [item(4, 3)] })); // el servidor sanea lo enviado
-            await wait(0);
-
-            expect(store.getState().items).toEqual([item(4, 5), item(7, 1)]);
-
-            await wait(300);
-            expect(server.puts()).toHaveLength(2);
-            expect(server.puts()[1].items).toEqual([item(4, 5), item(7, 1)]);
-        });
-
-        it('solo hay una petición en vuelo: lo que cambia mientras tanto se manda después', async () => {
-            const { store, server } = await setupLoggedIn();
-            const pending = deferred<Response>();
-            server.override('PUT', () => pending.promise);
-
-            store.getState().add(4, 1, 10);
-            await wait(300);
-            expect(server.puts()).toHaveLength(1);
-
-            store.getState().add(7, 1, 10);
-            await wait(1000); // el temporizador vence, pero la primera sigue sin responder
-            expect(server.puts()).toHaveLength(1);
-
-            pending.resolve(json(200, { items: [item(4, 1)] }));
-            await wait(0);
-
-            expect(server.puts()).toHaveLength(2);
-            expect(server.puts()[1].items).toEqual([item(4, 1), item(7, 1)]);
-            expect(store.getState().items).toEqual([item(4, 1), item(7, 1)]);
         });
 
         it('no sube si el carrito no es de la cuenta activa (otro dueño)', async () => {
@@ -709,7 +489,7 @@ describe('createCartSync', () => {
             expect(server.puts()).toHaveLength(0);
         });
 
-        it('un 401 al subir deja de subir: la cuenta pasa a anónima', async () => {
+        it('un 401 al subir deja de subir y no vacía el carrito; la siguiente sync sí lo vacía', async () => {
             const { store, server, cartSync } = await setupLoggedIn();
             server.state.session = null;
 
@@ -720,7 +500,6 @@ describe('createCartSync', () => {
             store.getState().add(7, 1, 10);
             await wait(1000);
             expect(server.puts()).toHaveLength(1);
-            // No se vacía aquí: la siguiente carga (sync) lo hará.
             expect(store.getState().items).toEqual([item(4, 1), item(7, 1)]);
             expect(store.getState().owner).toBe(5);
 
@@ -732,11 +511,11 @@ describe('createCartSync', () => {
         });
 
         it.each([
-            ['un 500', () => json(500, { message: 'Error' })],
-            ['un 200 sin cuerpo válido', () => json(200, { nada: true })],
-        ])('con %s se queda pendiente hasta el siguiente cambio', async (_, response) => {
+            ['un 500', async () => json(500, { message: 'Error' })],
+            ['un error de red', networkError],
+        ])('con %s se queda pendiente hasta el siguiente cambio', async (_, respond) => {
             const { store, server } = await setupLoggedIn();
-            server.override('PUT', async () => response());
+            server.override('PUT', respond);
 
             store.getState().add(4, 1, 10);
             await wait(300);
@@ -747,35 +526,96 @@ describe('createCartSync', () => {
             await wait(300);
 
             expect(server.puts()).toHaveLength(2);
-            expect(server.puts()[1].items).toEqual([item(4, 1), item(7, 1)]);
             expect(server.state.saved).toEqual([item(4, 1), item(7, 1)]);
         });
 
-        it('con un error de red se queda pendiente y flush lo reintenta', async () => {
-            const { store, server, cartSync } = await setupLoggedIn();
-            server.override('PUT', () => Promise.reject(new TypeError('Failed to fetch')));
-
-            store.getState().add(4, 1, 10);
-            await wait(300);
-            expect(server.state.saved).toEqual([]);
-
-            await cartSync.flush();
-            expect(server.state.saved).toEqual([item(4, 1)]);
-        });
-
-        it('la función que devuelve start lo para todo: suscripción, temporizador y ocultar', async () => {
-            const { store, server, hide, stop } = await setupLoggedIn();
-            expect(hide.isRegistered()).toBe(true);
+        it('la función que devuelve start lo para todo: suscripción y temporizador', async () => {
+            const { store, server, cartSync } = setup();
+            await cartSync.sync();
+            const stop = cartSync.start();
 
             store.getState().add(4, 1, 10); // queda un temporizador pendiente
             stop();
-            expect(hide.isRegistered()).toBe(false);
-
             await wait(1000);
             store.getState().add(7, 1, 10);
             await wait(1000);
 
             expect(server.puts()).toHaveLength(0);
+        });
+
+        describe('con un PUT en vuelo', () => {
+            it('solo hay una petición en vuelo: lo que cambia mientras tanto se manda después', async () => {
+                const { store, server } = await setupLoggedIn();
+                const release = server.hold('PUT');
+
+                store.getState().add(4, 1, 10);
+                await wait(300);
+                expect(server.puts()).toHaveLength(1);
+
+                store.getState().add(7, 1, 10);
+                await wait(1000); // el temporizador vence, pero la primera sigue sin responder
+                expect(server.puts()).toHaveLength(1);
+
+                release();
+                await wait(0);
+
+                expect(server.puts()).toHaveLength(2);
+                expect(server.puts()[1].items).toEqual([item(4, 1), item(7, 1)]);
+            });
+
+            it('si añade y quita la misma línea mientras vuela, el servidor acaba sin ella', async () => {
+                const { store, server } = await setupLoggedIn();
+                const release = server.hold('PUT');
+
+                store.getState().add(4, 1, 10);
+                await wait(300); // sale el PUT con [4], que se queda en vuelo
+                store.getState().remove(4); // lo local vuelve a ser igual a lo que el servidor sabía antes
+                release();
+                await wait(0);
+                expect(server.state.saved).toEqual([item(4, 1)]);
+
+                await wait(300);
+
+                expect(server.puts()).toHaveLength(2);
+                expect(server.puts()[1].items).toEqual([]);
+                expect(server.state.saved).toEqual([]);
+            });
+
+            it('lo que el usuario cambia mientras vuela no se pisa: el carrito local no vuelve atrás', async () => {
+                const { store, server } = await setupLoggedIn({
+                    saved: [item(4, 1)],
+                    local: [item(4, 1)],
+                    owner: 5,
+                });
+                const release = server.hold('PUT');
+
+                store.getState().setQuantity(4, 2, 10);
+                await wait(300); // sale el PUT con 2, que se queda en vuelo
+                store.getState().setQuantity(4, 3, 10);
+                store.getState().setQuantity(4, 4, 10);
+                release();
+                await wait(0);
+
+                expect(store.getState().items).toEqual([item(4, 4)]); // no vuelve a 2
+
+                await wait(300);
+                expect(server.puts()).toHaveLength(2);
+                expect(server.puts()[1].items).toEqual([item(4, 4)]);
+            });
+        });
+
+        it('no lee la respuesta del PUT: lo que el servidor sanee no cambia el carrito local', async () => {
+            const { store, server } = await setupLoggedIn();
+            server.state.sanitize = (items) =>
+                items.map((line) => item(line.variantId, Math.min(line.quantity, 3)));
+
+            store.getState().add(4, 5, 10);
+            await wait(300);
+            await wait(5000);
+
+            expect(server.state.saved).toEqual([item(4, 3)]);
+            expect(store.getState().items).toEqual([item(4, 5)]);
+            expect(server.puts()).toHaveLength(1);
         });
     });
 
@@ -794,28 +634,33 @@ describe('createCartSync', () => {
             expect(server.puts()).toHaveLength(1);
         });
 
-        it('sin nada pendiente no hace peticiones', async () => {
-            const { server, cartSync } = await setupLoggedIn();
+        it.each([
+            ['sin nada pendiente', 5],
+            ['sin sesión', null],
+        ])('%s no hace peticiones', async (_, session) => {
+            const { store, server, cartSync } = await setupLoggedIn({ session });
+            if (session === null) store.getState().add(4, 1, 10);
+
             await cartSync.flush();
+
             expect(server.fetchFn).not.toHaveBeenCalled();
         });
 
-        it('sin sesión no sube nada', async () => {
-            const { store, server, cartSync } = setup({ session: null });
-            await cartSync.sync();
-            cartSync.start();
-            server.requests.length = 0;
+        it('si falla el PUT, flush lo reintenta en la siguiente llamada', async () => {
+            const { store, server, cartSync } = await setupLoggedIn();
+            server.override('PUT', networkError);
 
             store.getState().add(4, 1, 10);
-            await cartSync.flush();
+            await wait(300);
+            expect(server.state.saved).toEqual([]);
 
-            expect(server.requests).toHaveLength(0);
+            await cartSync.flush();
+            expect(server.state.saved).toEqual([item(4, 1)]);
         });
 
         it('si hay una petición en vuelo, espera a que acabe y luego manda lo último', async () => {
             const { store, server, cartSync } = await setupLoggedIn();
-            const pending = deferred<Response>();
-            server.override('PUT', () => pending.promise);
+            const release = server.hold('PUT');
             store.getState().add(4, 1, 10);
             await wait(300);
             store.getState().add(7, 1, 10);
@@ -827,49 +672,10 @@ describe('createCartSync', () => {
             await wait(0);
             expect(done).toBe(false);
 
-            pending.resolve(json(200, { items: [item(4, 1)] }));
+            release();
             await flushing;
 
-            expect(done).toBe(true);
             expect(server.state.saved).toEqual([item(4, 1), item(7, 1)]);
-        });
-    });
-
-    describe('ocultar la pestaña', () => {
-        it('sube al instante lo pendiente con keepalive', async () => {
-            const { store, server, hide } = await setupLoggedIn();
-            store.getState().add(4, 1, 10);
-
-            hide.fire();
-            await wait(0);
-
-            expect(server.puts()).toHaveLength(1);
-            expect(server.puts()[0]).toEqual(
-                expect.objectContaining({ items: [item(4, 1)], keepalive: true }),
-            );
-
-            await wait(5000); // el temporizador ya no sube otra vez
-            expect(server.puts()).toHaveLength(1);
-        });
-
-        it('sin nada pendiente no hace peticiones', async () => {
-            const { server, hide } = await setupLoggedIn();
-            hide.fire();
-            await wait(0);
-            expect(server.fetchFn).not.toHaveBeenCalled();
-        });
-
-        it('sin sesión no sube nada', async () => {
-            const { store, server, hide, cartSync } = setup({ session: null });
-            await cartSync.sync();
-            cartSync.start();
-            server.requests.length = 0;
-
-            store.getState().add(4, 1, 10);
-            hide.fire();
-            await wait(0);
-
-            expect(server.requests).toHaveLength(0);
         });
     });
 
@@ -877,8 +683,8 @@ describe('createCartSync', () => {
         it('sube lo pendiente, vacía el carrito local y no manda nada más', async () => {
             const { store, server, cartSync } = await setupLoggedIn({
                 saved: [item(4, 2)],
-                owner: 5,
                 local: [item(4, 2)],
+                owner: 5,
             });
             store.getState().add(7, 1, 10); // pendiente: aún no ha vencido el temporizador
 
@@ -889,39 +695,27 @@ describe('createCartSync', () => {
             expect(store.getState().items).toEqual([]);
             expect(store.getState().owner).toBeNull();
 
-            await wait(5000);
             store.getState().add(9, 1, 10); // ya anónimo
             await wait(5000);
             expect(server.puts()).toHaveLength(1);
         });
 
-        it('sin nada pendiente, solo vacía', async () => {
-            const { store, server, cartSync } = await setupLoggedIn({
-                saved: [item(4, 2)],
-            });
-
+        it('sin nada pendiente solo vacía, y también si la subida falla', async () => {
+            const { store, server, cartSync } = await setupLoggedIn({ saved: [item(4, 2)] });
             await cartSync.prepareSignOut();
-
             expect(server.fetchFn).not.toHaveBeenCalled();
-            expect(store.getState().items).toEqual([]);
             expect(store.getState().owner).toBeNull();
+
+            const failing = await setupLoggedIn();
+            failing.server.override('PUT', networkError);
+            failing.store.getState().add(4, 1, 10);
+            await expect(failing.cartSync.prepareSignOut()).resolves.toBeUndefined();
+            expect(failing.store.getState().items).toEqual([]);
+            expect(failing.store.getState().owner).toBeNull();
         });
 
-        it('vacía el carrito aunque la subida falle', async () => {
-            const { store, server, cartSync } = await setupLoggedIn();
-            server.override('PUT', () => Promise.reject(new TypeError('Failed to fetch')));
-            store.getState().add(4, 1, 10);
-
-            await expect(cartSync.prepareSignOut()).resolves.toBeUndefined();
-
-            expect(store.getState().items).toEqual([]);
-            expect(store.getState().owner).toBeNull();
-        });
-
-        it('al volver a iniciar sesión, con otra cuenta, no hereda lo de la anterior', async () => {
-            const { store, server, cartSync } = await setupLoggedIn({
-                saved: [item(4, 2)],
-            });
+        it('al volver a iniciar sesión con otra cuenta no hereda lo de la anterior', async () => {
+            const { store, server, cartSync } = await setupLoggedIn({ saved: [item(4, 2)] });
             await cartSync.prepareSignOut();
             server.state.session = 8;
             server.state.saved = [item(9, 1)];
@@ -933,144 +727,11 @@ describe('createCartSync', () => {
             expect(server.posts()).toHaveLength(0);
         });
     });
-    describe('tiempo máximo de las peticiones', () => {
-        it('un GET que no responde se aborta a los 8 segundos y cuenta como error de red', async () => {
-            const { store, server, cartSync } = setup({ local: [item(4, 2)], owner: 5 });
-            let signal: AbortSignal | undefined;
-            server.override('GET', (init) => {
-                signal = init?.signal ?? undefined;
-                return hangUntilAborted(init);
-            });
-
-            const running = cartSync.sync();
-            await wait(7999);
-            expect(cartSync.isSynced()).toBe(false);
-            expect(signal?.aborted).toBe(false);
-
-            await wait(1);
-            await running;
-
-            expect(signal?.aborted).toBe(true);
-            expect(cartSync.isSynced()).toBe(true);
-            expect(store.getState().items).toEqual([item(4, 2)]); // lo local, como estaba
-            expect(store.getState().owner).toBe(5);
-            expect(vi.getTimerCount()).toBe(0);
-
-            // `activeUserId = null`: no se sube nada hasta la siguiente sync.
-            cartSync.start();
-            store.getState().add(7, 1, 10);
-            await wait(1000);
-            expect(server.puts()).toHaveLength(0);
-        });
-
-        it('el tiempo máximo se puede cambiar con timeoutMs', async () => {
-            const { server, cartSync } = setup({ timeoutMs: 500 });
-            server.override('GET', hangUntilAborted);
-
-            const running = cartSync.sync();
-            await wait(500);
-            await running;
-
-            expect(cartSync.isSynced()).toBe(true);
-        });
-
-        it('un POST de fusión que no responde se aborta y lo local queda sin fusionar', async () => {
-            const { store, server, cartSync } = setup({ local: [item(7, 3)], saved: [item(4, 2)] });
-            server.override('POST', hangUntilAborted);
-
-            const running = cartSync.sync();
-            await wait(8000);
-            await running;
-
-            expect(cartSync.isSynced()).toBe(true);
-            expect(store.getState().items).toEqual([item(7, 3)]);
-            expect(store.getState().owner).toBeNull();
-
-            await cartSync.sync(); // la siguiente sync lo reintenta
-            expect(store.getState().owner).toBe(5);
-            expect(store.getState().items).toEqual([item(4, 2), item(7, 3)]);
-        });
-
-        it('un PUT que no responde se aborta, queda pendiente y no bloquea la cola', async () => {
-            const { store, server } = await setupLoggedIn();
-            let signal: AbortSignal | undefined;
-            server.override('PUT', (init) => {
-                signal = init?.signal ?? undefined;
-                return hangUntilAborted(init);
-            });
-
-            store.getState().add(4, 1, 10);
-            await wait(300);
-            expect(server.puts()).toHaveLength(1);
-
-            store.getState().add(7, 1, 10);
-            await wait(7999); // el segundo cambio espera en la cola tras el PUT colgado
-            expect(server.puts()).toHaveLength(1);
-
-            await wait(1);
-
-            expect(signal?.aborted).toBe(true);
-            expect(server.puts()).toHaveLength(2);
-            expect(server.puts()[1].items).toEqual([item(4, 1), item(7, 1)]);
-            expect(server.state.saved).toEqual([item(4, 1), item(7, 1)]);
-        });
-
-        it('flush y prepareSignOut terminan aunque el PUT no responda', async () => {
-            const { store, server, cartSync } = await setupLoggedIn();
-            server.override('PUT', hangUntilAborted);
-            store.getState().add(4, 1, 10);
-
-            const signingOut = cartSync.prepareSignOut();
-            await wait(8000);
-            await signingOut;
-
-            expect(store.getState().items).toEqual([]);
-            expect(store.getState().owner).toBeNull();
-            expect(vi.getTimerCount()).toBe(0);
-        });
-
-        it('una subida con keepalive no se aborta, pero tampoco bloquea la cola más del tiempo máximo', async () => {
-            const { store, server, hide } = await setupLoggedIn();
-            let init: RequestInit | undefined;
-            server.override('PUT', (received) => {
-                init = received;
-                return new Promise<Response>(() => {}); // nunca responde ni respeta la señal
-            });
-
-            store.getState().add(4, 1, 10);
-            hide.fire();
-            await wait(0);
-            expect(server.puts()).toHaveLength(1);
-            expect(init?.keepalive).toBe(true);
-            expect(init?.signal).toBeUndefined();
-
-            store.getState().add(7, 1, 10);
-            await wait(7999);
-            expect(server.puts()).toHaveLength(1);
-            await wait(1);
-
-            expect(server.puts()).toHaveLength(2);
-            expect(server.puts()[1].items).toEqual([item(4, 1), item(7, 1)]);
-        });
-
-        it('las peticiones normales llevan señal de aborto y no dejan temporizadores al acabar', async () => {
-            const { store, server, cartSync } = setup({ saved: [item(4, 2)] });
-            await cartSync.sync();
-            cartSync.start();
-            store.getState().add(7, 1, 10);
-            await cartSync.flush();
-
-            expect(
-                server.fetchFn.mock.calls.map(([, init]) => init?.signal instanceof AbortSignal),
-            ).toEqual([true, true]);
-            expect(vi.getTimerCount()).toBe(0);
-        });
-    });
 
     describe('resyncIfOwnerChanged', () => {
         it('inicio de sesión en otra pestaña: el dueño pasa de null a una cuenta y hace sync', async () => {
             const { store, server, cartSync } = setup({ session: null });
-            await cartSync.sync(); // esta pestaña cargó anónima
+            await cartSync.sync(); // esta pestaña cargó sin sesión
             cartSync.start();
             server.requests.length = 0;
 
@@ -1089,7 +750,7 @@ describe('createCartSync', () => {
             expect(server.puts()[0].items).toEqual([item(4, 2), item(7, 1)]);
         });
 
-        it('cierre de sesión en otra pestaña: el dueño pasa a null, el GET da 401 y no se sube nada', async () => {
+        it('cierre de sesión en otra pestaña: el dueño pasa a null, el GET dice que no hay sesión y no se sube nada', async () => {
             const { store, server, cartSync } = await setupLoggedIn({
                 saved: [item(4, 2)],
                 local: [item(4, 2)],
@@ -1110,7 +771,7 @@ describe('createCartSync', () => {
 
         it.each([
             ['con sesión y el mismo dueño', 5, 5],
-            ['anónimo y sin dueño', null, null],
+            ['sin sesión y sin dueño', null, null],
         ])(
             'si el dueño coincide con la cuenta activa (%s) no hace peticiones',
             async (_, session, owner) => {
@@ -1134,125 +795,82 @@ describe('createCartSync', () => {
             expect(server.requests).toHaveLength(1);
         });
     });
+});
 
-    describe('cambios del usuario mientras vuela una sync', () => {
-        it('con un carrito de la propia cuenta, lo añadido durante el GET no se pierde: se conserva y se sube', async () => {
-            const { store, server, cartSync } = setup({ owner: 5, saved: [item(9, 1)] });
-            cartSync.start();
-            const release = server.hold('GET');
+/**
+ * El tiempo máximo usa `AbortSignal.timeout`, que corre con temporizadores reales: estos tests no
+ * usan los simulados y ponen un `timeoutMs` pequeño.
+ */
+describe('createCartSync: tiempo máximo de las peticiones', () => {
+    const TIMEOUT_MS = 20;
 
-            const running = cartSync.sync();
-            store.getState().add(4, 1, 10); // la ficha no espera a `synced`
-            release();
-            await running;
-
-            expect(store.getState().items).toEqual([item(4, 1)]);
-            expect(store.getState().owner).toBe(5);
-
-            await wait(300); // el último en escribir gana
-            expect(server.puts()).toHaveLength(1);
-            expect(server.puts()[0].items).toEqual([item(4, 1)]);
-            expect(server.state.saved).toEqual([item(4, 1)]);
+    /** Deja el servidor sin contestar la próxima petición con ese método y devuelve la señal que recibe. */
+    const hang = (server: FakeServer, method: string) => {
+        const received: { signal?: AbortSignal } = {};
+        server.override(method, (init) => {
+            received.signal = init?.signal ?? undefined;
+            return hangUntilAborted(init);
         });
+        return received;
+    };
 
-        it('si lo cambiado durante el GET deja el carrito igual que el del servidor, no sube nada', async () => {
-            const { store, server, cartSync } = setup({ owner: 5, saved: [item(4, 1)] });
-            cartSync.start();
-            const release = server.hold('GET');
-
-            const running = cartSync.sync();
-            store.getState().add(4, 1, 10);
-            release();
-            await running;
-            await wait(1000);
-
-            expect(store.getState().items).toEqual([item(4, 1)]);
-            expect(server.puts()).toHaveLength(0);
+    it('un GET que no responde se aborta y cuenta como error de red', async () => {
+        const { store, server, cartSync } = setup({
+            local: [item(4, 2)],
+            owner: 5,
+            timeoutMs: TIMEOUT_MS,
         });
+        const request = hang(server, 'GET');
 
-        it('un carrito de otra cuenta se descarta aunque cambie durante el GET', async () => {
-            const { store, server, cartSync } = setup({
-                owner: 9,
-                local: [item(1, 1)],
-                saved: [item(4, 2)],
-            });
-            cartSync.start();
-            const release = server.hold('GET');
+        await cartSync.sync();
 
-            const running = cartSync.sync();
-            store.getState().add(7, 1, 10);
-            release();
-            await running;
-            await wait(1000);
+        expect(request.signal?.aborted).toBe(true);
+        expect(cartSync.isSynced()).toBe(true);
+        expect(store.getState().items).toEqual([item(4, 2)]); // lo local, como estaba
+        expect(store.getState().owner).toBe(5);
+    });
 
-            expect(store.getState().items).toEqual([item(4, 2)]);
-            expect(store.getState().owner).toBe(5);
-            expect(server.puts()).toHaveLength(0);
+    it('un POST de fusión que no responde se aborta y lo local queda sin fusionar hasta la siguiente sync', async () => {
+        const { store, server, cartSync } = setup({
+            local: [item(7, 3)],
+            saved: [item(4, 2)],
+            timeoutMs: TIMEOUT_MS,
         });
+        const request = hang(server, 'POST');
 
-        it('un carrito anónimo vacío que se llena durante el GET se fusiona en vez de descartarse', async () => {
-            const { store, server, cartSync } = setup({ saved: [item(9, 1)] });
-            const release = server.hold('GET');
+        await cartSync.sync();
 
-            const running = cartSync.sync();
-            store.getState().add(4, 1, 10);
-            release();
-            await running;
+        expect(request.signal?.aborted).toBe(true);
+        expect(store.getState().items).toEqual([item(7, 3)]);
+        expect(store.getState().owner).toBeNull();
 
-            expect(server.posts()).toHaveLength(1);
-            expect(server.posts()[0].items).toEqual([item(4, 1)]);
-            expect(store.getState().items).toEqual([item(9, 1), item(4, 1)]);
-            expect(store.getState().owner).toBe(5);
-        });
+        await cartSync.sync();
+        expect(store.getState().owner).toBe(5);
+        expect(store.getState().items).toEqual([item(4, 2), item(7, 3)]);
+    });
 
-        it('lo añadido durante el POST de la fusión se vuelve a fusionar antes de adoptar', async () => {
-            const { store, server, cartSync } = setup({
-                saved: [item(4, 2)],
-                local: [item(7, 3)],
-            });
-            cartSync.start();
-            const release = server.hold('POST');
+    it('un PUT que no responde se aborta, queda pendiente y no bloquea la cola', async () => {
+        const { store, server, cartSync } = await setupLoggedIn({ timeoutMs: TIMEOUT_MS });
+        const request = hang(server, 'PUT');
 
-            const running = cartSync.sync();
-            await wait(0);
-            store.getState().add(8, 1, 10); // mientras el POST vuela
-            release();
-            await running;
+        store.getState().add(4, 1, 10);
+        await cartSync.flush(); // el PUT cuelga y se aborta
+        expect(request.signal?.aborted).toBe(true);
+        expect(server.state.saved).toEqual([]);
 
-            expect(server.posts()).toHaveLength(2);
-            expect(server.posts()[0].items).toEqual([item(7, 3)]);
-            expect(server.posts()[1].items).toEqual([item(7, 3), item(8, 1)]);
-            expect(store.getState().items).toEqual([item(4, 2), item(7, 3), item(8, 1)]);
-            expect(store.getState().owner).toBe(5);
+        store.getState().add(7, 1, 10);
+        await cartSync.flush();
+        expect(server.state.saved).toEqual([item(4, 1), item(7, 1)]);
+    });
 
-            await wait(1000);
-            expect(server.puts()).toHaveLength(0);
-        });
+    it('prepareSignOut termina aunque el PUT no responda', async () => {
+        const { store, server, cartSync } = await setupLoggedIn({ timeoutMs: TIMEOUT_MS });
+        hang(server, 'PUT');
+        store.getState().add(4, 1, 10);
 
-        it('si el POST no ve cambios, una sola ronda y todo como siempre', async () => {
-            const { store, server, cartSync } = setup({ saved: [item(4, 2)], local: [item(7, 3)] });
+        await cartSync.prepareSignOut();
 
-            await cartSync.sync();
-
-            expect(server.posts()).toHaveLength(1);
-            expect(store.getState().items).toEqual([item(4, 2), item(7, 3)]);
-        });
-
-        it('repite la fusión como mucho 3 rondas y adopta el resultado de la última', async () => {
-            const { store, server, cartSync } = setup({ saved: [item(4, 2)], local: [item(7, 3)] });
-            // Cada POST responde después de que el usuario haya añadido otra línea.
-            [10, 11, 12].forEach((variantId) =>
-                server.override('POST', async () => {
-                    store.getState().add(variantId, 1, 10);
-                    return json(200, { items: [item(4, 2)] });
-                }),
-            );
-
-            await cartSync.sync();
-
-            expect(server.posts()).toHaveLength(3);
-            expect(store.getState().items).toEqual([item(4, 2)]);
-            expect(store.getState().owner).toBe(5);
-        });
+        expect(store.getState().items).toEqual([]);
+        expect(store.getState().owner).toBeNull();
     });
 });

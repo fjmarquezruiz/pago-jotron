@@ -11,17 +11,19 @@ import { cartStore, type CartState } from '@/stores/cart';
  * `CartHydrator` y los formularios de sesión, y se puede probar sin DOM inyectando `fetchFn`.
  *
  * - **Al cargar o iniciar sesión** (`sync`): pregunta al servidor quién es el usuario. Sin sesión,
- *   el carrito sigue siendo local; si era de una cuenta cuya sesión ha caducado (401 con `owner`),
- *   se vacía para que no pase a la persona siguiente. Con sesión, `planCartSync` decide: el carrito
+ *   el carrito sigue siendo local; si era de una cuenta cuya sesión ha caducado (`owner`), se
+ *   vacía para que no pase a la persona siguiente. Con sesión, `planCartSync` decide: el carrito
  *   anónimo se fusiona una sola vez (`POST /api/carrito/fusionar`) y en los demás casos se adopta
- *   el del servidor. Después manda el servidor. Si el usuario toca el carrito mientras la petición
- *   vuela, no se pisa: el último en escribir gana (ver `sync`).
+ *   el del servidor. Después manda el servidor: un cambio hecho mientras vuela esa petición se
+ *   pierde (aceptado).
  * - **Mientras hay sesión** (`start`): cada cambio del almacén se sube (`PUT /api/carrito`) con
- *   un pequeño retraso que junta los cambios seguidos, con una sola petición en vuelo. El servidor
- *   sanea el carrito (quita lo no vendible, limita al stock) y, si el resultado difiere de lo
- *   local, se adopta.
- * - **Al ocultar la pestaña** se sube al instante lo pendiente (`keepalive`); **al cerrar sesión**
- *   (`prepareSignOut`), se sube y se vacía el carrito local para que no pase a la siguiente persona.
+ *   un pequeño retraso que junta los cambios seguidos, con una sola petición en vuelo. Todo PUT
+ *   lleva `keepalive`, para que el navegador lo termine aunque se cierre la pestaña. Eso solo
+ *   salva peticiones ya enviadas: un cambio de menos de `debounceMs` antes de cerrar se pierde
+ *   (aceptado). El cliente no lee la respuesta del PUT: lo que el servidor sanee (quitar lo no
+ *   vendible, limitar al stock) se refleja al recargar (`sync`) y en la página del carrito.
+ * - **Al cerrar sesión** (`prepareSignOut`) se sube lo pendiente y se vacía el carrito local para
+ *   que no pase a la persona siguiente.
  *
  * Solo se sube mientras el dueño del carrito (`owner`) es la cuenta activa: un carrito local que
  * aún no se ha fusionado (dueño `null`) nunca pisa el de la cuenta.
@@ -42,9 +44,6 @@ const DEFAULT_DEBOUNCE_MS = 300;
 /** Milisegundos que se espera la respuesta de una petición antes de darla por perdida. */
 const DEFAULT_TIMEOUT_MS = 8000;
 
-/** Veces como mucho que `sync` repite la fusión porque el carrito cambió mientras la petición volaba. */
-const MAX_MERGE_ROUNDS = 3;
-
 /** `GET /api/carrito`: la cuenta y su carrito, o `userId: null` (y sin líneas) si no hay sesión. */
 const serverCartSchema = cartItemsRequestSchema.extend({ userId: variantIdSchema.nullable() });
 
@@ -53,9 +52,6 @@ type CartStoreLike = Pick<StoreApi<CartState>, 'getState' | 'subscribe'>;
 
 /** `fetch` reducido a lo que usa el motor: una ruta del propio sitio. */
 export type CartFetch = (input: string, init?: RequestInit) => Promise<Response>;
-
-/** Registra una función que debe llamarse al ocultar la pestaña; devuelve cómo desregistrarla. */
-export type CartHideRegistrar = (onHide: () => void) => () => void;
 
 /** Opciones de `createCartSync`. Todas son opcionales; solo los tests suelen cambiarlas. */
 export interface CartSyncOptions {
@@ -67,8 +63,6 @@ export interface CartSyncOptions {
     debounceMs?: number;
     /** Tiempo máximo, en milisegundos, de cada petición; pasado, cuenta como error de red. Por defecto, 8000. */
     timeoutMs?: number;
-    /** Cómo enterarse de que se oculta la pestaña. Por defecto, `visibilitychange` y `pagehide`. */
-    onHide?: CartHideRegistrar;
 }
 
 /** Lo que devuelve `createCartSync`. Son funciones sueltas (no usan `this`) para pasarlas tal cual a React. */
@@ -76,11 +70,6 @@ export interface CartSync {
     /**
      * Pone el almacén al día con la cuenta (ver arriba). Nunca lanza; si ya hay una en curso,
      * devuelve esa misma. Debe llamarse con el carrito ya recuperado de `localStorage`.
-     *
-     * Si el usuario cambia el carrito mientras la petición vuela, no se pierde: con un carrito de
-     * la propia cuenta se conserva lo local y se sube (el último en escribir gana, lo del servidor
-     * que no esté en lo local se sobrescribe); con la fusión del carrito anónimo se repite con lo
-     * local de ahora (hasta `MAX_MERGE_ROUNDS` veces) antes de adoptar el resultado.
      */
     sync: () => Promise<void>;
     /**
@@ -101,66 +90,24 @@ export interface CartSync {
     prepareSignOut: () => Promise<void>;
 }
 
-/**
- * Registro por defecto de `onHide`: llama a `onHide` cuando la pestaña se oculta
- * (`visibilitychange` con `document.hidden`) y cuando se abandona la página (`pagehide`).
- * Donde no hay `document` o `window` (servidor, tests) no registra nada.
- */
-function registerPageHide(onHide: () => void): () => void {
-    const cleanups: (() => void)[] = [];
+/** Cómo ha ido la pregunta por la sesión: con cuenta y carrito, anónimo o sin saberlo. */
+type SessionCheck =
+    { kind: 'session'; userId: number; items: Cart } | { kind: 'anonymous' } | { kind: 'unknown' };
 
-    if (typeof document !== 'undefined') {
-        const onVisibilityChange = () => {
-            if (document.hidden) onHide();
-        };
-        document.addEventListener('visibilitychange', onVisibilityChange);
-        cleanups.push(() => document.removeEventListener('visibilitychange', onVisibilityChange));
-    }
-    if (typeof window !== 'undefined') {
-        window.addEventListener('pagehide', onHide);
-        cleanups.push(() => window.removeEventListener('pagehide', onHide));
-    }
-
-    return () => cleanups.forEach((cleanup) => cleanup());
-}
-
-/**
- * Petición con cuerpo `{ items }` en JSON. `keepalive` deja que la petición termine aunque la
- * página se cierre: solo se añade cuando hace falta.
- */
-function jsonRequest(method: 'PUT' | 'POST', items: Cart, keepalive = false): RequestInit {
+/** Petición con cuerpo `{ items }` en JSON. Los PUT llevan `keepalive` (ver la cabecera). */
+function jsonRequest(method: 'PUT' | 'POST', items: Cart): RequestInit {
     return {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items }),
-        ...(keepalive ? { keepalive: true } : {}),
+        keepalive: method === 'PUT',
     };
-}
-
-/** Respuesta ya leída: el estado HTTP y, si era un 200 con el cuerpo esperado, ese cuerpo. */
-interface CartReply<T> {
-    status: number;
-    body: T | null;
-}
-
-/** Cómo ha ido la pregunta por la sesión: con cuenta y carrito, anónimo (401) o sin saberlo. */
-type SessionCheck =
-    { kind: 'session'; userId: number; items: Cart } | { kind: 'anonymous' } | { kind: 'unknown' };
-
-/** Lee el cuerpo de una respuesta y lo valida con `schema`; `null` si no es JSON o no lo cumple. */
-async function readBody<T>(response: Response, schema: z.ZodType<T>): Promise<T | null> {
-    try {
-        const parsed = schema.safeParse(await response.json());
-        return parsed.success ? parsed.data : null;
-    } catch {
-        return null;
-    }
 }
 
 /**
  * Crea un motor de sincronización del carrito.
  *
- * @param options - Almacén, `fetch`, retraso y aviso de ocultar la pestaña; ver `CartSyncOptions`.
+ * @param options - Almacén, `fetch`, retraso y tiempo máximo; ver `CartSyncOptions`.
  * @returns Las funciones del motor; cada llamada crea uno independiente.
  *
  * @example
@@ -173,7 +120,6 @@ export function createCartSync(options: CartSyncOptions = {}): CartSync {
     const fetchFn: CartFetch = options.fetchFn ?? ((input, init) => globalThis.fetch(input, init));
     const debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    const onHide = options.onHide ?? registerPageHide;
 
     /** Cuenta con sesión según el último `sync`; `null` si es anónimo o no se pudo saber. */
     let activeUserId: number | null = null;
@@ -187,42 +133,22 @@ export function createCartSync(options: CartSyncOptions = {}): CartSync {
     const listeners = new Set<() => void>();
 
     /**
-     * Hace la petición y lee su cuerpo, todo dentro del tiempo máximo (`timeoutMs`). Devuelve
-     * `null` si falla la red o se agota el tiempo. Las peticiones normales se cancelan con un
-     * `AbortController` (con el `setTimeout` global, no `AbortSignal.timeout`); las de `keepalive`
-     * no, para que el navegador pueda terminarlas aunque se cierre la página, pero tampoco se
-     * espera por ellas más del tiempo máximo: la cola de subidas no se queda colgada.
+     * Hace la petición dentro del tiempo máximo (`timeoutMs`). Con `schema`, lee y valida el
+     * cuerpo de un 200; sin él, no lo lee. Devuelve `null` si falla la red o se agota el tiempo.
      */
-    async function call<T>(
+    async function call<T = never>(
         path: string,
         init: RequestInit,
-        schema: z.ZodType<T>,
-    ): Promise<CartReply<T> | null> {
-        const controller = init.keepalive ? null : new AbortController();
-        let timeoutId: ReturnType<typeof setTimeout> | undefined;
-        const timedOut = new Promise<null>((resolve) => {
-            timeoutId = setTimeout(() => {
-                controller?.abort();
-                resolve(null);
-            }, timeoutMs);
-        });
-        const exchange = async (): Promise<CartReply<T> | null> => {
-            try {
-                const response = await fetchFn(
-                    path,
-                    controller ? { ...init, signal: controller.signal } : init,
-                );
-                const body = response.status === 200 ? await readBody(response, schema) : null;
-                return { status: response.status, body };
-            } catch {
-                return null;
-            }
-        };
-
+        schema?: z.ZodType<T>,
+    ): Promise<{ status: number; body: T | null } | null> {
         try {
-            return await Promise.race([exchange(), timedOut]);
-        } finally {
-            clearTimeout(timeoutId);
+            const signal = AbortSignal.timeout(timeoutMs);
+            const response = await fetchFn(path, { ...init, signal });
+            if (!schema || response.status !== 200) return { status: response.status, body: null };
+            const parsed = schema.safeParse(await response.json());
+            return { status: response.status, body: parsed.success ? parsed.data : null };
+        } catch {
+            return null;
         }
     }
 
@@ -263,47 +189,30 @@ export function createCartSync(options: CartSyncOptions = {}): CartSync {
     }
 
     /**
-     * Procesa la respuesta de una subida correcta: el servidor tiene ahora `serverItems`. Si lo
-     * saneó (difiere de lo enviado) y el carrito local no ha cambiado desde entonces, lo adopta.
-     * Si ha cambiado mientras la petición volaba, lo local sigue por delante de lo que el servidor
-     * sabe (`lastSynced`): se programa otra subida, porque el aviso del almacén de ese cambio se
-     * pudo descartar al coincidir con el `lastSynced` anterior (p. ej. añadir y quitar la misma línea).
+     * Sube el carrito si hay algo pendiente. Nunca lanza. Un 200 da por guardado lo enviado; un
+     * 401 deja la cuenta como anónima (no se vacía aquí: la siguiente `sync` lo hará); cualquier
+     * otra cosa lo deja pendiente hasta el siguiente cambio.
      */
-    function applyUploaded(userId: number, sentKey: string, serverItems: Cart) {
-        const serverKey = cartKey(serverItems);
-        lastSynced = serverKey;
-        const { owner, items } = store.getState();
-        const unchanged = owner === userId && cartKey(items) === sentKey;
-        if (unchanged && serverKey !== sentKey) adoptServerCart(userId, serverItems);
-        if (pendingUser() !== null) scheduleUpload();
-    }
-
-    /** Sube el carrito si hay algo pendiente. Nunca lanza; si falla, lo deja pendiente. */
-    async function uploadPending(keepalive: boolean): Promise<void> {
+    async function uploadPending(): Promise<void> {
         const userId = pendingUser();
         if (userId === null) return;
         const { items } = store.getState();
         const sentKey = cartKey(items);
 
-        const reply = await call(
-            CART_API,
-            jsonRequest('PUT', items, keepalive),
-            cartItemsRequestSchema,
-        );
-        if (reply === null) return;
-        if (reply.status === 401) {
-            // Sesión caducada: no se vacía aquí; la siguiente `sync` lo hará.
-            if (activeUserId === userId) setActiveUser(null);
-            return;
-        }
-        if (reply.body !== null && activeUserId === userId) {
-            applyUploaded(userId, sentKey, reply.body.items);
-        }
+        const reply = await call(CART_API, jsonRequest('PUT', items));
+        if (reply === null || activeUserId !== userId) return;
+        if (reply.status === 401) setActiveUser(null);
+        if (reply.status !== 200) return;
+
+        lastSynced = sentKey;
+        // Si lo local cambió mientras volaba el PUT (y puede haber vuelto a un valor que ya
+        // coincidía con el `lastSynced` anterior, cancelando la subida), hay que subirlo otra vez.
+        if (pendingUser() !== null) scheduleUpload();
     }
 
     /** Pone una subida en la cola: se hace cuando acaben las anteriores, y solo si aún hay algo pendiente. */
-    function enqueueUpload(keepalive: boolean): Promise<void> {
-        uploads = uploads.then(() => uploadPending(keepalive)).catch(() => undefined);
+    function enqueueUpload(): Promise<void> {
+        uploads = uploads.then(uploadPending).catch(() => undefined);
         return uploads;
     }
 
@@ -312,7 +221,7 @@ export function createCartSync(options: CartSyncOptions = {}): CartSync {
         cancelTimer();
         timer = setTimeout(() => {
             timer = null;
-            void enqueueUpload(false);
+            void enqueueUpload();
         }, debounceMs);
     }
 
@@ -322,19 +231,12 @@ export function createCartSync(options: CartSyncOptions = {}): CartSync {
         else cancelTimer();
     }
 
-    /** Al ocultar la pestaña: sube ya lo pendiente, con `keepalive` por si la página se cierra. */
-    function onPageHidden() {
-        cancelTimer();
-        void enqueueUpload(true);
-    }
-
-    /** Pregunta al servidor por la sesión y su carrito. Sin sesión: `anonymous`. Sin saber (red, tiempo, 5xx, cuerpo no válido): `unknown`. */
+    /** Pregunta al servidor por la sesión y su carrito. Sin saber (red, tiempo, 5xx, cuerpo no válido): `unknown`. */
     async function checkSession(): Promise<SessionCheck> {
         const reply = await call(CART_API, {}, serverCartSchema);
-        if (reply === null) return { kind: 'unknown' };
         // Sin sesión el servidor responde 200 con `userId: null`; el 401 se mantiene por si lo devuelve un intermediario.
-        if (reply.status === 401) return { kind: 'anonymous' };
-        if (reply.status === 200 && reply.body !== null) {
+        if (reply?.status === 401) return { kind: 'anonymous' };
+        if (reply?.body) {
             const { userId, items } = reply.body;
             return userId === null ? { kind: 'anonymous' } : { kind: 'session', userId, items };
         }
@@ -342,9 +244,9 @@ export function createCartSync(options: CartSyncOptions = {}): CartSync {
     }
 
     /**
-     * El servidor dice que no hay sesión (200 con `userId: null`, o 401). Si el carrito local era de una cuenta (`owner`), esa
-     * sesión ha caducado sin cerrarla: se vacía, para que ni la persona anónima siguiente lo vea ni
-     * lo que añada herede ese dueño. Se olvida la cuenta antes de vaciar, así que no provoca ninguna subida.
+     * Sin sesión. Si el carrito local era de una cuenta (`owner`), esa sesión ha caducado sin
+     * cerrarla: se vacía, para que ni la persona anónima siguiente lo vea ni lo que añada herede
+     * ese dueño. Se olvida la cuenta antes de vaciar, así que no provoca ninguna subida.
      */
     function forgetSession() {
         setActiveUser(null);
@@ -354,45 +256,20 @@ export function createCartSync(options: CartSyncOptions = {}): CartSync {
 
     /**
      * Manda el carrito anónimo al servidor para fusionarlo con el de la cuenta y adopta el
-     * resultado. Si el carrito local cambia mientras la petición vuela, repite la fusión con lo
-     * local de ahora (hasta `MAX_MERGE_ROUNDS` rondas; la última adopta el resultado pase lo que
-     * pase). Si falla, no toca nada: lo local sigue sin dueño y `sync` lo reintentará.
+     * resultado. Si falla, no toca nada: lo local sigue sin dueño y `sync` lo reintentará.
      */
-    async function mergeLocalCart(userId: number) {
-        for (let round = 1; round <= MAX_MERGE_ROUNDS; round++) {
-            const sent = store.getState().items;
-            const sentKey = cartKey(sent);
-            const reply = await call(
-                CART_MERGE_API,
-                jsonRequest('POST', sent),
-                cartItemsRequestSchema,
-            );
-            if (reply === null) return;
-            if (reply.status === 401) {
-                if (activeUserId === userId) setActiveUser(null);
-                return;
-            }
-            if (reply.body === null || activeUserId !== userId) return;
-
-            const changed = cartKey(store.getState().items) !== sentKey;
-            if (!changed || round === MAX_MERGE_ROUNDS) {
-                adoptServerCart(userId, reply.body.items);
-                return;
-            }
-        }
-    }
-
-    /**
-     * El carrito local es de esta cuenta, pero el usuario lo cambió mientras volaba el GET: adoptar
-     * el del servidor borraría ese cambio. Se conserva lo local y se sube (el último en escribir gana).
-     */
-    function keepLocalCart(serverItems: Cart) {
-        lastSynced = cartKey(serverItems);
-        if (pendingUser() !== null) scheduleUpload();
+    async function mergeLocalCart(userId: number, items: Cart) {
+        const reply = await call(
+            CART_MERGE_API,
+            jsonRequest('POST', items),
+            cartItemsRequestSchema,
+        );
+        if (reply === null || activeUserId !== userId) return;
+        if (reply.status === 401) setActiveUser(null);
+        else if (reply.body !== null) adoptServerCart(userId, reply.body.items);
     }
 
     async function syncOnce() {
-        const keyBefore = cartKey(store.getState().items);
         const session = await checkSession();
         if (session.kind === 'unknown') {
             setActiveUser(null);
@@ -407,8 +284,7 @@ export function createCartSync(options: CartSyncOptions = {}): CartSync {
         setActiveUser(userId);
         const { owner, items } = store.getState();
         const plan = planCartSync({ localOwner: owner, userId, localItems: items });
-        if (plan === 'merge') await mergeLocalCart(userId);
-        else if (owner === userId && cartKey(items) !== keyBefore) keepLocalCart(serverItems);
+        if (plan === 'merge') await mergeLocalCart(userId, items);
         else adoptServerCart(userId, serverItems);
     }
 
@@ -434,17 +310,15 @@ export function createCartSync(options: CartSyncOptions = {}): CartSync {
 
     function start(): () => void {
         const unsubscribe = store.subscribe(onStoreChange);
-        const unregisterHide = onHide(onPageHidden);
         return () => {
             unsubscribe();
-            unregisterHide();
             cancelTimer();
         };
     }
 
     async function flush(): Promise<void> {
         cancelTimer();
-        await enqueueUpload(false);
+        await enqueueUpload();
     }
 
     function resyncIfOwnerChanged(): Promise<void> {
