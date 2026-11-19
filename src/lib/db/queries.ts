@@ -133,6 +133,21 @@ export async function getShippingTypes() {
         .orderBy(asc(shippingTypes.id));
 }
 
+/**
+ * Una modalidad de envío por su id, solo si se ofrece (no bloqueada): el checkout cobra el coste
+ * que dice la BD, nunca uno que mande el navegador.
+ *
+ * @param id - `shipping_types.shipping_type_id`.
+ * @returns La modalidad, o `null` si no existe o está bloqueada.
+ */
+export async function getShippingTypeById(id: number) {
+    const [row] = await db
+        .select()
+        .from(shippingTypes)
+        .where(and(eq(shippingTypes.id, id), eq(shippingTypes.isBlocked, false)));
+    return row ?? null;
+}
+
 /** Parámetros del listado: página (desde 1), productos por página, filtros y orden (RF5). */
 export interface CatalogPageParams {
     page: number;
@@ -868,4 +883,29 @@ export async function createUserAddress(
             .where(eq(addresses.id, insertId));
         return created;
     });
+}
+
+/**
+ * Una dirección vigente de un usuario por su id. Filtra por usuario: la dirección de otra cuenta
+ * no se devuelve aunque exista.
+ *
+ * @param userId - Id del usuario, el de la sesión (`getSessionUserId`).
+ * @param addressId - `addresses.address_id`.
+ * @returns La dirección, o `null` si no existe, es de otro usuario o ya fue sustituida.
+ */
+export async function getUserAddress(
+    userId: number,
+    addressId: number,
+): Promise<UserAddress | null> {
+    const [row] = await db
+        .select(addressColumns())
+        .from(addresses)
+        .where(
+            and(
+                eq(addresses.id, addressId),
+                eq(addresses.userId, userId),
+                eq(addresses.isActive, true),
+            ),
+        );
+    return row ?? null;
 }
