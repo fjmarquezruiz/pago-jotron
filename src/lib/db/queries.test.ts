@@ -12,6 +12,15 @@ import {
     catalogItemsQuery,
     catalogOrderBy,
     cartLinesQuery,
+    clearUserCartQuery,
+    decrementStockQuery,
+    insertOrderLinesQuery,
+    insertOrderQuery,
+    orderByPaymentIntentQuery,
+    orderLinesQuery,
+    updateUserProfileQuery,
+    userOrderQuery,
+    userProfileQuery,
     userAddressesQuery,
     deleteMissingCartItemsQuery,
     featuredProductsQuery,
@@ -831,5 +840,129 @@ describe('userAddressesQuery', () => {
     it('incluye el destinatario y no devuelve el usuario ni si está vigente', () => {
         expect(sql).toContain('`recipient_name`');
         expect(sql.split(' from ')[0]).not.toMatch(/user_id|is_active/);
+    });
+});
+
+describe('userProfileQuery', () => {
+    const { sql, params } = userProfileQuery(12).toSQL();
+
+    it('lee el perfil de ese usuario', () => {
+        expect(sql).toContain('from `users`');
+        expect(sql).toContain('where `users`.`user_id` = ?');
+        expect(params).toEqual([12]);
+    });
+
+    it('devuelve los datos de contacto y nunca la contraseña ni el rol', () => {
+        const columns = sql.split(' from ')[0];
+        expect(columns).toContain('`id_card`');
+        expect(columns).toContain('`email`');
+        expect(columns).not.toMatch(/password|role|birth/);
+    });
+});
+
+describe('updateUserProfileQuery', () => {
+    const input = { name: 'Ana', lastName: 'López', phone: '600123456', idCard: null };
+    const { sql, params } = updateUserProfileQuery(12, input).toSQL();
+
+    it('actualiza nombre, apellidos, teléfono y NIF de ese usuario', () => {
+        expect(sql).toBe(
+            'update `users` set `name` = ?, `last_name` = ?, `id_card` = ?, `phone` = ? where `users`.`user_id` = ?',
+        );
+        expect(params).toEqual(['Ana', 'López', null, '600123456', 12]);
+    });
+
+    it('no toca el correo', () => {
+        expect(sql).not.toContain('`email`');
+    });
+});
+
+describe('orderByPaymentIntentQuery', () => {
+    const { sql, params } = orderByPaymentIntentQuery('pi_1').toSQL();
+
+    it('busca por el PaymentIntent y trae el estado', () => {
+        expect(sql).toContain('from `orders` inner join `order_statuses`');
+        expect(sql).toContain('where `orders`.`payment_intent_id` = ?');
+        expect(params).toEqual(['pi_1']);
+    });
+});
+
+describe('decrementStockQuery', () => {
+    const { sql, params } = decrementStockQuery(db, 4, 3).toSQL();
+
+    it('descuenta solo si queda stock suficiente', () => {
+        expect(sql).toBe(
+            'update `product_variants` set `stock` = `product_variants`.`stock` - ? where (`product_variants`.`variant_id` = ? and `product_variants`.`stock` >= ?)',
+        );
+        expect(params).toEqual([3, 4, 3]);
+    });
+});
+
+describe('insertOrderQuery y insertOrderLinesQuery', () => {
+    it('inserta el pedido con importes en texto decimal', () => {
+        const { sql, params } = insertOrderQuery(db, {
+            userId: 12,
+            shippingAddressId: 3,
+            billingAddressId: 3,
+            paymentMethod: 'Tarjeta',
+            shippingTypeId: 1,
+            shippingCost: '4.95',
+            total: '33.45',
+            statusId: 2,
+            paymentIntentId: 'pi_1',
+        }).toSQL();
+        expect(sql).toContain('insert into `orders`');
+        expect(params).toContain('33.45');
+        expect(params).toContain('pi_1');
+    });
+
+    it('inserta todas las líneas en un solo insert con el precio y el IVA fijados', () => {
+        const { sql, params } = insertOrderLinesQuery(db, 7, [
+            { variantId: 4, quantity: 2, unitPrice: '11.50', taxRate: '21.00' },
+            { variantId: 9, quantity: 1, unitPrice: '5.50', taxRate: '10.00' },
+        ]).toSQL();
+        expect(sql).toContain('insert into `order_products`');
+        expect(sql.match(/\(\?, \?, \?, \?, \?\)/g)).toHaveLength(2);
+        expect(params).toEqual([7, 4, 2, '11.50', '21.00', 7, 9, 1, '5.50', '10.00']);
+    });
+});
+
+describe('clearUserCartQuery', () => {
+    it('borra solo las líneas del carrito de ese usuario', () => {
+        const { sql, params } = clearUserCartQuery(db, 12).toSQL();
+        expect(sql).toBe('delete from `cart_products` where `cart_products`.`user_id` = ?');
+        expect(params).toEqual([12]);
+    });
+});
+
+describe('userOrderQuery', () => {
+    const { sql, params } = userOrderQuery(12, 5).toSQL();
+
+    it('filtra por pedido y por usuario', () => {
+        expect(sql).toContain('where (`orders`.`order_id` = ? and `orders`.`user_id` = ?)');
+        expect(params).toEqual([5, 12]);
+    });
+
+    it('trae estado, envío y dirección sin exigir que siga vigente', () => {
+        expect(sql).toContain('inner join `order_statuses`');
+        expect(sql).toContain('inner join `shipping_types`');
+        expect(sql).toContain(
+            'left join `addresses` on `addresses`.`address_id` = `orders`.`shipping_address_id`',
+        );
+        expect(sql).not.toContain('is_active');
+    });
+});
+
+describe('orderLinesQuery', () => {
+    const { sql, params } = orderLinesQuery(5).toSQL();
+
+    it('lee las líneas del pedido con el precio y el IVA guardados', () => {
+        expect(sql).toContain('`order_products`.`unit_price`');
+        expect(sql).toContain('`order_products`.`tax_rate`');
+        expect(sql).toContain('where `order_products`.`order_id` = ?');
+        expect(params).toEqual([5]);
+    });
+
+    it('las ordena por presentación', () => {
+        expect(sql).toContain('order by `order_products`.`variant_id` asc');
     });
 });

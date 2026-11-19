@@ -4,11 +4,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const create = vi.fn();
 const capturePI = vi.fn();
 const cancelPI = vi.fn();
+const retrievePI = vi.fn();
 vi.mock('./stripe', () => ({
-    getStripe: () => ({ paymentIntents: { create, capture: capturePI, cancel: cancelPI } }),
+    getStripe: () => ({
+        paymentIntents: { create, capture: capturePI, cancel: cancelPI, retrieve: retrievePI },
+    }),
 }));
 
-import { cancel, capture, createAuthorization, MIN_AMOUNT_CENTS, PaymentError } from './index';
+import {
+    cancel,
+    capture,
+    createAuthorization,
+    getAuthorization,
+    MIN_AMOUNT_CENTS,
+    PaymentError,
+} from './index';
 
 const input = { amountCents: 3345, userId: 12, cartFingerprint: 'a'.repeat(64) };
 const stripeError = (code?: string) =>
@@ -20,6 +30,12 @@ beforeEach(() => {
         .mockResolvedValue({ id: 'pi_1', client_secret: 'pi_1_secret_x', amount: 3345 });
     capturePI.mockReset().mockResolvedValue({ id: 'pi_1', amount_received: 3345 });
     cancelPI.mockReset().mockResolvedValue({ id: 'pi_1', amount: 3345 });
+    retrievePI.mockReset().mockResolvedValue({
+        id: 'pi_1',
+        status: 'requires_capture',
+        amount: 3345,
+        metadata: { userId: '12', cartFingerprint: 'a'.repeat(64) },
+    });
 });
 
 describe('createAuthorization', () => {
@@ -122,5 +138,39 @@ describe('cancel', () => {
             code: 'api_error',
             message: 'No se ha podido cancelar el pago',
         });
+    });
+});
+
+describe('getAuthorization', () => {
+    it('lee el PaymentIntent y devuelve estado, importe, cliente y huella', async () => {
+        await expect(getAuthorization('pi_1')).resolves.toEqual({
+            id: 'pi_1',
+            status: 'requires_capture',
+            amountCents: 3345,
+            userId: 12,
+            cartFingerprint: 'a'.repeat(64),
+        });
+        expect(retrievePI).toHaveBeenCalledWith('pi_1');
+    });
+
+    it.each([
+        ['sin metadata', undefined],
+        ['con el cliente vacío', { userId: '' }],
+        ['con un cliente que no es un número', { userId: 'abc' }],
+        ['con un cliente decimal', { userId: '1.5' }],
+        ['con el cliente 0', { userId: '0' }],
+    ])('el cliente es null %s', async (_, metadata) => {
+        retrievePI.mockResolvedValue({ id: 'pi_1', status: 'canceled', amount: 1, metadata });
+        const state = await getAuthorization('pi_1');
+        expect(state.userId).toBeNull();
+        expect(state.cartFingerprint).toBeNull();
+    });
+
+    it('un fallo de Stripe sale como PaymentError con su código', async () => {
+        retrievePI.mockRejectedValue(stripeError('resource_missing'));
+        const error = await getAuthorization('pi_x').catch((e) => e);
+        expect(error).toBeInstanceOf(PaymentError);
+        expect(error.code).toBe('resource_missing');
+        expect(error.message).toBe('No se ha podido consultar el pago');
     });
 });

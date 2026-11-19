@@ -30,8 +30,18 @@ export const ADDRESS_COUNTRY = 'España';
 /** Teléfono español: 9 dígitos que empiezan por 6, 7, 8 o 9, con o sin prefijo `+34` / `0034`. */
 const PHONE_PATTERN = /^[6-9]\d{8}$/;
 
+/**
+ * Teléfono español (RF3, RF7), compartido por las direcciones y el perfil: se escribe con o sin
+ * prefijo `+34` / `0034`, con espacios, puntos o guiones, y sale normalizado, solo con los 9 dígitos.
+ */
+export const phoneSchema = z
+    .string('El teléfono es obligatorio')
+    .trim()
+    .transform((value) => value.replace(/[\s.-]/g, '').replace(/^(\+34|0034)/, ''))
+    .refine((value) => PHONE_PATTERN.test(value), 'Introduce un teléfono español de 9 dígitos');
+
 /** Texto obligatorio, sin espacios en los extremos, con un máximo (el de la columna). */
-const requiredText = (label: string, max: number) =>
+export const requiredText = (label: string, max: number) =>
     z
         .string(`${label}: escribe un texto`)
         .trim()
@@ -41,11 +51,7 @@ const requiredText = (label: string, max: number) =>
 /** Campos que escribe el cliente. La provincia no está: se deriva del código postal. */
 const addressFields = z.object({
     recipientName: requiredText('El nombre y apellidos de quien recibe', 200),
-    phone: z
-        .string('El teléfono es obligatorio')
-        .trim()
-        .transform((value) => value.replace(/[\s.-]/g, '').replace(/^(\+34|0034)/, ''))
-        .refine((value) => PHONE_PATTERN.test(value), 'Introduce un teléfono español de 9 dígitos'),
+    phone: phoneSchema,
     streetType: z.enum(STREET_TYPES, 'Elige un tipo de vía válido').default('Calle'),
     streetName: requiredText('El nombre de la vía', 100),
     number: requiredText('El número', 10),

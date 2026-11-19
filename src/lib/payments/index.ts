@@ -36,6 +36,20 @@ export interface Authorization {
     amountCents: number;
 }
 
+/** Estado de una reserva, leído de Stripe: lo que el servidor comprueba antes de crear el pedido. */
+export interface AuthorizationState {
+    /** Id del PaymentIntent (`pi_…`). */
+    id: string;
+    /** Estado de Stripe: `requires_capture` es una reserva confirmada y lista para cobrar. */
+    status: string;
+    /** Importe reservado, en céntimos. */
+    amountCents: number;
+    /** Cliente que la creó (`metadata.userId`); `null` si falta o no es un entero válido. */
+    userId: number | null;
+    /** Huella del carrito autorizado (`metadata.cartFingerprint`); `null` si falta. */
+    cartFingerprint: string | null;
+}
+
 /** Resultado de capturar o cancelar. */
 export interface PaymentResult {
     id: string;
@@ -97,6 +111,29 @@ export async function createAuthorization({
         if (!intent.client_secret)
             throw new PaymentError('No se ha podido autorizar el pago', 'missing_client_secret');
         return { id: intent.id, clientSecret: intent.client_secret, amountCents: intent.amount };
+    });
+}
+
+/**
+ * Lee el estado de una reserva en Stripe, con el cliente y la huella del carrito que se guardaron
+ * al crearla. Al crear el pedido se comprueba que está confirmada (`requires_capture`), que es del
+ * cliente de la sesión y que importe y huella coinciden con lo recalculado en el servidor.
+ *
+ * @param paymentIntentId - Id del PaymentIntent (`pi_…`).
+ * @returns El estado de la reserva.
+ * @throws {PaymentError} Si Stripe falla o el PaymentIntent no existe (código `resource_missing`).
+ */
+export async function getAuthorization(paymentIntentId: string): Promise<AuthorizationState> {
+    return callStripe('consultar', async (stripe) => {
+        const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+        const userId = Number(intent.metadata?.userId);
+        return {
+            id: intent.id,
+            status: intent.status,
+            amountCents: intent.amount,
+            userId: Number.isInteger(userId) && userId >= 1 ? userId : null,
+            cartFingerprint: intent.metadata?.cartFingerprint || null,
+        };
     });
 }
 

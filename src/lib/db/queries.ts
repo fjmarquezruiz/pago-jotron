@@ -29,6 +29,7 @@ import { priceRangeBounds } from '@/lib/catalog/price-range';
 import { toVintageOptions, type CatalogFilterOptions } from '@/lib/catalog/filter-options';
 import { LIKE_ESCAPE, searchPattern } from '@/lib/catalog/search';
 import type { AddressInput } from '@/lib/validations/address';
+import type { ProfileInput } from '@/lib/validations/profile';
 import {
     DEFAULT_CATALOG_SORT,
     type CatalogFilters,
@@ -39,6 +40,9 @@ import {
     cartProducts,
     grapes,
     guaranteesOfOrigin,
+    orderProducts,
+    orderStatuses,
+    orders,
     productGrapes,
     productVariants,
     products,
@@ -909,3 +913,283 @@ export async function getUserAddress(
         );
     return row ?? null;
 }
+
+/** Columnas del perfil de contacto de una cuenta: nunca la contraseña, el rol ni la fecha de nacimiento. */
+function profileColumns() {
+    return {
+        name: users.name,
+        lastName: users.lastName,
+        email: users.email,
+        phone: users.phone,
+        idCard: users.idCard,
+    };
+}
+
+/**
+ * Consulta del perfil de contacto de un usuario. Se separa de `getUserProfile` para poder
+ * comprobar su SQL sin conectar a la BD.
+ *
+ * @param userId - Id del usuario (`users.user_id`).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function userProfileQuery(userId: number) {
+    return db.select(profileColumns()).from(users).where(eq(users.id, userId));
+}
+
+/**
+ * Perfil de contacto de una cuenta (RF3): nombre, apellidos, correo, teléfono y NIF. Los datos
+ * que no se han rellenado salen como `null`.
+ *
+ * @param userId - Id del usuario, el de la sesión (`getSessionUserId`).
+ * @returns El perfil, o `null` si la cuenta ya no existe.
+ */
+export async function getUserProfile(userId: number) {
+    const [row] = await userProfileQuery(userId);
+    return row ?? null;
+}
+
+/** El perfil de contacto de una cuenta tal como se devuelve al cliente. */
+export type UserProfile = NonNullable<Awaited<ReturnType<typeof getUserProfile>>>;
+
+/**
+ * Consulta que actualiza los datos de contacto de un usuario. No toca el correo: no se puede
+ * cambiar desde el perfil.
+ *
+ * @param userId - Id del usuario (`users.user_id`).
+ * @param input - Los datos ya validados (`profileSchema`).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function updateUserProfileQuery(userId: number, input: ProfileInput) {
+    return db
+        .update(users)
+        .set({
+            name: input.name,
+            lastName: input.lastName,
+            phone: input.phone,
+            idCard: input.idCard,
+        })
+        .where(eq(users.id, userId));
+}
+
+/**
+ * Guarda los datos de contacto de una cuenta (RF3) y devuelve el perfil resultante.
+ *
+ * @param userId - Id del usuario, el de la sesión (`getSessionUserId`).
+ * @param input - Los datos ya validados (`profileSchema`).
+ * @returns El perfil guardado, o `null` si la cuenta no existe.
+ * @throws El error de MySQL `ER_DUP_ENTRY` si el NIF ya es de otra cuenta (`isDuplicateEntryError`).
+ */
+export async function updateUserProfile(userId: number, input: ProfileInput) {
+    await updateUserProfileQuery(userId, input);
+    // Se relee en vez de fiarse de `affectedRows`: MySQL cuenta 0 filas si los datos no cambian.
+    return getUserProfile(userId);
+}
+
+/**
+ * Lo que necesitan las consultas del pedido: el cliente de BD o una transacción
+ * (`db.transaction`), para construirlas con el ejecutor que toque.
+ */
+type OrderWriter = Pick<typeof db, 'insert' | 'delete' | 'update'>;
+
+/**
+ * Consulta de un pedido por el PaymentIntent con el que se pagó (`orders.payment_intent_id`,
+ * único): sirve para no duplicar un pedido si la confirmación llega dos veces.
+ *
+ * @param paymentIntentId - Id del PaymentIntent (`pi_…`).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function orderByPaymentIntentQuery(paymentIntentId: string) {
+    return db
+        .select({
+            id: orders.id,
+            userId: orders.userId,
+            status: orderStatuses.name,
+            paymentMethod: orders.paymentMethod,
+        })
+        .from(orders)
+        .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
+        .where(eq(orders.paymentIntentId, paymentIntentId));
+}
+
+/**
+ * Pedido ya creado para un PaymentIntent.
+ *
+ * @param paymentIntentId - Id del PaymentIntent (`pi_…`).
+ * @returns `{ id, userId, status, paymentMethod }`, o `null` si no hay pedido con ese pago.
+ */
+export async function getOrderByPaymentIntent(paymentIntentId: string) {
+    const [row] = await orderByPaymentIntentQuery(paymentIntentId);
+    return row ?? null;
+}
+
+/**
+ * Id de un estado de pedido por su nombre (`order_statuses.name`, sembrado: 'Confirmado',
+ * 'Pendiente de pago'…).
+ *
+ * @param name - Nombre del estado.
+ * @returns El `status_id`, o `null` si no existe.
+ */
+export async function getOrderStatusId(name: string): Promise<number | null> {
+    const [row] = await db
+        .select({ id: orderStatuses.id })
+        .from(orderStatuses)
+        .where(eq(orderStatuses.name, name));
+    return row?.id ?? null;
+}
+
+/**
+ * Consulta que descuenta stock de forma atómica: `stock = stock - cantidad` solo si quedan
+ * unidades suficientes (`stock >= cantidad`). Si otro cliente compró entre medias, no cambia
+ * ninguna fila (`affectedRows = 0`) y el stock nunca queda negativo.
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param variantId - `product_variants.variant_id`.
+ * @param quantity - Unidades a descontar (entero >= 1).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function decrementStockQuery(writer: OrderWriter, variantId: number, quantity: number) {
+    return writer
+        .update(productVariants)
+        .set({ stock: sql`${productVariants.stock} - ${quantity}` })
+        .where(and(eq(productVariants.id, variantId), gte(productVariants.stock, quantity)));
+}
+
+/** Lo que se guarda de un pedido al crearlo: los importes ya van como texto decimal (`'33.45'`). */
+export interface NewOrder {
+    userId: number;
+    shippingAddressId: number;
+    billingAddressId: number;
+    paymentMethod: 'Tarjeta' | 'Transferencia';
+    shippingTypeId: number;
+    shippingCost: string;
+    total: string;
+    statusId: number;
+    paymentIntentId: string | null;
+}
+
+/**
+ * Consulta que inserta un pedido.
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param order - Los datos del pedido.
+ * @returns La consulta, lista para ejecutar con `await`; su resultado trae el `insertId`.
+ */
+export function insertOrderQuery(writer: OrderWriter, order: NewOrder) {
+    return writer.insert(orders).values(order);
+}
+
+/** Una línea de pedido: el precio y el IVA van fijados tal como estaban al comprar. */
+export interface NewOrderLine {
+    variantId: number;
+    quantity: number;
+    unitPrice: string;
+    taxRate: string;
+}
+
+/**
+ * Consulta que inserta las líneas de un pedido (un solo `insert`); no puede estar vacío.
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param orderId - `orders.order_id`.
+ * @param lines - Las líneas, con precio e IVA del momento de la compra.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function insertOrderLinesQuery(
+    writer: OrderWriter,
+    orderId: number,
+    lines: readonly NewOrderLine[],
+) {
+    return writer.insert(orderProducts).values(lines.map((line) => ({ orderId, ...line })));
+}
+
+/**
+ * Consulta que vacía el carrito guardado de un usuario (`cart_products`).
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param userId - Id del usuario (`users.user_id`).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function clearUserCartQuery(writer: OrderWriter, userId: number) {
+    return writer.delete(cartProducts).where(eq(cartProducts.userId, userId));
+}
+
+/**
+ * Consulta de un pedido de un usuario con su estado, su tipo de envío y su dirección de envío.
+ * Filtra por usuario: el pedido de otra cuenta no se devuelve aunque exista. La dirección se lee
+ * aunque ya esté sustituida (`is_active = false`): el pedido conserva la suya.
+ *
+ * @param userId - Id del usuario, el de la sesión.
+ * @param orderId - `orders.order_id`.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function userOrderQuery(userId: number, orderId: number) {
+    return db
+        .select({
+            id: orders.id,
+            status: orderStatuses.name,
+            paymentMethod: orders.paymentMethod,
+            createdAt: orders.createdAt,
+            shippingCost: orders.shippingCost,
+            shippingTypeName: shippingTypes.name,
+            minDeliveryDays: shippingTypes.minDeliveryDays,
+            maxDeliveryDays: shippingTypes.maxDeliveryDays,
+            recipientName: addresses.recipientName,
+            streetType: addresses.streetType,
+            streetName: addresses.streetName,
+            number: addresses.number,
+            floor: addresses.floor,
+            postalCode: addresses.postalCode,
+            city: addresses.city,
+            province: addresses.province,
+            country: addresses.country,
+            phone: addresses.phone,
+        })
+        .from(orders)
+        .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
+        .innerJoin(shippingTypes, eq(shippingTypes.id, orders.shippingTypeId))
+        .leftJoin(addresses, eq(addresses.id, orders.shippingAddressId))
+        .where(and(eq(orders.id, orderId), eq(orders.userId, userId)));
+}
+
+/**
+ * Consulta de las líneas de un pedido con su producto, de la primera a la última presentación
+ * (`variant_id`). El precio y el IVA son los guardados en `order_products`, no los vigentes.
+ *
+ * @param orderId - `orders.order_id`.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function orderLinesQuery(orderId: number) {
+    return db
+        .select({
+            variantId: orderProducts.variantId,
+            name: products.name,
+            vintage: products.vintage,
+            format: productVariants.format,
+            capacity: productVariants.capacity,
+            capacityUnit: productVariants.capacityUnit,
+            quantity: orderProducts.quantity,
+            unitPrice: orderProducts.unitPrice,
+            taxRate: orderProducts.taxRate,
+        })
+        .from(orderProducts)
+        .innerJoin(productVariants, eq(productVariants.id, orderProducts.variantId))
+        .innerJoin(products, eq(products.id, productVariants.productId))
+        .where(eq(orderProducts.orderId, orderId))
+        .orderBy(asc(orderProducts.variantId));
+}
+
+/**
+ * Un pedido de un usuario con sus líneas (RF8).
+ *
+ * @param userId - Id del usuario, el de la sesión (`getSessionUserId`).
+ * @param orderId - `orders.order_id`.
+ * @returns `{ order, lines }`, o `null` si el pedido no existe o es de otra cuenta.
+ */
+export async function getUserOrder(userId: number, orderId: number) {
+    const [order] = await userOrderQuery(userId, orderId);
+    if (!order) return null;
+    return { order, lines: await orderLinesQuery(orderId) };
+}
+
+/** Un pedido con sus líneas tal como lo devuelve `getUserOrder`. */
+export type UserOrder = NonNullable<Awaited<ReturnType<typeof getUserOrder>>>;
