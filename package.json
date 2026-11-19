@@ -10,7 +10,7 @@
         "lint": "next lint",
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
-        "e2e": "playwright test",
+        "test:e2e": "playwright test",
         "db:generate": "drizzle-kit generate",
         "db:migrate": "drizzle-kit migrate",
         "db:studio": "drizzle-kit studio",

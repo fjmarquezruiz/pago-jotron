@@ -23,7 +23,7 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 ## Pruebas
 
 - `pnpm test`: pruebas unitarias (Vitest), junto al código.
-- `pnpm e2e`: pruebas de extremo a extremo (Playwright, en `e2e/`). Usan el navegador, la app y la
+- `pnpm test:e2e`: pruebas de extremo a extremo (Playwright, en `e2e/`). Usan el navegador, la app y la
   BD de verdad, así que necesitan MySQL arrancado y sembrado (`pnpm db:seed`). Reutilizan el
   servidor de `http://localhost:3000` si ya está en marcha (`E2E_BASE_URL` lo cambia) y, si no,
   arrancan `pnpm dev`. En local usan el Chrome del sistema. Tocan solo el carrito del cliente

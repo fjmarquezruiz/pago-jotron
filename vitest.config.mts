@@ -6,6 +6,6 @@ export default defineConfig({
     resolve: {
         alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
     },
-    // Las pruebas E2E (`e2e/`) las ejecuta Playwright (`pnpm e2e`), no Vitest.
+    // Las pruebas E2E (`e2e/`) las ejecuta Playwright (`pnpm test:e2e`), no Vitest.
     test: { exclude: [...configDefaults.exclude, 'e2e/**'] },
 });

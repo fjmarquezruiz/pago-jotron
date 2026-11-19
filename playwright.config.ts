@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 import { BASE_URL } from './e2e/support';
 
 /**
- * Pruebas E2E (`pnpm e2e`): el navegador, la app y la BD de verdad. Necesitan MySQL arrancado y
+ * Pruebas E2E (`pnpm test:e2e`): el navegador, la app y la BD de verdad. Necesitan MySQL arrancado y
  * sembrado (`pnpm db:seed`). Si ya hay un servidor en `BASE_URL` lo reutilizan; si no, arrancan
  * `pnpm dev`. En local usan el Chrome del sistema (no hace falta descargar navegadores); en CI,
  * el de Playwright (`pnpm exec playwright install --with-deps chromium`).
