@@ -680,6 +680,11 @@ export function userCartQuery(userId: number) {
  *
  * @param userId - Id del usuario (`users.user_id`).
  * @returns Sus líneas `{ variantId, quantity }`, de la más antigua a la más reciente; vacío si no tiene carrito.
+ *   Ojo con el orden: `added_at` tiene precisión de segundos, así que las líneas que se guardan a
+ *   la vez (una fusión, un carrito entero) comparten fecha y salen ordenadas por `variantId`, no
+ *   por el orden en que estaban en el carrito del navegador. El carrito puede reordenarse al
+ *   recuperarlo en otro dispositivo; no cambia ninguna cantidad. Guardar el orden exigiría una
+ *   columna `position` en `cart_products`.
  *
  * @example
  * const saved = await getUserCart(12);

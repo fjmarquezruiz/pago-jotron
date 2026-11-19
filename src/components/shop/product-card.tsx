@@ -48,7 +48,7 @@ const imageSizes = '(min-width: 640px) 288px, 240px';
  *
  * Al pasar el ratón (o al enfocar con el teclado) aparece sobre el borde inferior de la imagen un
  * botón "Añadir" (como en el diseño): con una sola presentación la añade al carrito, y con varias
- * lleva a la ficha para elegir (`ProductCardAddButton`). Va por encima del enlace que cubre la
+ * dice "Elegir formato" y lleva a la ficha (`ProductCardAddButton`). Va por encima del enlace que cubre la
  * tarjeta, así su clic no abre la ficha. En pantallas táctiles no se ve ni recibe toques. Un
  * producto agotado no lo lleva.
  *

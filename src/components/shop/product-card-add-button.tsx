@@ -21,8 +21,8 @@ interface ProductCardAddButtonProps {
  *
  * - Con una sola presentación, añade 1 unidad al carrito y sale el aviso con "Ver carrito".
  * - Con varias (por ejemplo, una caja de 500 g y otra de 1000 g, con distinto precio y stock),
- *   sigue diciendo "Añadir" pero lleva a la ficha para elegir: no se mete en el carrito algo que
- *   el cliente no ha elegido.
+ *   dice "Elegir formato" (no "Añadir": no añade nada, y el botón debe cumplir lo que promete) y
+ *   lleva a la ficha: no se mete en el carrito algo que el cliente no ha elegido.
  *
  * En pantallas táctiles el botón no se ve (aparece al pasar el ratón o al enfocar) y no recibe
  * toques: quien toca una tarjeta entra en su ficha, como siempre.
@@ -44,11 +44,8 @@ export function ProductCardAddButton({
     if (variantCount > 1) {
         return (
             <Button asChild variant="brand" size="lg" className={className}>
-                <Link
-                    href={`/productos/${slug}`}
-                    aria-label={`Añadir ${name}: elegir presentación`}
-                >
-                    Añadir
+                <Link href={`/productos/${slug}`} aria-label={`Elegir formato de ${name}`}>
+                    Elegir formato
                 </Link>
             </Button>
         );

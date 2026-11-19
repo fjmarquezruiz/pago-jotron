@@ -20,6 +20,15 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Pruebas
+
+- `pnpm test`: pruebas unitarias (Vitest), junto al código.
+- `pnpm e2e`: pruebas de extremo a extremo (Playwright, en `e2e/`). Usan el navegador, la app y la
+  BD de verdad, así que necesitan MySQL arrancado y sembrado (`pnpm db:seed`). Reutilizan el
+  servidor de `http://localhost:3000` si ya está en marcha (`E2E_BASE_URL` lo cambia) y, si no,
+  arrancan `pnpm dev`. En local usan el Chrome del sistema. Tocan solo el carrito del cliente
+  `user@jotron.com` y lo vacían antes y después.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
