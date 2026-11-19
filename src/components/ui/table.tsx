@@ -18,9 +18,11 @@ const Table = React.forwardRef<
     React.HTMLAttributes<HTMLTableElement> & {
         /** Densidad de las filas (Figma: Data Cell size): `sm` 48 px y 14 px, `xs` 40 px y 12 px. */
         size?: 'xs' | 'sm';
+        /** Borde y esquinas redondeadas alrededor de la tabla. Quítalo si va dentro de otro panel o sin marco (el carrito). */
+        bordered?: boolean;
     }
->(({ className, size = 'sm', ...props }, ref) => (
-    <div className="relative w-full overflow-x-auto rounded-sm border">
+>(({ className, size = 'sm', bordered = true, ...props }, ref) => (
+    <div className={cn('relative w-full overflow-x-auto', bordered && 'rounded-sm border')}>
         <table
             ref={ref}
             data-size={size}

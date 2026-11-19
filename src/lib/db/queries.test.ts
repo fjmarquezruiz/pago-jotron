@@ -1,15 +1,26 @@
 import { sql, type SQL } from 'drizzle-orm';
 import { MySqlDialect } from 'drizzle-orm/mysql-core';
-import { describe, expect, it, vi } from 'vitest';
+import { drizzle } from 'drizzle-orm/mysql2';
+import type { Connection } from 'mysql2/promise';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { db } from '@/db';
+import * as schema from '@/db/schema';
 import {
     catalogConditions,
     catalogCountQuery,
     catalogFilterOptionsQueries,
     catalogItemsQuery,
     catalogOrderBy,
+    cartLinesQuery,
+    deleteMissingCartItemsQuery,
     featuredProductsQuery,
+    getCartLines,
+    getUserCart,
     isNewCondition,
     relatedProductsQuery,
+    saveUserCart,
+    upsertCartItemsQuery,
+    userCartQuery,
     visibleProductsCondition,
 } from './queries';
 
@@ -404,6 +415,8 @@ describe('featuredProductsQuery', () => {
         expect(sql).toContain('inner join `product_variants`');
         expect(sql).toContain('min(`product_variants`.`price`)');
         expect(sql).toContain('sum(`product_variants`.`stock`)');
+        // el id de la presentación, para el botón "Añadir" de la tarjeta cuando solo hay una
+        expect(sql).toContain('min(`product_variants`.`variant_id`)');
     });
 });
 
@@ -545,5 +558,251 @@ describe('catalogFilterOptionsQueries', () => {
         for (const name of ['origins', 'wineries'] as const) {
             expect(sqlOf(name).sql.match(/inner join/g)).toHaveLength(3);
         }
+    });
+});
+
+describe('cartLinesQuery', () => {
+    const { sql, params } = cartLinesQuery([4, 7, 9]).toSQL();
+
+    it('parte de las presentaciones y las une con su producto, su bodega y su D.O.', () => {
+        expect(sql).toContain('from `product_variants`');
+        expect(sql).toContain(
+            'inner join `products` on `products`.`product_id` = `product_variants`.`product_id`',
+        );
+        expect(sql).toContain('inner join `wineries`');
+        expect(sql).toContain('inner join `guarantees_of_origin`');
+    });
+
+    it('pide solo los ids del carrito', () => {
+        expect(sql).toContain('`product_variants`.`variant_id` in (?, ?, ?)');
+        expect(params.slice(0, 3)).toEqual([4, 7, 9]);
+    });
+
+    it('descarta las presentaciones bloqueadas y aplica la visibilidad del catálogo', () => {
+        expect(sql).toContain(
+            'where (`product_variants`.`variant_id` in (?, ?, ?) and `product_variants`.`is_blocked` = ? and (`products`.`is_blocked` = ? and `wineries`.`is_blocked` = ? and `guarantees_of_origin`.`is_blocked` = ?))',
+        );
+        // ids, presentación sin bloquear y los 3 bloqueos de la regla de visibilidad
+        expect(params).toEqual([4, 7, 9, false, false, false, false]);
+    });
+
+    it('devuelve el precio y el stock de ahora, y lo necesario para pintar la línea', () => {
+        for (const column of [
+            '`product_variants`.`variant_id`',
+            '`products`.`slug`',
+            '`products`.`name`',
+            '`products`.`image`',
+            '`products`.`vintage`',
+            '`guarantees_of_origin`.`name`',
+            '`product_variants`.`format`',
+            '`product_variants`.`capacity`',
+            '`product_variants`.`capacity_unit`',
+            '`product_variants`.`price`',
+            '`product_variants`.`stock`',
+        ]) {
+            expect(sql).toContain(column);
+        }
+    });
+
+    it('no agrega: una fila por presentación', () => {
+        expect(sql).not.toMatch(/group by|sum\(|min\(|count\(/);
+    });
+});
+
+describe('getCartLines', () => {
+    it('sin ids devuelve una lista vacía, sin consultar la BD', async () => {
+        await expect(getCartLines([])).resolves.toEqual([]);
+    });
+});
+
+describe('userCartQuery', () => {
+    const { sql, params } = userCartQuery(12).toSQL();
+
+    it('lee solo las líneas del usuario, con la presentación y la cantidad', () => {
+        expect(sql).toContain('select `variant_id`, `quantity` from `cart_products`');
+        expect(sql).toContain('where `cart_products`.`user_id` = ?');
+        expect(params).toEqual([12]);
+    });
+
+    it('ordena de la más antigua a la más reciente, con la presentación de desempate', () => {
+        expect(
+            sql.endsWith(
+                'order by `cart_products`.`added_at` asc, `cart_products`.`variant_id` asc',
+            ),
+        ).toBe(true);
+    });
+
+    it('no agrega ni pagina: es el carrito entero', () => {
+        expect(sql).not.toMatch(/group by|limit|offset|join/);
+    });
+});
+
+describe('upsertCartItemsQuery', () => {
+    const items = [
+        { variantId: 4, quantity: 2 },
+        { variantId: 9, quantity: 1 },
+    ];
+    const { sql, params } = upsertCartItemsQuery(db, 12, items).toSQL();
+
+    it('inserta todas las líneas en una sola sentencia, con el usuario en cada una', () => {
+        expect(sql).toContain(
+            'insert into `cart_products` (`user_id`, `variant_id`, `quantity`, `added_at`) values (?, ?, ?, default), (?, ?, ?, default)',
+        );
+        expect(params).toEqual([12, 4, 2, 12, 9, 1]);
+    });
+
+    it('si la línea ya existe solo cambia la cantidad, así que conserva added_at', () => {
+        expect(sql.endsWith(' on duplicate key update `quantity` = values(`quantity`)')).toBe(true);
+        expect(sql).not.toMatch(/added_at` = /);
+    });
+});
+
+describe('deleteMissingCartItemsQuery', () => {
+    it('borra las líneas del usuario que no están en el carrito nuevo', () => {
+        const { sql, params } = deleteMissingCartItemsQuery(db, 12, [
+            { variantId: 4, quantity: 2 },
+            { variantId: 9, quantity: 1 },
+        ]).toSQL();
+
+        expect(sql).toBe(
+            'delete from `cart_products` where (`cart_products`.`user_id` = ? and `cart_products`.`variant_id` not in (?, ?))',
+        );
+        expect(params).toEqual([12, 4, 9]);
+    });
+
+    it('con el carrito vacío borra todas las del usuario, sin un not in () vacío', () => {
+        const { sql, params } = deleteMissingCartItemsQuery(db, 12, []).toSQL();
+
+        expect(sql).toBe('delete from `cart_products` where `cart_products`.`user_id` = ?');
+        expect(params).toEqual([12]);
+    });
+
+    it('no repite ids en el not in', () => {
+        const { params } = deleteMissingCartItemsQuery(db, 12, [
+            { variantId: 4, quantity: 1 },
+            { variantId: 4, quantity: 2 },
+        ]).toSQL();
+        expect(params).toEqual([12, 4]);
+    });
+
+    it('solo toca al usuario indicado: nunca borra sin filtrar por user_id', () => {
+        for (const items of [[], [{ variantId: 4, quantity: 1 }]]) {
+            expect(deleteMissingCartItemsQuery(db, 12, items).toSQL().sql).toContain(
+                '`cart_products`.`user_id` = ?',
+            );
+        }
+    });
+});
+
+/**
+ * Un cliente Drizzle de verdad (mismo esquema y modo que `@/db`) sobre una conexión falsa que
+ * apunta cada sentencia que recibe y contesta `rows` a los `select`. `fail` hace que falle la
+ * sentencia que lo cumpla. Sirve para ver qué SQL ejecutan `getUserCart` y `saveUserCart`, y en
+ * qué orden y dentro de qué transacción, sin conectar a ninguna BD.
+ */
+function recordingDb(rows: unknown[][] = [], fail?: (sql: string) => boolean) {
+    const statements: { sql: string; params: unknown[] }[] = [];
+    const client = {
+        async query({ sql }: { sql: string }, params: unknown[]) {
+            statements.push({ sql, params });
+            if (fail?.(sql)) throw new Error('fallo de la BD');
+            return /^select/.test(sql) ? [rows, []] : [{ insertId: 0, affectedRows: 0 }, undefined];
+        },
+    } as unknown as Connection;
+    return { recorder: drizzle(client, { schema, mode: 'planetscale' }), statements };
+}
+
+describe('getUserCart', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('devuelve las líneas como { variantId, quantity }', async () => {
+        const { recorder, statements } = recordingDb([
+            [4, 2],
+            [9, 1],
+        ]);
+        vi.spyOn(db, 'select').mockImplementation(
+            recorder.select.bind(recorder) as typeof db.select,
+        );
+
+        await expect(getUserCart(12)).resolves.toEqual([
+            { variantId: 4, quantity: 2 },
+            { variantId: 9, quantity: 1 },
+        ]);
+        expect(statements).toHaveLength(1);
+        expect(statements[0].params).toEqual([12]);
+    });
+
+    it('un usuario sin carrito guardado recibe una lista vacía', async () => {
+        const { recorder } = recordingDb([]);
+        vi.spyOn(db, 'select').mockImplementation(
+            recorder.select.bind(recorder) as typeof db.select,
+        );
+        await expect(getUserCart(12)).resolves.toEqual([]);
+    });
+});
+
+describe('saveUserCart', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    /** Hace que `saveUserCart` use la conexión falsa en vez de la BD. */
+    function useRecording(fail?: (sql: string) => boolean) {
+        const { recorder, statements } = recordingDb([], fail);
+        vi.spyOn(db, 'transaction').mockImplementation(((
+            ...args: Parameters<typeof db.transaction>
+        ) => recorder.transaction(...args)) as typeof db.transaction);
+        return statements;
+    }
+
+    it('guarda las líneas y borra las que sobran, todo dentro de una transacción', async () => {
+        const statements = useRecording();
+
+        await saveUserCart(12, [
+            { variantId: 4, quantity: 2 },
+            { variantId: 9, quantity: 1 },
+        ]);
+
+        expect(statements.map(({ sql }) => sql.split(' ').slice(0, 3).join(' '))).toEqual([
+            'begin',
+            'insert into `cart_products`',
+            'delete from `cart_products`',
+            'commit',
+        ]);
+        expect(statements[1].sql).toContain(
+            'on duplicate key update `quantity` = values(`quantity`)',
+        );
+        expect(statements[1].params).toEqual([12, 4, 2, 12, 9, 1]);
+        expect(statements[2].sql).toContain('`variant_id` not in (?, ?)');
+        expect(statements[2].params).toEqual([12, 4, 9]);
+    });
+
+    it('con el carrito vacío solo borra: no hay insert sin filas', async () => {
+        const statements = useRecording();
+
+        await saveUserCart(12, []);
+
+        expect(statements.map(({ sql }) => sql.split(' ')[0])).toEqual([
+            'begin',
+            'delete',
+            'commit',
+        ]);
+        expect(statements[1].sql).not.toContain('not in');
+        expect(statements[1].params).toEqual([12]);
+    });
+
+    it.each([
+        ['el insert', (sql: string) => sql.startsWith('insert')],
+        ['el delete', (sql: string) => sql.startsWith('delete')],
+    ])('si falla %s deshace todo y propaga el error', async (_, fail) => {
+        const statements = useRecording(fail);
+
+        // Drizzle envuelve el error del driver en otro (`Failed query: ...`) y lo deja en `cause`.
+        await expect(saveUserCart(12, [{ variantId: 4, quantity: 1 }])).rejects.toHaveProperty(
+            'cause.message',
+            'fallo de la BD',
+        );
+
+        const last = statements.at(-1)?.sql;
+        expect(last).toBe('rollback');
+        expect(statements.map(({ sql }) => sql)).not.toContain('commit');
     });
 });

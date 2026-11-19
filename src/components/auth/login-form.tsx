@@ -16,6 +16,7 @@ import { FieldLabel } from '../ui/field';
 import { FieldMessage } from '../ui/field';
 import { TextLink } from '../ui/link';
 import { Alert } from '../ui/alert';
+import { syncCart } from '@/stores/cart-sync';
 
 /** Formulario de acceso con email, contraseña, y enlace de recuperación. */
 export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
@@ -35,6 +36,9 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
             setError('Email o contraseña incorrectos');
             return;
         }
+        // Con la sesión recién creada, el carrito anónimo se fusiona con el de la cuenta antes de
+        // entrar: así la página que se abre ya lo ve completo.
+        await syncCart();
         router.push(callbackUrl);
         router.refresh();
     }

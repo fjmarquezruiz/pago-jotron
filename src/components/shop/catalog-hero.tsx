@@ -6,13 +6,19 @@ import { SiteHeader } from '@/components/shop/site-header';
  * al 60 %, el menú superpuesto arriba y, pegados abajo, "La tienda" y el título de la página.
  * Es el `h1` de `/productos`. Va en el tema oscuro del sistema de diseño para que el texto sea claro.
  *
+ * El carrito reutiliza la misma cabecera (Figma: checkout-1-carrito), pero su `h1` es "Tu carrito":
+ * con `titleAs="p"` el título grande deja de ser un encabezado.
+ *
  * El diseño del listado solo existe para escritorio: en móvil se reutiliza la misma composición
  * (título de 48 px y menú de 68 px).
  *
+ * @param props.titleAs - Etiqueta del título grande: `h1` (por defecto) o `p` si la página tiene otro `h1`.
+ *
  * @example
  * <CatalogHero />
+ * <CatalogHero titleAs="p" />
  */
-export function CatalogHero() {
+export function CatalogHero({ titleAs: Title = 'h1' }: { titleAs?: 'h1' | 'p' }) {
     return (
         <section className="dark relative isolate h-105 overflow-hidden text-foreground">
             <Image
@@ -32,9 +38,9 @@ export function CatalogHero() {
                 <div className="mx-auto flex h-full w-full max-w-9xl flex-col justify-end pb-12">
                     <div className="flex flex-col gap-6 lg:max-w-[calc((100%-3rem)/2)]">
                         <p className="text-2xl">La tienda</p>
-                        <h1 className="font-display text-5xl leading-none lg:text-7xl">
+                        <Title className="font-display text-5xl leading-none lg:text-7xl">
                             Los mejores vinos de Andalucía
-                        </h1>
+                        </Title>
                     </div>
                 </div>
             </div>

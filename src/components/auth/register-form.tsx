@@ -4,6 +4,7 @@ import { forwardRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
+import { syncCart } from '@/stores/cart-sync';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff } from 'lucide-react';
@@ -168,6 +169,8 @@ export function RegisterForm({ callbackUrl }: { callbackUrl: string }) {
             router.push('/auth/login');
             return;
         }
+        // La cuenta es nueva y no tiene carrito guardado: el anónimo pasa a ser el suyo.
+        await syncCart();
         router.push(callbackUrl);
         router.refresh();
     }

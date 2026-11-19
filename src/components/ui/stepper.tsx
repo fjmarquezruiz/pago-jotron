@@ -22,6 +22,11 @@ export interface StepperProps extends React.OlHTMLAttributes<HTMLOListElement> {
     variant?: 'default' | 'progress-bar';
     /** Tamaño del indicador: sm 24, md 32, lg 40, xl 48 px. */
     size?: 'sm' | 'md' | 'lg' | 'xl';
+    /**
+     * Atenúa los indicadores al 40 % (Figma: StepItem state=disabled). Para cuando el proceso no
+     * está en marcha, por ejemplo el checkout con el carrito vacío.
+     */
+    disabled?: boolean;
 }
 
 const indicatorSizes = {
@@ -32,7 +37,12 @@ const indicatorSizes = {
 };
 const labelSizes = { sm: 'text-xs', md: 'text-sm', lg: 'text-base', xl: 'text-lg' };
 const descSizes = { sm: 'text-xs', md: 'text-xs', lg: 'text-sm', xl: 'text-base' };
-const connectorOffset = { sm: 'mt-3', md: 'mt-4', lg: 'mt-5', xl: 'mt-6' };
+// Hueco entre indicador, texto y conector, y entre pasos (Figma: StepItem lg usa gap-sm, 12 px).
+const gapClass = { sm: 'gap-gap-xs', md: 'gap-gap-xs', lg: 'gap-gap-sm', xl: 'gap-gap-xs' };
+// Para centrar la primera línea del texto con el indicador: (indicador - altura de línea) / 2.
+const labelOffset = { sm: 'pt-1.5', md: 'pt-1.5', lg: 'pt-2', xl: 'pt-1.5' };
+// Para centrar el conector de 2 px con el indicador: la mitad del indicador menos 1 px.
+const connectorOffset = { sm: 'mt-3', md: 'mt-4', lg: 'mt-[19px]', xl: 'mt-6' };
 
 /**
  * Pasos de un proceso (Figma: Stepper), por ejemplo el checkout.
@@ -53,6 +63,7 @@ const Stepper = React.forwardRef<HTMLOListElement, StepperProps>(
             orientation = 'horizontal',
             variant = 'default',
             size = 'md',
+            disabled = false,
             ...props
         },
         ref,
@@ -62,7 +73,8 @@ const Stepper = React.forwardRef<HTMLOListElement, StepperProps>(
             <ol
                 ref={ref}
                 className={cn(
-                    'flex gap-gap-xs',
+                    'flex',
+                    gapClass[size],
                     orientation === 'horizontal' ? 'flex-row items-start' : 'flex-col',
                     className,
                 )}
@@ -84,7 +96,8 @@ const Stepper = React.forwardRef<HTMLOListElement, StepperProps>(
                             key={step.label}
                             aria-current={status === 'active' ? 'step' : undefined}
                             className={cn(
-                                'flex gap-gap-xs',
+                                'flex',
+                                gapClass[size],
                                 bar
                                     ? 'relative flex-1 flex-col items-center text-center'
                                     : orientation === 'horizontal'
@@ -126,6 +139,7 @@ const Stepper = React.forwardRef<HTMLOListElement, StepperProps>(
                                     'flex shrink-0 items-center justify-center rounded-full font-medium',
                                     indicatorSizes[size],
                                     bar && 'absolute',
+                                    disabled && 'opacity-40',
                                     status === 'upcoming' &&
                                         'border border-input bg-muted text-muted-foreground',
                                     (status === 'active' || status === 'completed') &&
@@ -152,7 +166,7 @@ const Stepper = React.forwardRef<HTMLOListElement, StepperProps>(
                             <span
                                 className={cn(
                                     'flex min-w-0 flex-col',
-                                    !bar && 'pt-1.5',
+                                    !bar && labelOffset[size],
                                     orientation === 'horizontal' &&
                                         status !== 'active' &&
                                         'max-sm:sr-only',
@@ -181,7 +195,12 @@ const Stepper = React.forwardRef<HTMLOListElement, StepperProps>(
                                     className={cn(
                                         'h-0.5 min-w-2 flex-1 rounded-full',
                                         connectorOffset[size],
-                                        i < current ? 'bg-brand' : 'bg-muted',
+                                        // Figma: tras un paso completado, marca; tras el activo, marca al 20 %; el resto, tinta al 10 %.
+                                        i < current
+                                            ? 'bg-brand'
+                                            : i === current
+                                              ? 'bg-brand/20'
+                                              : 'bg-primary/10',
                                     )}
                                 />
                             )}

@@ -8,6 +8,7 @@ import {
     VINTAGE_MAX,
     VINTAGE_MIN,
 } from '@/lib/catalog/filter-constants';
+import { MAX_ID } from '@/lib/validations/ids';
 
 // Los valores y tipos de los filtros viven en `filter-constants.ts`; se reexportan para que quien
 // valida la URL los tenga junto al esquema.
@@ -20,9 +21,6 @@ export {
     VINTAGE_MIN,
 };
 export type { CatalogSort, PriceRange } from '@/lib/catalog/filter-constants';
-
-/** El `int` de MySQL más alto: un id mayor no puede existir en las tablas. */
-const MAX_ID = 2_147_483_647;
 
 /**
  * Un filtro opcional: si el valor no pasa `schema` (o hay varios, `?uva=1&uva=2`) no da error,

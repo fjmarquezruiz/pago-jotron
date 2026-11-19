@@ -6,11 +6,13 @@ import {
     eq,
     exists,
     gte,
+    inArray,
     isNotNull,
     lt,
     min,
     ne,
     not,
+    notInArray,
     or,
     sql,
     sum,
@@ -19,6 +21,8 @@ import {
 } from 'drizzle-orm';
 import type { MySqlSelect } from 'drizzle-orm/mysql-core';
 import { db } from '@/db';
+import type { Cart } from '@/lib/cart/cart';
+import { orderLinesByVariantIds } from '@/lib/cart/lines';
 import { NEW_PRODUCT_DAYS } from '@/lib/catalog/novelty';
 import { toPositiveInt } from '@/lib/catalog/pagination';
 import { priceRangeBounds } from '@/lib/catalog/price-range';
@@ -30,6 +34,7 @@ import {
     type CatalogSort,
 } from '@/lib/validations/catalog';
 import {
+    cartProducts,
     grapes,
     guaranteesOfOrigin,
     productGrapes,
@@ -172,6 +177,11 @@ function catalogColumns() {
         minPrice: min(productVariants.price) as SQL<string>,
         /** Número de presentaciones a la venta: con más de una, el precio lleva "Desde". */
         variantCount: count(productVariants.id),
+        /**
+         * Id de la presentación si el producto solo tiene una (`variantCount` 1): es la que añade el
+         * botón "Añadir" de la tarjeta. Con varias es la de menor id y no se usa: hay que elegir.
+         */
+        firstVariantId: min(productVariants.id) as SQL<number>,
         /** Stock sumado de todas sus presentaciones: 0 = agotado. */
         totalStock: sum(productVariants.stock).mapWith(Number),
     };
@@ -573,4 +583,188 @@ export function relatedProductsQuery({
  */
 export async function getRelatedProducts(params: RelatedProductsParams) {
     return relatedProductsQuery(params);
+}
+
+/** Columnas de una línea del carrito: la presentación con lo mínimo de su producto para pintarla. */
+function cartLineColumns() {
+    return {
+        variantId: productVariants.id,
+        productId: products.id,
+        slug: products.slug,
+        name: products.name,
+        image: products.image,
+        vintage: products.vintage,
+        /** Nombre de la D.O.: el carrito lo pinta bajo el nombre, como la tarjeta del listado. */
+        originName: guaranteesOfOrigin.name,
+        /** Formato, capacidad y unidad: `formatPresentation` los convierte en "Botella 75 cl". */
+        format: productVariants.format,
+        capacity: productVariants.capacity,
+        capacityUnit: productVariants.capacityUnit,
+        /** Precio vigente, como texto (`decimal`): el carrito no guarda precios, se lee siempre de aquí. */
+        price: productVariants.price,
+        /** Unidades disponibles: 0 = agotada. El carrito limita sus cantidades a este número. */
+        stock: productVariants.stock,
+    };
+}
+
+/**
+ * Consulta de las presentaciones que se pueden comprar de entre unos ids: sin bloquear ellas
+ * (`product_variants.is_blocked`) y con la regla de visibilidad del catálogo
+ * (`visibleProductsCondition`: ni su producto, ni su bodega, ni su D.O. bloqueados). Mismas
+ * uniones que el listado.
+ *
+ * @param variantIds - Ids de presentaciones (`product_variants.variant_id`), sin repetir y no vacío.
+ * @returns La consulta, lista para ejecutar con `await`; sin orden definido.
+ */
+export function cartLinesQuery(variantIds: readonly number[]) {
+    return db
+        .select(cartLineColumns())
+        .from(productVariants)
+        .innerJoin(products, eq(products.id, productVariants.productId))
+        .innerJoin(wineries, joinWinery)
+        .innerJoin(guaranteesOfOrigin, joinOrigin)
+        .where(
+            and(
+                inArray(productVariants.id, [...variantIds]),
+                eq(productVariants.isBlocked, false),
+                visibleProductsCondition(),
+            ) as SQL,
+        );
+}
+
+/**
+ * Líneas del carrito (RF6): para cada presentación pedida, su producto, su precio y su stock de
+ * ahora. El carrito del cliente solo guarda ids y cantidades, así que el precio y el stock salen
+ * siempre de aquí.
+ *
+ * Descarta lo que no se puede comprar (`cartLinesQuery`): presentaciones bloqueadas, de productos,
+ * bodegas o D.O. bloqueados, o que no existen. Las agotadas sí vuelven, con `stock: 0`, para que
+ * el carrito las marque como agotadas. Quien llama debe quitar de su carrito los ids que no
+ * vuelvan.
+ *
+ * @param variantIds - Ids de presentaciones, en el orden del carrito. Los repetidos se juntan.
+ * @returns Las líneas, en el orden de `variantIds`.
+ *
+ * @example
+ * const lines = await getCartLines([4, 7]);
+ * // [{ variantId: 4, name: 'Tinto Roble', format: 'Botella', price: '9.50', stock: 12, ... }]
+ */
+export async function getCartLines(variantIds: readonly number[]) {
+    const ids = Array.from(new Set(variantIds));
+    if (ids.length === 0) return [];
+    return orderLinesByVariantIds(ids, await cartLinesQuery(ids));
+}
+
+/** Una línea del carrito con su producto, su precio y su stock actuales. */
+export type CartLine = Awaited<ReturnType<typeof getCartLines>>[number];
+
+/**
+ * Consulta de las líneas guardadas del carrito de un usuario (`cart_products`), de la más antigua
+ * a la más reciente: `added_at` y, de desempate, `variant_id`, para que el orden sea estable.
+ * Se separa de `getUserCart` para poder comprobar su SQL sin conectar a la BD.
+ *
+ * @param userId - Id del usuario (`users.user_id`).
+ * @returns La consulta, lista para ejecutar con `await`: filas `{ variantId, quantity }`.
+ */
+export function userCartQuery(userId: number) {
+    return db
+        .select({ variantId: cartProducts.variantId, quantity: cartProducts.quantity })
+        .from(cartProducts)
+        .where(eq(cartProducts.userId, userId))
+        .orderBy(asc(cartProducts.addedAt), asc(cartProducts.variantId));
+}
+
+/**
+ * Carrito guardado de un usuario (RF6), tal como está en `cart_products`: sin comprobar si las
+ * presentaciones siguen a la venta ni si hay stock. Para eso, `getCartLines` o `mergeWithSaved`.
+ *
+ * @param userId - Id del usuario (`users.user_id`).
+ * @returns Sus líneas `{ variantId, quantity }`, de la más antigua a la más reciente; vacío si no tiene carrito.
+ *   Ojo con el orden: `added_at` tiene precisión de segundos, así que las líneas que se guardan a
+ *   la vez (una fusión, un carrito entero) comparten fecha y salen ordenadas por `variantId`, no
+ *   por el orden en que estaban en el carrito del navegador. El carrito puede reordenarse al
+ *   recuperarlo en otro dispositivo; no cambia ninguna cantidad. Guardar el orden exigiría una
+ *   columna `position` en `cart_products`.
+ *
+ * @example
+ * const saved = await getUserCart(12);
+ * // [{ variantId: 4, quantity: 2 }, { variantId: 9, quantity: 1 }]
+ */
+export async function getUserCart(userId: number): Promise<Cart> {
+    return userCartQuery(userId);
+}
+
+/**
+ * Lo que necesitan las consultas de escritura del carrito: `insert` y `delete` del cliente de BD
+ * o de una transacción (`db.transaction`). Así se construyen con el ejecutor que toque y se
+ * pueden comprobar sin conectar.
+ */
+type CartWriter = Pick<typeof db, 'insert' | 'delete'>;
+
+/**
+ * Consulta que guarda las líneas de un carrito: un solo `insert` con todas, que si la línea ya
+ * existe (clave `(user_id, variant_id)`) solo le cambia la cantidad (`on duplicate key update
+ * quantity = values(quantity)`). Así `added_at` de las que ya estaban se conserva, y el orden del
+ * carrito con él. `values()` es válido en MySQL y en TiDB.
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param userId - Id del usuario (`users.user_id`).
+ * @param items - Líneas a guardar; no puede estar vacío (un `insert` sin filas no es SQL válido).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function upsertCartItemsQuery(writer: CartWriter, userId: number, items: Cart) {
+    return writer
+        .insert(cartProducts)
+        .values(items.map(({ variantId, quantity }) => ({ userId, variantId, quantity })))
+        .onDuplicateKeyUpdate({
+            // Sin tabla (`values(quantity)`), la forma canónica en MySQL y TiDB: con la columna
+            // dentro de `sql`, Drizzle escribiría `values(cart_products.quantity)`.
+            set: { quantity: sql`values(${sql.identifier(cartProducts.quantity.name)})` },
+        });
+}
+
+/**
+ * Consulta que borra las líneas guardadas de un usuario que ya no están en su carrito. Con
+ * `items` vacío borra todas, sin `not in ()` (SQL inválido con la lista vacía).
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param userId - Id del usuario (`users.user_id`).
+ * @param items - El carrito que debe quedar; solo importan sus `variantId`.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function deleteMissingCartItemsQuery(writer: CartWriter, userId: number, items: Cart) {
+    const keep = Array.from(new Set(items.map(({ variantId }) => variantId)));
+    return writer
+        .delete(cartProducts)
+        .where(
+            and(
+                eq(cartProducts.userId, userId),
+                keep.length > 0 ? notInArray(cartProducts.variantId, keep) : undefined,
+            ),
+        );
+}
+
+/**
+ * Reemplaza el carrito guardado de un usuario por `items` (RF6), en una sola transacción: guarda
+ * cada línea (las que ya estaban solo cambian de cantidad y conservan `added_at`) y borra las que
+ * ya no están. Si algo falla no cambia nada: el carrito guardado queda como estaba. Con `items`
+ * vacío, borra el carrito.
+ *
+ * El llamador debe haber saneado `items`: presentaciones que existan, se puedan comprar y con
+ * cantidades dentro del stock (`normalizeCart` en `src/lib/cart/server.ts`). Aquí no se comprueba:
+ * la clave foránea `fk_cartproduct_variant` rechaza los ids que no existen (la transacción falla y
+ * no se guarda nada), pero no el stock ni el bloqueo.
+ *
+ * @param userId - Id del usuario (`users.user_id`).
+ * @param items - El carrito que debe quedar guardado: sin presentaciones repetidas y con cantidades >= 1.
+ *
+ * @example
+ * await saveUserCart(12, [{ variantId: 4, quantity: 3 }]);
+ * // deja en `cart_products` solo la 4 (con 3 unidades) y borra el resto de líneas del usuario 12
+ */
+export async function saveUserCart(userId: number, items: Cart): Promise<void> {
+    await db.transaction(async (tx) => {
+        if (items.length > 0) await upsertCartItemsQuery(tx, userId, items);
+        await deleteMissingCartItemsQuery(tx, userId, items);
+    });
 }

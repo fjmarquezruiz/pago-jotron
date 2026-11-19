@@ -3,9 +3,14 @@ import { Role } from '@/types/auth';
 const PUBLIC_EXACT = ['/'];
 const PUBLIC_PREFIXES = [
     '/productos',
+    // El carrito se ve y se llena sin sesión (con la verificación de edad); para comprar sí hace falta.
+    '/carrito',
     '/auth',
     '/api/auth',
     '/api/verificar-edad',
+    // Las líneas del carrito (precio y stock de las presentaciones): lo mismo que enseña el
+    // catálogo, y el invitado también tiene carrito.
+    '/api/carrito',
     '/acceso-denegado',
     '/verificar-edad',
     '/condiciones',

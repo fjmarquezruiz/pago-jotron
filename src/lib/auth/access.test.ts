@@ -5,11 +5,16 @@ describe('isPublicPath', () => {
     it('reconoce las rutas públicas', () => {
         expect(isPublicPath('/')).toBe(true);
         expect(isPublicPath('/productos/fino')).toBe(true);
+        expect(isPublicPath('/carrito')).toBe(true);
         expect(isPublicPath('/api/auth/session')).toBe(true);
+        expect(isPublicPath('/api/carrito/lineas')).toBe(true);
     });
 
     it('no confunde prefijos parecidos', () => {
         expect(isPublicPath('/productosx')).toBe(false);
+        expect(isPublicPath('/carritox')).toBe(false);
+        expect(isPublicPath('/checkout')).toBe(false);
+        expect(isPublicPath('/api/carritox')).toBe(false);
         expect(isPublicPath('/admin')).toBe(false);
     });
 });
@@ -30,6 +35,10 @@ describe('checkAccess', () => {
         ['/sistema-diseno', 'Administrador', 'ok'],
         ['/verificar-edad', null, 'ok'],
         ['/api/verificar-edad', null, 'ok'],
+        ['/api/carrito/lineas', null, 'ok'],
+        ['/carrito', null, 'ok'],
+        ['/checkout', null, 'login'],
+        ['/checkout', 'Cliente', 'ok'],
         ['/condiciones', null, 'ok'],
         ['/privacidad', null, 'ok'],
         ['/cookies', null, 'ok'],
@@ -42,6 +51,8 @@ describe('needsAgeGate', () => {
     it.each([
         ['/', false, false, true],
         ['/productos/fino', false, false, true],
+        ['/carrito', false, false, true],
+        ['/carrito', true, false, false],
         ['/cuenta', false, false, true],
         ['/admin', false, false, true],
         ['/', true, false, false],

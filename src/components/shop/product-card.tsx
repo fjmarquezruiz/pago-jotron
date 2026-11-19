@@ -1,6 +1,6 @@
 import Link from 'next/link';
+import { ProductCardAddButton } from '@/components/shop/product-card-add-button';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CloudinaryImage } from '@/components/ui/cloudinary-image';
 import { productCardBadge, productCardPrice } from '@/lib/catalog/product-card';
@@ -10,7 +10,15 @@ import { cn } from '@/lib/utils';
 /** Lo que la tarjeta necesita de un producto del listado (`CatalogItem`). */
 export type ProductCardProduct = Pick<
     CatalogItem,
-    'slug' | 'name' | 'originName' | 'image' | 'minPrice' | 'variantCount' | 'totalStock' | 'isNew'
+    | 'slug'
+    | 'name'
+    | 'originName'
+    | 'image'
+    | 'minPrice'
+    | 'variantCount'
+    | 'firstVariantId'
+    | 'totalStock'
+    | 'isNew'
 >;
 
 interface ProductCardProps {
@@ -38,16 +46,27 @@ const imageSizes = '(min-width: 640px) 288px, 240px';
  * nombre y su `::after` cubre la tarjeta, así el lector de pantalla anuncia un solo enlace con el
  * nombre del producto y el foco de teclado se dibuja alrededor de toda la tarjeta.
  *
- * Al pasar el ratón aparece sobre el borde inferior de la imagen un botón "Añadir" (como en el
- * diseño). Mientras no exista el carrito (A8) está deshabilitado y es solo decorativo: va en un
- * contenedor `aria-hidden` y sin eventos de puntero para que no se anuncie un botón que no se
- * puede usar ni intercepte el clic del enlace. Un producto agotado no lo lleva.
+ * Al pasar el ratón (o al enfocar con el teclado) aparece sobre el borde inferior de la imagen un
+ * botón "Añadir" (como en el diseño): con una sola presentación la añade al carrito, y con varias
+ * dice "Elegir formato" y lleva a la ficha (`ProductCardAddButton`). Va por encima del enlace que cubre la
+ * tarjeta, así su clic no abre la ficha. En pantallas táctiles no se ve ni recibe toques. Un
+ * producto agotado no lo lleva.
  *
  * @example
  * <ProductCard product={item} priority={index < 4} />
  */
 export function ProductCard({ product, priority, className }: ProductCardProps) {
-    const { slug, name, originName, image, minPrice, variantCount, totalStock, isNew } = product;
+    const {
+        slug,
+        name,
+        originName,
+        image,
+        minPrice,
+        variantCount,
+        firstVariantId,
+        totalStock,
+        isNew,
+    } = product;
     const badge = productCardBadge({ totalStock, isNew });
 
     return (
@@ -88,14 +107,14 @@ export function ProductCard({ product, priority, className }: ProductCardProps) 
                     )}
                 </div>
                 {totalStock > 0 && (
-                    <div
-                        aria-hidden="true"
-                        className="pointer-events-none absolute right-0 bottom-0 left-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
-                    >
-                        {/* TODO(A8): añadir al carrito desde la tarjeta */}
-                        <Button variant="brand" size="lg" className="w-full" tabIndex={-1} disabled>
-                            Añadir
-                        </Button>
+                    <div className="pointer-events-none absolute right-0 bottom-0 left-0 z-20 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+                        <ProductCardAddButton
+                            slug={slug}
+                            name={name}
+                            variantCount={variantCount}
+                            firstVariantId={firstVariantId}
+                            stock={totalStock}
+                        />
                     </div>
                 )}
             </div>

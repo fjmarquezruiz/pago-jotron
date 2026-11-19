@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
+import { addToCartWithFeedback } from '@/components/shop/add-to-cart';
 import { Button } from '@/components/ui/button';
 import { Field, FieldControl, FieldLabel } from '@/components/ui/field';
 import { NumberInput } from '@/components/ui/number-input';
@@ -22,6 +24,9 @@ export interface ProductPurchaseProps {
  *
  * - Al abrir queda elegida la primera presentación con stock (`pickDefaultVariant`).
  * - La cantidad va de 1 al stock de la presentación y vuelve a 1 al cambiar de presentación.
+ * - "Añadir al carrito" mete la cantidad elegida de esa presentación en el carrito, limitada al
+ *   stock con el que se cargó la ficha (el servidor lo vuelve a comprobar). Un toast con la acción
+ *   "Ver carrito" confirma, o avisa de que el stock ha limitado lo añadido (`describeAdd`).
  * - Si la presentación elegida está agotada, el botón dice "Agotado", la cantidad se desactiva y
  *   un aviso invita a elegir otro formato, o dice que no queda nada si todas están agotadas
  *   (`soldOutMessage`).
@@ -37,6 +42,7 @@ export interface ProductPurchaseProps {
 export function ProductPurchase({ variants, children }: ProductPurchaseProps) {
     const [variantId, setVariantId] = React.useState(() => pickDefaultVariant(variants)?.id);
     const [quantity, setQuantity] = React.useState(1);
+    const router = useRouter();
 
     const variant = variants.find((item) => item.id === variantId) ?? pickDefaultVariant(variants);
     if (!variant) return null;
@@ -48,6 +54,17 @@ export function ProductPurchase({ variants, children }: ProductPurchaseProps) {
     function selectVariant(id: string) {
         setVariantId(Number(id));
         setQuantity(1);
+    }
+
+    /** Añade al carrito y avisa de lo que ha entrado, que el stock puede limitar. */
+    function handleAdd() {
+        if (!variant) return;
+        addToCartWithFeedback({
+            variantId: variant.id,
+            quantity,
+            stock: variant.stock,
+            onViewCart: () => router.push('/carrito'),
+        });
     }
 
     return (
@@ -104,8 +121,13 @@ export function ProductPurchase({ variants, children }: ProductPurchaseProps) {
                 </div>
 
                 <div className="flex flex-col gap-4">
-                    {/* TODO(A8): añadir al carrito. Hasta entonces el botón queda deshabilitado. */}
-                    <Button variant="brand" size="lg" className="w-full" disabled>
+                    <Button
+                        variant="brand"
+                        size="lg"
+                        className="w-full"
+                        disabled={soldOut}
+                        onClick={handleAdd}
+                    >
                         {soldOut ? 'Agotado' : 'Añadir al carrito'}
                     </Button>
                     {soldOut && (
