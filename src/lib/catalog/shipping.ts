@@ -94,3 +94,59 @@ export function cheapestDelivery<T extends ShippingOptionInput>(options: readonl
     }
     return best?.option ?? null;
 }
+
+/**
+ * Las modalidades de envío que se ofrecen en el checkout: las que tienen plazo de entrega. Deja
+ * fuera la recogida en bodega (`minDeliveryDays` y `maxDeliveryDays` nulos), igual que
+ * `cheapestDelivery`. Conserva el orden recibido.
+ *
+ * @param options - Las modalidades de envío, tal como salen de la BD.
+ * @returns Las que tienen plazo; vacío si ninguna.
+ *
+ * @example
+ * deliveryOptions([
+ *     { name: 'Envío estándar', cost: '4.95', minDeliveryDays: 3, maxDeliveryDays: 5 },
+ *     { name: 'Recogida en bodega', cost: '0.00', minDeliveryDays: null, maxDeliveryDays: null },
+ * ]);
+ * // solo el envío estándar
+ */
+export function deliveryOptions<T extends ShippingOptionInput>(options: readonly T[]): T[] {
+    return options.filter(
+        ({ minDeliveryDays, maxDeliveryDays }) =>
+            minDeliveryDays !== null || maxDeliveryDays !== null,
+    );
+}
+
+/**
+ * Plazo de entrega en días laborables, como lo dibuja el resumen del checkout: `1 día laborable`,
+ * `3-5 días laborables`.
+ *
+ * @param min - Días mínimos de entrega, o `null`.
+ * @param max - Días máximos de entrega, o `null`.
+ * @returns El plazo, o `null` si la modalidad no tiene plazo.
+ *
+ * @example
+ * formatBusinessDeliveryTime(3, 5); // '3-5 días laborables'
+ */
+export function formatBusinessDeliveryTime(min: number | null, max: number | null): string | null {
+    const time = formatDeliveryTime(min, max);
+    if (time === null) return null;
+    return time === '1 día' ? '1 día laborable' : `${time} laborables`;
+}
+
+/**
+ * Nombre de una modalidad con su precio entre paréntesis, para el selector de envío y la fila
+ * "Envío" de la confirmación. Un coste de 0 se pinta como "gratis".
+ *
+ * @param option - Nombre y coste (en euros, como texto) de la modalidad.
+ * @returns El texto, por ejemplo `Envío estándar (4,95 €)`.
+ *
+ * @example
+ * formatShippingChoice({ name: 'Envío estándar', cost: '4.95' }); // 'Envío estándar (4,95 €)'
+ */
+export function formatShippingChoice({
+    name,
+    cost,
+}: Pick<ShippingOptionInput, 'name' | 'cost'>): string {
+    return `${name} (${Number(cost) === 0 ? 'gratis' : formatEuros(cost)})`;
+}

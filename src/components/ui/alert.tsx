@@ -57,7 +57,7 @@ const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
                 className={cn(alertVariants({ type, size }), className)}
                 {...props}
             >
-                <Icon aria-hidden="true" className="mt-0.5" />
+                <Icon aria-hidden="true" />
                 <div className="flex flex-col gap-gap-2xs">
                     {title && (
                         <p data-slot="alert-title" className="font-semibold">

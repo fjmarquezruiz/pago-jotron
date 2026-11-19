@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { CartItemsTable, type CartRow } from '@/components/shop/cart-items-table';
 import { CartNotices } from '@/components/shop/cart-notices';
 import { CartSkeleton } from '@/components/shop/cart-skeleton';
-import { CartSteps } from '@/components/shop/cart-steps';
+import { CheckoutSteps } from '@/components/shop/checkout-steps';
 import { CartSummary, type CartDelivery } from '@/components/shop/cart-summary';
 import { useCartLines } from '@/components/shop/use-cart-lines';
 import { Alert } from '@/components/ui/alert';
@@ -76,7 +76,7 @@ export function CartView({ delivery }: CartViewProps) {
     if (items.length === 0) {
         return (
             <div className="flex flex-col gap-12">
-                <CartSteps dimmed />
+                <CheckoutSteps dimmed />
                 {noticeAlert}
                 <EmptyState
                     titleAs="h1"
@@ -100,7 +100,7 @@ export function CartView({ delivery }: CartViewProps) {
     if (status === 'error') {
         return (
             <div className="flex flex-col gap-12">
-                <CartSteps />
+                <CheckoutSteps />
                 <h1 className="sr-only">Tu carrito</h1>
                 <Alert
                     type="error"
@@ -126,7 +126,7 @@ export function CartView({ delivery }: CartViewProps) {
 
     return (
         <div className="flex flex-col gap-12">
-            <CartSteps />
+            <CheckoutSteps />
             <div className="flex min-h-12 items-baseline gap-4">
                 <h1 className="font-display text-4xl">Tu carrito</h1>
                 <p className="text-base text-muted-foreground">

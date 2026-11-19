@@ -213,6 +213,38 @@ describe('createCartStore', () => {
             expect(store.getState().owner).toBeNull();
         });
 
+        it('empty vacía las líneas y conserva el dueño, en una sola escritura', () => {
+            const store = createCartStore(storage);
+            store.getState().adopt(5, [{ variantId: 4, quantity: 2 }]);
+            let calls = 0;
+            const unsubscribe = store.subscribe(() => (calls += 1));
+            const writesBefore = storage.writes();
+
+            store.getState().empty();
+
+            expect(store.getState().items).toEqual([]);
+            expect(store.getState().owner).toBe(5);
+            expect(calls).toBe(1);
+            expect(storage.writes()).toBe(writesBefore + 1);
+            expect(saved(storage).state).toEqual({ items: [], owner: 5 });
+            unsubscribe();
+        });
+
+        it('empty con el carrito vacío no escribe ni avisa', () => {
+            const store = createCartStore(storage);
+            store.getState().adopt(5, []);
+            let calls = 0;
+            const unsubscribe = store.subscribe(() => (calls += 1));
+            const writesBefore = storage.writes();
+
+            store.getState().empty();
+
+            expect(calls).toBe(0);
+            expect(storage.writes()).toBe(writesBefore);
+            expect(store.getState().owner).toBe(5);
+            unsubscribe();
+        });
+
         it('clear sin líneas y sin dueño no escribe ni avisa', () => {
             const store = createCartStore(storage);
             store.getState().add(4, 1, 10);
