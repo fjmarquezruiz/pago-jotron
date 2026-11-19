@@ -1,3 +1,4 @@
+import '@/lib/validations/locale';
 import { z } from 'zod';
 import { provinceFromPostalCode } from '@/lib/geo/provinces';
 import { MAX_ID } from '@/lib/validations/ids';

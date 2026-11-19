@@ -1,3 +1,4 @@
+import '@/lib/validations/locale';
 import { z } from 'zod';
 import { CART_MAX_LINES } from '@/lib/cart/cart';
 import { MAX_ID } from '@/lib/validations/ids';

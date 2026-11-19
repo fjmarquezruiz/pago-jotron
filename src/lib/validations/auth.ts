@@ -1,3 +1,4 @@
+import '@/lib/validations/locale';
 import { z } from 'zod';
 import { isAdult, isRealDate } from '@/lib/auth/age';
 
