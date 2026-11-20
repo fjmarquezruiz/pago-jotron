@@ -263,6 +263,39 @@ describe('createOrder con tarjeta', () => {
         expect(transaction).not.toHaveBeenCalled();
     });
 
+    it('con el stock justo (exactamente lo pedido) crea el pedido y captura', async () => {
+        // 1 unidad de la presentación 9 y 2 de la 4: el stock es justo lo que se compra.
+        getCartLines.mockResolvedValue([
+            { ...lines[0], stock: 1 },
+            { ...lines[1], stock: 2 },
+        ]);
+
+        const result = await createOrder(USER, card);
+
+        expect(result).toMatchObject({ ok: true, created: true, order: { orderId: 12 } });
+        expect(decrementStockQuery.mock.calls).toEqual([
+            [tx, 4, 2],
+            [tx, 9, 1],
+        ]);
+        expect(capture).toHaveBeenCalledWith('pi_1');
+        expect(cancel).not.toHaveBeenCalled();
+    });
+
+    it('con una unidad menos de la que se pide en una sola línea, no crea nada y cancela', async () => {
+        getCartLines.mockResolvedValue([lines[0], { ...lines[1], stock: 1 }]);
+
+        const result = await createOrder(USER, card);
+
+        expect(result).toMatchObject({
+            ok: false,
+            code: 'stock',
+            problems: [{ variantId: 4, available: 1 }],
+        });
+        expect(transaction).not.toHaveBeenCalled();
+        expect(capture).not.toHaveBeenCalled();
+        expect(cancel).toHaveBeenCalledWith('pi_1');
+    });
+
     it('si el descuento atómico no afecta filas, revierte, cancela y da stock', async () => {
         decrementStockQuery
             .mockResolvedValueOnce([{ affectedRows: 1 }])
