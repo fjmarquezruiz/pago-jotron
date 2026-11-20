@@ -13,7 +13,10 @@ import {
     catalogOrderBy,
     cartLinesQuery,
     clearUserCartQuery,
+    changeOrderStatusQuery,
     decrementStockQuery,
+    insertAuditLogQuery,
+    restoreStockQuery,
     insertOrderLinesQuery,
     insertOrderQuery,
     orderByPaymentIntentQuery,
@@ -964,5 +967,41 @@ describe('orderLinesQuery', () => {
 
     it('las ordena por presentación', () => {
         expect(sql).toContain('order by `order_products`.`variant_id` asc');
+    });
+});
+
+describe('restoreStockQuery', () => {
+    const { sql, params } = restoreStockQuery(db, 4, 3).toSQL();
+
+    it('suma las unidades al stock de la presentación', () => {
+        expect(sql).toBe(
+            'update `product_variants` set `stock` = `product_variants`.`stock` + ? where `product_variants`.`variant_id` = ?',
+        );
+        expect(params).toEqual([3, 4]);
+    });
+});
+
+describe('changeOrderStatusQuery', () => {
+    const { sql, params } = changeOrderStatusQuery(db, 12, 2, 7).toSQL();
+
+    it('cambia el estado solo si el pedido sigue en el estado de origen', () => {
+        expect(sql).toContain(
+            'update `orders` set `status_id` = ?, `status_updated_at` = CURRENT_TIMESTAMP',
+        );
+        expect(sql).toContain('where (`orders`.`order_id` = ? and `orders`.`status_id` = ?)');
+        expect(params).toEqual([7, 12, 2]);
+    });
+});
+
+describe('insertAuditLogQuery', () => {
+    const { sql, params } = insertAuditLogQuery(db, {
+        userId: 12,
+        action: 'Pedido anulado',
+        details: 'pedido 5',
+    }).toSQL();
+
+    it('inserta la acción en audit_logs', () => {
+        expect(sql).toContain('insert into `audit_logs`');
+        expect(params).toEqual([12, 'Pedido anulado', 'pedido 5']);
     });
 });

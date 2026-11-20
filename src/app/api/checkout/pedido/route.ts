@@ -14,6 +14,7 @@ function respond(body: unknown, status = 200) {
 
 /** Código HTTP de cada motivo por el que no se pudo crear el pedido. */
 const FAILURE_STATUS: Record<CreateOrderFailureCode, number> = {
+    method_unavailable: 400,
     empty_cart: 400,
     shipping_not_found: 404,
     address_not_found: 404,
@@ -28,15 +29,17 @@ const FAILURE_STATUS: Record<CreateOrderFailureCode, number> = {
 /**
  * Crea el pedido del carrito del cliente (RF7). Todo sale del servidor (ver `createOrder`): el
  * carrito guardado, los precios, el envío y, con tarjeta, el importe y la huella autorizados en
- * `/api/checkout/pago`. Con tarjeta cobra (captura) dentro de la misma transacción que descuenta
- * el stock; con transferencia deja el pedido 'Pendiente de pago' con el stock reservado.
+ * `/api/checkout/pago`. Con tarjeta confirma primero la transacción que descuenta el stock y crea
+ * el pedido y DESPUÉS cobra (captura); si el cobro falla, una transacción de compensación devuelve
+ * el stock y anula el pedido. Con transferencia (apagada salvo `BANK_TRANSFER_ENABLED=true`, es de
+ * MVP2) deja el pedido 'Pendiente de pago' con el stock reservado.
  *
  * Cuerpo: `{ paymentMethod: 'Tarjeta' | 'Transferencia', shippingTypeId, shippingAddressId,
  * billingAddressId?, paymentIntentId? }` (`paymentIntentId` obligatorio con tarjeta y prohibido
  * con transferencia). Respuestas: 201 `{ orderId, orderNumber, status, paymentMethod }`; 200 lo
  * mismo si ya existía un pedido de ese pago (reintento idempotente); 400 cuerpo no válido o
- * carrito vacío; 401 sin sesión (antes de leer el cuerpo); 402 no se pudo cobrar (no hay pedido
- * ni cargo); 403 el pago es de otra cuenta; 404 envío, dirección o pago inexistentes; 409 falta
+ * carrito vacío o transferencia no disponible; 401 sin sesión (antes de leer el cuerpo); 402 no se
+ * pudo cobrar (pedido anulado y stock devuelto, sin cargo); 403 el pago es de otra cuenta; 404 envío, dirección o pago inexistentes; 409 falta
  * stock (`{ problems }`) o la autorización no coincide con el carrito (en ambos casos con tarjeta
  * se cancela la reserva antes de responder); 502 la pasarela falla; 500 error interno.
  */

@@ -81,6 +81,7 @@ describe('POST /api/checkout/pedido', () => {
     });
 
     it.each([
+        ['method_unavailable', 400],
         ['empty_cart', 400],
         ['shipping_not_found', 404],
         ['address_not_found', 404],

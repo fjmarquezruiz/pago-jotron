@@ -37,6 +37,7 @@ import {
 } from '@/lib/validations/catalog';
 import {
     addresses,
+    auditLogs,
     cartProducts,
     grapes,
     guaranteesOfOrigin,
@@ -1052,6 +1053,63 @@ export function decrementStockQuery(writer: OrderWriter, variantId: number, quan
         .update(productVariants)
         .set({ stock: sql`${productVariants.stock} - ${quantity}` })
         .where(and(eq(productVariants.id, variantId), gte(productVariants.stock, quantity)));
+}
+
+/**
+ * Consulta que devuelve al stock las unidades de una línea de un pedido que se anula: `stock =
+ * stock + cantidad`. Es la inversa de `decrementStockQuery` y no necesita comprobar nada: sumar
+ * nunca deja el stock negativo.
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param variantId - `product_variants.variant_id`.
+ * @param quantity - Unidades a devolver (entero >= 1).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function restoreStockQuery(writer: OrderWriter, variantId: number, quantity: number) {
+    return writer
+        .update(productVariants)
+        .set({ stock: sql`${productVariants.stock} + ${quantity}` })
+        .where(eq(productVariants.id, variantId));
+}
+
+/**
+ * Consulta que marca un pedido con un estado nuevo (`status_id` y `status_updated_at`). Se usa
+ * para anularlo cuando falla el cobro de la tarjeta. Solo cambia el pedido que está en
+ * `fromStatusId`: si otro proceso ya lo movió a otro estado, no pisa ese cambio
+ * (`affectedRows = 0`).
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param orderId - `orders.order_id`.
+ * @param fromStatusId - Estado en el que debe estar ahora.
+ * @param toStatusId - Estado al que pasa.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function changeOrderStatusQuery(
+    writer: OrderWriter,
+    orderId: number,
+    fromStatusId: number,
+    toStatusId: number,
+) {
+    return writer
+        .update(orders)
+        .set({ statusId: toStatusId, statusUpdatedAt: sql`CURRENT_TIMESTAMP` })
+        .where(and(eq(orders.id, orderId), eq(orders.statusId, fromStatusId)));
+}
+
+/**
+ * Consulta que anota una acción en la auditoría (`audit_logs`, RF12): es lo que hace que un
+ * fallo que no ve el cliente, como un pedido anulado por no poder cobrarlo, lo vea quien
+ * administra la tienda.
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param entry - Usuario afectado (o `null`), qué pasó y el detalle para localizarlo.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function insertAuditLogQuery(
+    writer: OrderWriter,
+    entry: { userId: number | null; action: string; details: string },
+) {
+    return writer.insert(auditLogs).values(entry);
 }
 
 /** Lo que se guarda de un pedido al crearlo: los importes ya van como texto decimal (`'33.45'`). */

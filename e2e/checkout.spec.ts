@@ -167,7 +167,7 @@ test.describe('RF7: compra', () => {
         const transfer = page.getByRole('radio', { name: 'Transferencia bancaria' });
         test.skip(
             (await transfer.count()) === 0,
-            'El servidor no tiene BANK_TRANSFER_HOLDER y BANK_TRANSFER_IBAN: no ofrece la transferencia.',
+            'El servidor no ofrece la transferencia (MVP2): necesita BANK_TRANSFER_ENABLED=true, BANK_TRANSFER_HOLDER y BANK_TRANSFER_IBAN.',
         );
         await transfer.check();
         await expect(

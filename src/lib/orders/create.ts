@@ -4,14 +4,26 @@
  * `POST /api/checkout/pedido` solo traduce el resultado a códigos de respuesta).
  *
  * Todo sale de la BD y de Stripe, nunca del navegador: el carrito guardado, los precios y el IVA
- * de ahora, el coste del envío y, con tarjeta, el importe y la huella autorizados. La escritura
- * va en UNA transacción: descuenta el stock (con `stock >= cantidad`, atómico), inserta el
- * pedido y sus líneas, vacía el carrito y, con tarjeta, CAPTURA el pago justo antes del commit.
- * Si la captura falla, la transacción se revierte: no hay pedido ni stock descontado.
+ * de ahora, el coste del envío y, con tarjeta, el importe y la huella autorizados.
  *
- * Limitación conocida: si la captura tiene éxito y el commit falla justo después (la BD cae en
- * ese instante), el cobro queda hecho sin pedido. Es una ventana de milisegundos; se deja
- * constancia en el log con el id del PaymentIntent para devolverlo a mano.
+ * El orden con tarjeta es: (1) UNA transacción que descuenta el stock (con `stock >= cantidad`,
+ * atómico), inserta el pedido y sus líneas y vacía el carrito, y se CONFIRMA (commit); (2) solo
+ * entonces se CAPTURA el cobro. Así nunca hay un cobro sin pedido: si el commit falla, no se ha
+ * cobrado nada (la reserva caduca sola), y no se mantiene abierta una transacción con las filas
+ * de stock bloqueadas mientras Stripe responde (hasta 10 s con reintentos), que haría esperar a
+ * otros compradores (RNF4).
+ *
+ * Si la captura falla, el fallo es nuestro y se controla: una SEGUNDA transacción de
+ * compensación devuelve el stock, vuelve a llenar el carrito, marca el pedido como 'Anulado' y
+ * anota en la auditoría (`audit_logs`) qué pedido y qué PaymentIntent fueron, y después se
+ * cancela la autorización. Antes de compensar se pregunta a Stripe si el cobro se hizo de verdad
+ * (una captura con tiempo agotado puede haber salido bien): si está cobrado, el pedido se queda.
+ * Si Stripe no contesta o la compensación falla, no se adivina: se deja el pedido como está y se
+ * registra con `[CRÍTICO]` en el log (con los ids) para resolverlo a mano.
+ *
+ * El pedido de tarjeta nace 'Confirmado' antes de capturar. Esa ventana dura lo que tarda
+ * Stripe (segundos); quien reaccione a los pedidos 'Confirmado' (A10: correos, preparación)
+ * debe saber que, si el cobro falla, pasan a 'Anulado'.
  */
 import { db } from '@/db';
 import { cartFingerprint } from '@/lib/orders/fingerprint';
@@ -20,6 +32,7 @@ import { quoteOrder } from '@/lib/orders/quote';
 import { findStockProblems, type StockProblem } from '@/lib/orders/stock';
 import { isDuplicateEntryError } from '@/lib/db/errors';
 import {
+    changeOrderStatusQuery,
     clearUserCartQuery,
     decrementStockQuery,
     getCartLines,
@@ -28,10 +41,14 @@ import {
     getShippingTypeById,
     getUserAddress,
     getUserCart,
+    insertAuditLogQuery,
     insertOrderLinesQuery,
     insertOrderQuery,
+    restoreStockQuery,
+    upsertCartItemsQuery,
 } from '@/lib/db/queries';
 import { cancel, capture, getAuthorization, PaymentError } from '@/lib/payments';
+import { isTransferEnabled } from '@/lib/payments/transfer';
 import type { CheckoutOrderRequest } from '@/lib/validations/checkout';
 
 /** Estado con el que nace un pedido según cómo se paga: la tarjeta ya está cobrada; la transferencia, no. */
@@ -55,6 +72,7 @@ export interface OrderSummary {
 
 /** Por qué no se pudo crear el pedido; la ruta lo traduce a un código HTTP. */
 export type CreateOrderFailureCode =
+    | 'method_unavailable' // 400: la transferencia está apagada (MVP2)
     | 'empty_cart' // 400
     | 'shipping_not_found' // 404
     | 'address_not_found' // 404
@@ -96,6 +114,98 @@ async function cancelQuietly(paymentIntentId: string): Promise<void> {
 }
 
 /**
+ * Deja constancia de un fallo que el cliente no ve: lo escribe en el log con `[CRÍTICO]` y, si la
+ * BD responde, lo anota en la auditoría. Nunca lanza: es lo último que se hace con un fallo ya
+ * grave y no debe taparlo.
+ */
+async function reportFailure(userId: number, action: string, details: string): Promise<void> {
+    console.error(`[CRÍTICO] ${action}: ${details}`);
+    try {
+        await insertAuditLogQuery(db, { userId, action, details });
+    } catch (error) {
+        console.error('No se pudo anotar en la auditoría', error);
+    }
+}
+
+/** Lo que hace falta para cobrar un pedido ya creado o deshacerlo si no se puede. */
+interface SettleInput {
+    orderId: number;
+    userId: number;
+    paymentIntentId: string;
+    items: readonly { variantId: number; quantity: number }[];
+    confirmedStatusId: number;
+    cancelledStatusId: number;
+}
+
+/**
+ * Captura el cobro de un pedido de tarjeta que ya está confirmado en la BD (commit hecho) y, si
+ * no se puede, lo deshace con una transacción de compensación.
+ *
+ * @returns `'captured'` si el cobro está hecho (o no se puede saber, y se deja el pedido) o
+ * `'undone'` si se compensó: stock devuelto, carrito repuesto, pedido 'Anulado' y autorización
+ * cancelada.
+ * @throws Si la transacción de compensación falla: el pedido queda 'Confirmado' sin cobrar y la
+ * autorización intacta (no se cancela, para poder capturarla a mano); ya se registró `[CRÍTICO]`.
+ */
+async function settlePayment(input: SettleInput): Promise<'captured' | 'undone'> {
+    const { orderId, userId, paymentIntentId, items } = input;
+    try {
+        await capture(paymentIntentId);
+        return 'captured';
+    } catch (captureError) {
+        console.error('No se pudo capturar el pago', paymentIntentId, captureError);
+    }
+
+    // ¿Se cobró de verdad? Una captura con tiempo agotado puede haber salido bien en Stripe.
+    let status: string;
+    try {
+        status = (await getAuthorization(paymentIntentId)).status;
+    } catch (lookupError) {
+        console.error('No se pudo leer el estado del pago', paymentIntentId, lookupError);
+        await reportFailure(
+            userId,
+            'Estado del cobro desconocido',
+            `pedido ${orderId}, PaymentIntent ${paymentIntentId}: la captura falló y Stripe no responde. El pedido se ha dejado como está; revisar a mano.`,
+        );
+        return 'captured';
+    }
+    if (status === 'succeeded') return 'captured';
+
+    try {
+        await db.transaction(async (tx) => {
+            const [moved] = await changeOrderStatusQuery(
+                tx,
+                orderId,
+                input.confirmedStatusId,
+                input.cancelledStatusId,
+            );
+            // Otro proceso ya movió el pedido: no se devuelve el stock dos veces.
+            if (moved.affectedRows === 0) return;
+            // Mismo orden que al descontar (por presentación): sin bloqueos cruzados.
+            for (const { variantId, quantity } of [...items].sort(
+                (a, b) => a.variantId - b.variantId,
+            ))
+                await restoreStockQuery(tx, variantId, quantity);
+            // El carrito se vació al crear el pedido: se repone para poder reintentar el pago.
+            await upsertCartItemsQuery(tx, userId, items);
+            await insertAuditLogQuery(tx, {
+                userId,
+                action: 'Pedido anulado: no se pudo cobrar el pago',
+                details: `pedido ${orderId}, PaymentIntent ${paymentIntentId} (estado en Stripe: ${status})`,
+            });
+        });
+    } catch (undoError) {
+        console.error(
+            `[CRÍTICO] No se pudo anular el pedido ${orderId} tras fallar el cobro (PaymentIntent ${paymentIntentId}): queda 'Confirmado' sin cobrar`,
+            undoError,
+        );
+        throw undoError;
+    }
+    await cancelQuietly(paymentIntentId);
+    return 'undone';
+}
+
+/**
  * Crea el pedido del carrito guardado del cliente (RF7).
  *
  * Orden de las comprobaciones, y qué pasa con la autorización de la tarjeta:
@@ -128,6 +238,10 @@ export async function createOrder(
 ): Promise<CreateOrderResult> {
     const { paymentMethod, shippingTypeId, shippingAddressId } = input;
     const paymentIntentId = input.paymentMethod === 'Tarjeta' ? input.paymentIntentId : null;
+
+    // MVP2: la transferencia está apagada por entorno; el cuerpo es válido pero no se atiende.
+    if (paymentMethod === 'Transferencia' && !isTransferEnabled())
+        return fail('method_unavailable', 'La transferencia bancaria no está disponible');
 
     let authorization: Awaited<ReturnType<typeof getAuthorization>> | null = null;
     if (paymentIntentId !== null) {
@@ -213,6 +327,10 @@ export async function createOrder(
     const statusName = STATUS_BY_METHOD[paymentMethod];
     const statusId = await getOrderStatusId(statusName);
     if (statusId === null) throw new Error(`Falta el estado de pedido '${statusName}'`);
+    // Se busca ya, antes de tocar nada: la compensación no puede fallar por no encontrarlo.
+    const cancelledStatusId = paymentIntentId !== null ? await getOrderStatusId('Anulado') : null;
+    if (paymentIntentId !== null && cancelledStatusId === null)
+        throw new Error("Falta el estado de pedido 'Anulado'");
 
     try {
         const orderId = await db.transaction(async (tx) => {
@@ -236,10 +354,24 @@ export async function createOrder(
             });
             await insertOrderLinesQuery(tx, insertId, orderLines);
             await clearUserCartQuery(tx, userId);
-            // Lo último antes del commit: si cobrar falla, se revierte todo lo anterior.
-            if (paymentIntentId !== null) await capture(paymentIntentId);
             return insertId;
         });
+        // El pedido ya está confirmado en la BD: ahora sí se cobra (fuera de la transacción).
+        if (paymentIntentId !== null) {
+            const outcome = await settlePayment({
+                orderId,
+                userId,
+                paymentIntentId,
+                items,
+                confirmedStatusId: statusId,
+                cancelledStatusId: cancelledStatusId!,
+            });
+            if (outcome === 'undone')
+                return fail(
+                    'payment_failed',
+                    'No se ha podido cobrar el pago. No se ha hecho ningún cargo.',
+                );
+        }
         return {
             ok: true,
             created: true,
@@ -268,13 +400,6 @@ export async function createOrder(
             const existing = await getOrderByPaymentIntent(paymentIntentId);
             if (existing?.userId === userId)
                 return { ok: true, created: false, order: summaryOf(existing.id, existing) };
-        }
-        if (error instanceof PaymentError) {
-            console.error('No se pudo capturar el pago', paymentIntentId, error, error.cause);
-            return reject(
-                'payment_failed',
-                'No se ha podido cobrar el pago. No se ha hecho ningún cargo.',
-            );
         }
         throw error;
     }

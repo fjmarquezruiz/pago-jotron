@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cartFingerprint } from './fingerprint';
 
 const tx = { tx: true };
@@ -17,6 +17,10 @@ const decrementStockQuery = vi.fn();
 const insertOrderQuery = vi.fn();
 const insertOrderLinesQuery = vi.fn();
 const clearUserCartQuery = vi.fn();
+const changeOrderStatusQuery = vi.fn();
+const restoreStockQuery = vi.fn();
+const upsertCartItemsQuery = vi.fn();
+const insertAuditLogQuery = vi.fn();
 vi.mock('@/lib/db/queries', () => ({
     getUserCart: (...a: unknown[]) => getUserCart(...a),
     getCartLines: (...a: unknown[]) => getCartLines(...a),
@@ -28,6 +32,10 @@ vi.mock('@/lib/db/queries', () => ({
     insertOrderQuery: (...a: unknown[]) => insertOrderQuery(...a),
     insertOrderLinesQuery: (...a: unknown[]) => insertOrderLinesQuery(...a),
     clearUserCartQuery: (...a: unknown[]) => clearUserCartQuery(...a),
+    changeOrderStatusQuery: (...a: unknown[]) => changeOrderStatusQuery(...a),
+    restoreStockQuery: (...a: unknown[]) => restoreStockQuery(...a),
+    upsertCartItemsQuery: (...a: unknown[]) => upsertCartItemsQuery(...a),
+    insertAuditLogQuery: (...a: unknown[]) => insertAuditLogQuery(...a),
 }));
 
 const getAuthorization = vi.fn();
@@ -79,6 +87,8 @@ const authorized = {
 let consoleError: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
+    // Por defecto la transferencia está encendida: varios casos la usan como pedido sin tarjeta.
+    vi.stubEnv('BANK_TRANSFER_ENABLED', 'true');
     consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     transaction.mockReset().mockImplementation((run) => run(tx));
     getUserCart.mockReset().mockResolvedValue(items);
@@ -96,14 +106,24 @@ beforeEach(() => {
     getOrderByPaymentIntent.mockReset().mockResolvedValue(null);
     getOrderStatusId
         .mockReset()
-        .mockImplementation(async (name) => (name === 'Confirmado' ? 2 : 1));
+        .mockImplementation(async (name) =>
+            name === 'Confirmado' ? 2 : name === 'Anulado' ? 7 : 1,
+        );
     decrementStockQuery.mockReset().mockResolvedValue([{ affectedRows: 1 }]);
     insertOrderQuery.mockReset().mockResolvedValue([{ insertId: 12 }]);
     insertOrderLinesQuery.mockReset().mockResolvedValue(undefined);
     clearUserCartQuery.mockReset().mockResolvedValue(undefined);
+    changeOrderStatusQuery.mockReset().mockResolvedValue([{ affectedRows: 1 }]);
+    restoreStockQuery.mockReset().mockResolvedValue(undefined);
+    upsertCartItemsQuery.mockReset().mockResolvedValue(undefined);
+    insertAuditLogQuery.mockReset().mockResolvedValue(undefined);
     getAuthorization.mockReset().mockResolvedValue(authorized);
     capture.mockReset().mockResolvedValue({ id: 'pi_1', status: 'succeeded', amountCents: TOTAL });
     cancel.mockReset().mockResolvedValue({ id: 'pi_1', status: 'canceled', amountCents: TOTAL });
+});
+
+afterEach(() => {
+    vi.unstubAllEnvs();
 });
 
 describe('createOrder con tarjeta', () => {
@@ -145,12 +165,33 @@ describe('createOrder con tarjeta', () => {
         expect(cancel).not.toHaveBeenCalled();
     });
 
-    it('captura lo último, después de escribir en la BD', async () => {
-        const order: string[] = [];
-        clearUserCartQuery.mockImplementation(async () => order.push('carrito'));
-        capture.mockImplementation(async () => order.push('captura'));
+    it('captura DESPUÉS del commit, nunca dentro de la transacción', async () => {
+        const events: string[] = [];
+        transaction.mockImplementation(async (run) => {
+            events.push('begin');
+            const result = await run(tx);
+            events.push('commit');
+            return result;
+        });
+        clearUserCartQuery.mockImplementation(async () => events.push('carrito'));
+        capture.mockImplementation(async () => events.push('captura'));
+
         await createOrder(USER, card);
-        expect(order).toEqual(['carrito', 'captura']);
+
+        expect(events).toEqual(['begin', 'carrito', 'commit', 'captura']);
+        // Si todo va bien, no hay transacción de compensación.
+        expect(transaction).toHaveBeenCalledTimes(1);
+        expect(restoreStockQuery).not.toHaveBeenCalled();
+    });
+
+    it('si el commit falla, no se llega a capturar ni se cancela la reserva (puede haberse confirmado)', async () => {
+        transaction.mockImplementation(async (run) => {
+            await run(tx);
+            throw new Error('conexión perdida en el commit');
+        });
+        await expect(createOrder(USER, card)).rejects.toThrow('conexión perdida');
+        expect(capture).not.toHaveBeenCalled();
+        expect(cancel).not.toHaveBeenCalled();
     });
 
     it('es idempotente: si ya hay un pedido de ese pago, lo devuelve sin tocar nada', async () => {
@@ -283,13 +324,102 @@ describe('createOrder con tarjeta', () => {
         expect(consoleError).toHaveBeenCalled();
     });
 
-    it('si la captura falla, la transacción se revierte, cancela y da payment_failed', async () => {
-        capture.mockRejectedValue(new PaymentError('x', 'card_declined'));
-        const result = await createOrder(USER, card);
-        expect(result).toMatchObject({ ok: false, code: 'payment_failed' });
-        expect(cancel).toHaveBeenCalledWith('pi_1');
-        // El error salió de la transacción (rollback), así que no se devuelve ningún pedido.
-        expect(result).not.toHaveProperty('order');
+    describe('si la captura falla', () => {
+        beforeEach(() => {
+            capture.mockRejectedValue(new PaymentError('x', 'api_connection_error'));
+        });
+
+        it('compensa en una segunda transacción: devuelve el stock, repone el carrito y anula el pedido', async () => {
+            const result = await createOrder(USER, card);
+
+            expect(result).toMatchObject({ ok: false, code: 'payment_failed' });
+            expect(result).not.toHaveProperty('order');
+            // 1.ª transacción: crear el pedido (ya confirmada); 2.ª: compensación.
+            expect(transaction).toHaveBeenCalledTimes(2);
+            expect(changeOrderStatusQuery).toHaveBeenCalledWith(tx, 12, 2, 7);
+            expect(restoreStockQuery.mock.calls).toEqual([
+                [tx, 4, 2],
+                [tx, 9, 1],
+            ]);
+            expect(upsertCartItemsQuery).toHaveBeenCalledWith(tx, USER, items);
+            expect(insertAuditLogQuery).toHaveBeenCalledWith(
+                tx,
+                expect.objectContaining({
+                    userId: USER,
+                    action: 'Pedido anulado: no se pudo cobrar el pago',
+                    details: expect.stringContaining('pedido 12, PaymentIntent pi_1'),
+                }),
+            );
+        });
+
+        it('cancela la autorización DESPUÉS de compensar', async () => {
+            const events: string[] = [];
+            changeOrderStatusQuery.mockImplementation(async () => {
+                events.push('anular');
+                return [{ affectedRows: 1 }];
+            });
+            cancel.mockImplementation(async () => events.push('cancelar'));
+
+            await createOrder(USER, card);
+
+            expect(events).toEqual(['anular', 'cancelar']);
+            expect(cancel).toHaveBeenCalledWith('pi_1');
+        });
+
+        it('pregunta a Stripe antes de compensar y, si el cobro se hizo, deja el pedido', async () => {
+            getAuthorization
+                .mockResolvedValueOnce(authorized)
+                .mockResolvedValueOnce({ ...authorized, status: 'succeeded' });
+
+            const result = await createOrder(USER, card);
+
+            expect(result).toMatchObject({ ok: true, created: true, order: { orderId: 12 } });
+            expect(transaction).toHaveBeenCalledTimes(1);
+            expect(restoreStockQuery).not.toHaveBeenCalled();
+            expect(changeOrderStatusQuery).not.toHaveBeenCalled();
+            expect(cancel).not.toHaveBeenCalled();
+        });
+
+        it('si Stripe no contesta, no adivina: deja el pedido, lo registra como crítico y lo anota', async () => {
+            getAuthorization
+                .mockResolvedValueOnce(authorized)
+                .mockRejectedValueOnce(new PaymentError('x', 'api_connection_error'));
+
+            const result = await createOrder(USER, card);
+
+            expect(result).toMatchObject({ ok: true, created: true });
+            expect(transaction).toHaveBeenCalledTimes(1);
+            expect(restoreStockQuery).not.toHaveBeenCalled();
+            expect(cancel).not.toHaveBeenCalled();
+            expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('[CRÍTICO]'));
+            expect(insertAuditLogQuery).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({ action: 'Estado del cobro desconocido' }),
+            );
+        });
+
+        it('si la compensación falla, propaga el error, no cancela la reserva y lo registra como crítico', async () => {
+            transaction.mockImplementationOnce((run) => run(tx));
+            transaction.mockRejectedValueOnce(new Error('BD caída'));
+
+            await expect(createOrder(USER, card)).rejects.toThrow('BD caída');
+
+            expect(cancel).not.toHaveBeenCalled();
+            expect(consoleError).toHaveBeenCalledWith(
+                expect.stringContaining('[CRÍTICO]'),
+                expect.any(Error),
+            );
+        });
+
+        it('si otro proceso ya movió el pedido, no devuelve el stock dos veces', async () => {
+            changeOrderStatusQuery.mockResolvedValue([{ affectedRows: 0 }]);
+
+            const result = await createOrder(USER, card);
+
+            expect(result).toMatchObject({ ok: false, code: 'payment_failed' });
+            expect(restoreStockQuery).not.toHaveBeenCalled();
+            expect(upsertCartItemsQuery).not.toHaveBeenCalled();
+        });
     });
 
     it('una colisión del PaymentIntent único devuelve el pedido de la otra petición', async () => {
@@ -324,6 +454,17 @@ describe('createOrder con tarjeta', () => {
 });
 
 describe('createOrder con transferencia', () => {
+    it('con la transferencia apagada (MVP2), method_unavailable sin tocar la BD ni Stripe', async () => {
+        vi.stubEnv('BANK_TRANSFER_ENABLED', undefined);
+
+        expect(await createOrder(USER, transfer)).toMatchObject({
+            ok: false,
+            code: 'method_unavailable',
+        });
+        expect(getUserCart).not.toHaveBeenCalled();
+        expect(transaction).not.toHaveBeenCalled();
+    });
+
     it('crea el pedido Pendiente de pago, sin tocar Stripe', async () => {
         const result = await createOrder(USER, transfer);
 
