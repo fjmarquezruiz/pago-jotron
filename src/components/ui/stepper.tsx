@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Check, X } from 'lucide-react';
+import { CircleCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type StepStatus = 'upcoming' | 'active' | 'completed' | 'error';
@@ -15,7 +15,10 @@ export interface StepperProps extends React.OlHTMLAttributes<HTMLOListElement> {
     steps: Step[];
     /** Índice (desde 0) del paso activo. Los anteriores se marcan como completados. */
     current: number;
-    /** Índice de un paso con error, si lo hay. */
+    /**
+     * Índice de un paso con error, si lo hay (Figma: StepItem status=error): indicador en
+     * `destructive-subtle` con su número, sin icono, y la etiqueta en `destructive`.
+     */
     errorStep?: number;
     orientation?: 'horizontal' | 'vertical';
     /** `progress-bar`: indicador centrado entre dos barras y el texto debajo (Figma: style). */
@@ -48,6 +51,11 @@ const connectorOffset = { sm: 'mt-3', md: 'mt-4', lg: 'mt-[19px]', xl: 'mt-6' };
  * Pasos de un proceso (Figma: Stepper), por ejemplo el checkout.
  * `variant="progress-bar"` centra cada indicador entre dos barras con el texto debajo.
  * Es una lista ordenada; el paso activo lleva `aria-current="step"`.
+ *
+ * Conectores (criterio único, el de Figma en carrito, datos, pago y confirmar): el tramo que llega a
+ * un paso ya alcanzado va en `brand` al 20 %; el que llega a un paso por venir o con error, en
+ * `primary` al 10 %. Es decir, el tramo tras el paso `i` es `brand/20` si `i + 1 <= current` y el
+ * paso `i + 1` no es el del error.
  * En horizontal y en móvil solo se ve el texto del paso activo (el resto queda para lectores de pantalla).
  *
  * @example
@@ -104,6 +112,12 @@ const Stepper = React.forwardRef<HTMLOListElement, StepperProps>(
                                       ? 'flex-1 items-start'
                                       : 'items-start',
                                 !bar && isLast && 'flex-none',
+                                // Figma: el último paso de tamaño lg mide 128 px fijos.
+                                !bar &&
+                                    isLast &&
+                                    size === 'lg' &&
+                                    orientation === 'horizontal' &&
+                                    'sm:w-32',
                             )}
                         >
                             {bar && (
@@ -144,14 +158,11 @@ const Stepper = React.forwardRef<HTMLOListElement, StepperProps>(
                                         'border border-input bg-muted text-muted-foreground',
                                     (status === 'active' || status === 'completed') &&
                                         'bg-brand text-brand-foreground',
-                                    status === 'error' &&
-                                        'bg-destructive text-destructive-foreground',
+                                    status === 'error' && 'bg-destructive-subtle text-destructive',
                                 )}
                             >
                                 {status === 'completed' ? (
-                                    <Check aria-hidden="true" strokeWidth={3} />
-                                ) : status === 'error' ? (
-                                    <X aria-hidden="true" strokeWidth={3} />
+                                    <CircleCheck aria-hidden="true" />
                                 ) : (
                                     (step.icon ?? i + 1)
                                 )}
@@ -176,9 +187,10 @@ const Stepper = React.forwardRef<HTMLOListElement, StepperProps>(
                                     className={cn(
                                         'font-medium',
                                         labelSizes[size],
-                                        status === 'upcoming'
-                                            ? 'text-muted-foreground'
-                                            : 'text-foreground',
+                                        status === 'upcoming' && 'text-muted-foreground',
+                                        status === 'error' && 'text-destructive',
+                                        (status === 'active' || status === 'completed') &&
+                                            'text-foreground',
                                     )}
                                 >
                                     {step.label}
@@ -195,12 +207,10 @@ const Stepper = React.forwardRef<HTMLOListElement, StepperProps>(
                                     className={cn(
                                         'h-0.5 min-w-2 flex-1 rounded-full',
                                         connectorOffset[size],
-                                        // Figma: tras un paso completado, marca; tras el activo, marca al 20 %; el resto, tinta al 10 %.
-                                        i < current
-                                            ? 'bg-brand'
-                                            : i === current
-                                              ? 'bg-brand/20'
-                                              : 'bg-primary/10',
+                                        // Llega a un paso alcanzado: marca al 20 %; si no (por venir o con error), tinta al 10 %.
+                                        i + 1 <= current && i + 1 !== errorStep
+                                            ? 'bg-brand/20'
+                                            : 'bg-primary/10',
                                     )}
                                 />
                             )}

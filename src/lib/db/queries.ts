@@ -28,15 +28,22 @@ import { toPositiveInt } from '@/lib/catalog/pagination';
 import { priceRangeBounds } from '@/lib/catalog/price-range';
 import { toVintageOptions, type CatalogFilterOptions } from '@/lib/catalog/filter-options';
 import { LIKE_ESCAPE, searchPattern } from '@/lib/catalog/search';
+import type { AddressInput } from '@/lib/validations/address';
+import type { ProfileInput } from '@/lib/validations/profile';
 import {
     DEFAULT_CATALOG_SORT,
     type CatalogFilters,
     type CatalogSort,
 } from '@/lib/validations/catalog';
 import {
+    addresses,
+    auditLogs,
     cartProducts,
     grapes,
     guaranteesOfOrigin,
+    orderProducts,
+    orderStatuses,
+    orders,
     productGrapes,
     productVariants,
     products,
@@ -129,6 +136,21 @@ export async function getShippingTypes() {
         .from(shippingTypes)
         .where(eq(shippingTypes.isBlocked, false))
         .orderBy(asc(shippingTypes.id));
+}
+
+/**
+ * Una modalidad de envío por su id, solo si se ofrece (no bloqueada): el checkout cobra el coste
+ * que dice la BD, nunca uno que mande el navegador.
+ *
+ * @param id - `shipping_types.shipping_type_id`.
+ * @returns La modalidad, o `null` si no existe o está bloqueada.
+ */
+export async function getShippingTypeById(id: number) {
+    const [row] = await db
+        .select()
+        .from(shippingTypes)
+        .where(and(eq(shippingTypes.id, id), eq(shippingTypes.isBlocked, false)));
+    return row ?? null;
 }
 
 /** Parámetros del listado: página (desde 1), productos por página, filtros y orden (RF5). */
@@ -604,6 +626,8 @@ function cartLineColumns() {
         price: productVariants.price,
         /** Unidades disponibles: 0 = agotada. El carrito limita sus cantidades a este número. */
         stock: productVariants.stock,
+        /** IVA en % de la tipología del producto (`typologies.tax_rate`, `'21.00'`): lo usa el presupuesto del pedido. */
+        taxRate: typologies.taxRate,
     };
 }
 
@@ -623,6 +647,7 @@ export function cartLinesQuery(variantIds: readonly number[]) {
         .innerJoin(products, eq(products.id, productVariants.productId))
         .innerJoin(wineries, joinWinery)
         .innerJoin(guaranteesOfOrigin, joinOrigin)
+        .innerJoin(typologies, eq(typologies.id, products.typologyId))
         .where(
             and(
                 inArray(productVariants.id, [...variantIds]),
@@ -768,3 +793,461 @@ export async function saveUserCart(userId: number, items: Cart): Promise<void> {
         await deleteMissingCartItemsQuery(tx, userId, items);
     });
 }
+
+/** Columnas de una dirección que se devuelven al cliente: todas menos `user_id` y `is_active`. */
+function addressColumns() {
+    return {
+        id: addresses.id,
+        recipientName: addresses.recipientName,
+        phone: addresses.phone,
+        streetType: addresses.streetType,
+        streetName: addresses.streetName,
+        number: addresses.number,
+        floor: addresses.floor,
+        postalCode: addresses.postalCode,
+        city: addresses.city,
+        province: addresses.province,
+        country: addresses.country,
+        addressType: addresses.addressType,
+    };
+}
+
+/**
+ * Consulta de las direcciones vigentes de un usuario (`is_active = true`), de la más antigua a la
+ * más reciente. Las sustituidas (`is_active = false`) siguen en la BD, porque un pedido antiguo
+ * apunta a ellas, pero no se ofrecen. Se separa de `getUserAddresses` para poder comprobar su SQL
+ * sin conectar a la BD.
+ *
+ * @param userId - Id del usuario (`users.user_id`).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function userAddressesQuery(userId: number) {
+    return db
+        .select(addressColumns())
+        .from(addresses)
+        .where(and(eq(addresses.userId, userId), eq(addresses.isActive, true)))
+        .orderBy(asc(addresses.id));
+}
+
+/**
+ * Direcciones vigentes de un usuario (RF3, RF7).
+ *
+ * @param userId - Id del usuario, el de la sesión (`getSessionUserId`).
+ * @returns Sus direcciones, de la más antigua a la más reciente; vacío si no tiene ninguna.
+ *
+ * @example
+ * const list = await getUserAddresses(12);
+ * // [{ id: 3, recipientName: 'Ana García', streetType: 'Calle', ... }]
+ */
+export async function getUserAddresses(userId: number) {
+    return userAddressesQuery(userId);
+}
+
+/** Una dirección vigente tal como se devuelve al cliente. */
+export type UserAddress = Awaited<ReturnType<typeof getUserAddresses>>[number];
+
+/**
+ * Crea una dirección del usuario (RF3, RF7). Con `replaces`, la dirección anterior pasa a
+ * `is_active = false` en la misma transacción: una dirección no se modifica, porque un pedido
+ * antiguo apunta a ella y su dirección no puede cambiar. Si `replaces` no es una dirección
+ * vigente de este usuario, no se crea nada.
+ *
+ * @param userId - Id del usuario, el de la sesión (`getSessionUserId`).
+ * @param input - Los datos ya validados (`addressSchema`).
+ * @param replaces - Id de la dirección vigente a la que sustituye, si se está editando.
+ * @returns La dirección creada, o `null` si `replaces` no existe, es de otro usuario o ya estaba
+ *   sustituida.
+ *
+ * @example
+ * const created = await createUserAddress(12, input, 3); // sustituye a la 3
+ */
+export async function createUserAddress(
+    userId: number,
+    input: AddressInput,
+    replaces?: number,
+): Promise<UserAddress | null> {
+    return db.transaction(async (tx) => {
+        if (replaces !== undefined) {
+            const [result] = await tx
+                .update(addresses)
+                .set({ isActive: false })
+                .where(
+                    and(
+                        eq(addresses.id, replaces),
+                        eq(addresses.userId, userId),
+                        eq(addresses.isActive, true),
+                    ),
+                );
+            if (result.affectedRows === 0) return null;
+        }
+
+        const [{ insertId }] = await tx.insert(addresses).values({ ...input, userId });
+        const [created] = await tx
+            .select(addressColumns())
+            .from(addresses)
+            .where(eq(addresses.id, insertId));
+        return created;
+    });
+}
+
+/**
+ * Una dirección vigente de un usuario por su id. Filtra por usuario: la dirección de otra cuenta
+ * no se devuelve aunque exista.
+ *
+ * @param userId - Id del usuario, el de la sesión (`getSessionUserId`).
+ * @param addressId - `addresses.address_id`.
+ * @returns La dirección, o `null` si no existe, es de otro usuario o ya fue sustituida.
+ */
+export async function getUserAddress(
+    userId: number,
+    addressId: number,
+): Promise<UserAddress | null> {
+    const [row] = await db
+        .select(addressColumns())
+        .from(addresses)
+        .where(
+            and(
+                eq(addresses.id, addressId),
+                eq(addresses.userId, userId),
+                eq(addresses.isActive, true),
+            ),
+        );
+    return row ?? null;
+}
+
+/** Columnas del perfil de contacto de una cuenta: nunca la contraseña, el rol ni la fecha de nacimiento. */
+function profileColumns() {
+    return {
+        name: users.name,
+        lastName: users.lastName,
+        email: users.email,
+        phone: users.phone,
+        idCard: users.idCard,
+    };
+}
+
+/**
+ * Consulta del perfil de contacto de un usuario. Se separa de `getUserProfile` para poder
+ * comprobar su SQL sin conectar a la BD.
+ *
+ * @param userId - Id del usuario (`users.user_id`).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function userProfileQuery(userId: number) {
+    return db.select(profileColumns()).from(users).where(eq(users.id, userId));
+}
+
+/**
+ * Perfil de contacto de una cuenta (RF3): nombre, apellidos, correo, teléfono y NIF. Los datos
+ * que no se han rellenado salen como `null`.
+ *
+ * @param userId - Id del usuario, el de la sesión (`getSessionUserId`).
+ * @returns El perfil, o `null` si la cuenta ya no existe.
+ */
+export async function getUserProfile(userId: number) {
+    const [row] = await userProfileQuery(userId);
+    return row ?? null;
+}
+
+/** El perfil de contacto de una cuenta tal como se devuelve al cliente. */
+export type UserProfile = NonNullable<Awaited<ReturnType<typeof getUserProfile>>>;
+
+/**
+ * Consulta que actualiza los datos de contacto de un usuario. No toca el correo: no se puede
+ * cambiar desde el perfil.
+ *
+ * @param userId - Id del usuario (`users.user_id`).
+ * @param input - Los datos ya validados (`profileSchema`).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function updateUserProfileQuery(userId: number, input: ProfileInput) {
+    return db
+        .update(users)
+        .set({
+            name: input.name,
+            lastName: input.lastName,
+            phone: input.phone,
+            idCard: input.idCard,
+        })
+        .where(eq(users.id, userId));
+}
+
+/**
+ * Guarda los datos de contacto de una cuenta (RF3) y devuelve el perfil resultante.
+ *
+ * @param userId - Id del usuario, el de la sesión (`getSessionUserId`).
+ * @param input - Los datos ya validados (`profileSchema`).
+ * @returns El perfil guardado, o `null` si la cuenta no existe.
+ * @throws El error de MySQL `ER_DUP_ENTRY` si el NIF ya es de otra cuenta (`isDuplicateEntryError`).
+ */
+export async function updateUserProfile(userId: number, input: ProfileInput) {
+    await updateUserProfileQuery(userId, input);
+    // Se relee en vez de fiarse de `affectedRows`: MySQL cuenta 0 filas si los datos no cambian.
+    return getUserProfile(userId);
+}
+
+/**
+ * Lo que necesitan las consultas del pedido: el cliente de BD o una transacción
+ * (`db.transaction`), para construirlas con el ejecutor que toque.
+ */
+type OrderWriter = Pick<typeof db, 'insert' | 'delete' | 'update'>;
+
+/**
+ * Consulta de un pedido por el PaymentIntent con el que se pagó (`orders.payment_intent_id`,
+ * único): sirve para no duplicar un pedido si la confirmación llega dos veces.
+ *
+ * @param paymentIntentId - Id del PaymentIntent (`pi_…`).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function orderByPaymentIntentQuery(paymentIntentId: string) {
+    return db
+        .select({
+            id: orders.id,
+            userId: orders.userId,
+            status: orderStatuses.name,
+            paymentMethod: orders.paymentMethod,
+        })
+        .from(orders)
+        .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
+        .where(eq(orders.paymentIntentId, paymentIntentId));
+}
+
+/**
+ * Pedido ya creado para un PaymentIntent.
+ *
+ * @param paymentIntentId - Id del PaymentIntent (`pi_…`).
+ * @returns `{ id, userId, status, paymentMethod }`, o `null` si no hay pedido con ese pago.
+ */
+export async function getOrderByPaymentIntent(paymentIntentId: string) {
+    const [row] = await orderByPaymentIntentQuery(paymentIntentId);
+    return row ?? null;
+}
+
+/**
+ * Id de un estado de pedido por su nombre (`order_statuses.name`, sembrado: 'Confirmado',
+ * 'Pendiente de pago'…).
+ *
+ * @param name - Nombre del estado.
+ * @returns El `status_id`, o `null` si no existe.
+ */
+export async function getOrderStatusId(name: string): Promise<number | null> {
+    const [row] = await db
+        .select({ id: orderStatuses.id })
+        .from(orderStatuses)
+        .where(eq(orderStatuses.name, name));
+    return row?.id ?? null;
+}
+
+/**
+ * Consulta que descuenta stock de forma atómica: `stock = stock - cantidad` solo si quedan
+ * unidades suficientes (`stock >= cantidad`). Si otro cliente compró entre medias, no cambia
+ * ninguna fila (`affectedRows = 0`) y el stock nunca queda negativo.
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param variantId - `product_variants.variant_id`.
+ * @param quantity - Unidades a descontar (entero >= 1).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function decrementStockQuery(writer: OrderWriter, variantId: number, quantity: number) {
+    return writer
+        .update(productVariants)
+        .set({ stock: sql`${productVariants.stock} - ${quantity}` })
+        .where(and(eq(productVariants.id, variantId), gte(productVariants.stock, quantity)));
+}
+
+/**
+ * Consulta que devuelve al stock las unidades de una línea de un pedido que se anula: `stock =
+ * stock + cantidad`. Es la inversa de `decrementStockQuery` y no necesita comprobar nada: sumar
+ * nunca deja el stock negativo.
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param variantId - `product_variants.variant_id`.
+ * @param quantity - Unidades a devolver (entero >= 1).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function restoreStockQuery(writer: OrderWriter, variantId: number, quantity: number) {
+    return writer
+        .update(productVariants)
+        .set({ stock: sql`${productVariants.stock} + ${quantity}` })
+        .where(eq(productVariants.id, variantId));
+}
+
+/**
+ * Consulta que marca un pedido con un estado nuevo (`status_id` y `status_updated_at`). Se usa
+ * para anularlo cuando falla el cobro de la tarjeta. Solo cambia el pedido que está en
+ * `fromStatusId`: si otro proceso ya lo movió a otro estado, no pisa ese cambio
+ * (`affectedRows = 0`).
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param orderId - `orders.order_id`.
+ * @param fromStatusId - Estado en el que debe estar ahora.
+ * @param toStatusId - Estado al que pasa.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function changeOrderStatusQuery(
+    writer: OrderWriter,
+    orderId: number,
+    fromStatusId: number,
+    toStatusId: number,
+) {
+    return writer
+        .update(orders)
+        .set({ statusId: toStatusId, statusUpdatedAt: sql`CURRENT_TIMESTAMP` })
+        .where(and(eq(orders.id, orderId), eq(orders.statusId, fromStatusId)));
+}
+
+/**
+ * Consulta que anota una acción en la auditoría (`audit_logs`, RF12): es lo que hace que un
+ * fallo que no ve el cliente, como un pedido anulado por no poder cobrarlo, lo vea quien
+ * administra la tienda.
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param entry - Usuario afectado (o `null`), qué pasó y el detalle para localizarlo.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function insertAuditLogQuery(
+    writer: OrderWriter,
+    entry: { userId: number | null; action: string; details: string },
+) {
+    return writer.insert(auditLogs).values(entry);
+}
+
+/** Lo que se guarda de un pedido al crearlo: los importes ya van como texto decimal (`'33.45'`). */
+export interface NewOrder {
+    userId: number;
+    shippingAddressId: number;
+    billingAddressId: number;
+    paymentMethod: 'Tarjeta' | 'Transferencia';
+    shippingTypeId: number;
+    shippingCost: string;
+    total: string;
+    statusId: number;
+    paymentIntentId: string | null;
+}
+
+/**
+ * Consulta que inserta un pedido.
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param order - Los datos del pedido.
+ * @returns La consulta, lista para ejecutar con `await`; su resultado trae el `insertId`.
+ */
+export function insertOrderQuery(writer: OrderWriter, order: NewOrder) {
+    return writer.insert(orders).values(order);
+}
+
+/** Una línea de pedido: el precio y el IVA van fijados tal como estaban al comprar. */
+export interface NewOrderLine {
+    variantId: number;
+    quantity: number;
+    unitPrice: string;
+    taxRate: string;
+}
+
+/**
+ * Consulta que inserta las líneas de un pedido (un solo `insert`); no puede estar vacío.
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param orderId - `orders.order_id`.
+ * @param lines - Las líneas, con precio e IVA del momento de la compra.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function insertOrderLinesQuery(
+    writer: OrderWriter,
+    orderId: number,
+    lines: readonly NewOrderLine[],
+) {
+    return writer.insert(orderProducts).values(lines.map((line) => ({ orderId, ...line })));
+}
+
+/**
+ * Consulta que vacía el carrito guardado de un usuario (`cart_products`).
+ *
+ * @param writer - El cliente de BD o la transacción en la que se ejecuta.
+ * @param userId - Id del usuario (`users.user_id`).
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function clearUserCartQuery(writer: OrderWriter, userId: number) {
+    return writer.delete(cartProducts).where(eq(cartProducts.userId, userId));
+}
+
+/**
+ * Consulta de un pedido de un usuario con su estado, su tipo de envío y su dirección de envío.
+ * Filtra por usuario: el pedido de otra cuenta no se devuelve aunque exista. La dirección se lee
+ * aunque ya esté sustituida (`is_active = false`): el pedido conserva la suya.
+ *
+ * @param userId - Id del usuario, el de la sesión.
+ * @param orderId - `orders.order_id`.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function userOrderQuery(userId: number, orderId: number) {
+    return db
+        .select({
+            id: orders.id,
+            status: orderStatuses.name,
+            paymentMethod: orders.paymentMethod,
+            createdAt: orders.createdAt,
+            shippingCost: orders.shippingCost,
+            shippingTypeName: shippingTypes.name,
+            minDeliveryDays: shippingTypes.minDeliveryDays,
+            maxDeliveryDays: shippingTypes.maxDeliveryDays,
+            recipientName: addresses.recipientName,
+            streetType: addresses.streetType,
+            streetName: addresses.streetName,
+            number: addresses.number,
+            floor: addresses.floor,
+            postalCode: addresses.postalCode,
+            city: addresses.city,
+            province: addresses.province,
+            country: addresses.country,
+            phone: addresses.phone,
+        })
+        .from(orders)
+        .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
+        .innerJoin(shippingTypes, eq(shippingTypes.id, orders.shippingTypeId))
+        .leftJoin(addresses, eq(addresses.id, orders.shippingAddressId))
+        .where(and(eq(orders.id, orderId), eq(orders.userId, userId)));
+}
+
+/**
+ * Consulta de las líneas de un pedido con su producto, de la primera a la última presentación
+ * (`variant_id`). El precio y el IVA son los guardados en `order_products`, no los vigentes.
+ *
+ * @param orderId - `orders.order_id`.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function orderLinesQuery(orderId: number) {
+    return db
+        .select({
+            variantId: orderProducts.variantId,
+            name: products.name,
+            vintage: products.vintage,
+            format: productVariants.format,
+            capacity: productVariants.capacity,
+            capacityUnit: productVariants.capacityUnit,
+            quantity: orderProducts.quantity,
+            unitPrice: orderProducts.unitPrice,
+            taxRate: orderProducts.taxRate,
+        })
+        .from(orderProducts)
+        .innerJoin(productVariants, eq(productVariants.id, orderProducts.variantId))
+        .innerJoin(products, eq(products.id, productVariants.productId))
+        .where(eq(orderProducts.orderId, orderId))
+        .orderBy(asc(orderProducts.variantId));
+}
+
+/**
+ * Un pedido de un usuario con sus líneas (RF8).
+ *
+ * @param userId - Id del usuario, el de la sesión (`getSessionUserId`).
+ * @param orderId - `orders.order_id`.
+ * @returns `{ order, lines }`, o `null` si el pedido no existe o es de otra cuenta.
+ */
+export async function getUserOrder(userId: number, orderId: number) {
+    const [order] = await userOrderQuery(userId, orderId);
+    if (!order) return null;
+    return { order, lines: await orderLinesQuery(orderId) };
+}
+
+/** Un pedido con sus líneas tal como lo devuelve `getUserOrder`. */
+export type UserOrder = NonNullable<Awaited<ReturnType<typeof getUserOrder>>>;

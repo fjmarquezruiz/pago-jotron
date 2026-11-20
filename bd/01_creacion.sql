@@ -37,6 +37,7 @@ CREATE TABLE `addresses` (
   `country` varchar(100) NOT NULL DEFAULT 'España',
   `address_type` enum('Envío','Facturación') NOT NULL DEFAULT 'Envío',
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `recipient_name` varchar(200) NOT NULL,
   PRIMARY KEY (`address_id`),
   KEY `addresses_user_id_users_user_id_fk` (`user_id`),
   CONSTRAINT `addresses_user_id_users_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON UPDATE CASCADE
@@ -230,7 +231,9 @@ CREATE TABLE `orders` (
   `cancellation_type_id` int DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `shipping_date` date DEFAULT NULL,
+  `payment_intent_id` varchar(64) DEFAULT NULL,
   PRIMARY KEY (`order_id`),
+  UNIQUE KEY `orders_payment_intent_id_unique` (`payment_intent_id`),
   KEY `orders_user_id_users_user_id_fk` (`user_id`),
   KEY `fk_order_shipping_address` (`shipping_address_id`),
   KEY `fk_order_billing_address` (`billing_address_id`),

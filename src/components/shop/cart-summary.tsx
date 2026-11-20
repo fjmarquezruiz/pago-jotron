@@ -1,7 +1,12 @@
 import Link from 'next/link';
-import { ArrowRight, Lock, RotateCcw, ShieldLock } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import {
+    SummaryPanel,
+    SummaryRow,
+    SummaryTotal,
+    TrustBadges,
+} from '@/components/shop/summary-parts';
 import { formatCents } from '@/lib/cart/totals';
 import { formatDeliveryTime, type ShippingOptionInput } from '@/lib/catalog/shipping';
 import { formatEuros } from '@/lib/utils';
@@ -11,23 +16,6 @@ export type CartDelivery = Pick<
     ShippingOptionInput,
     'cost' | 'minDeliveryDays' | 'maxDeliveryDays'
 >;
-
-// Texto del diseño de Figma que no sale de la BD: confirmar con la bodega.
-const TRUST_BADGES = [
-    { icon: ShieldLock, text: 'Pago seguro' },
-    { icon: RotateCcw, text: 'Devoluciones gratuitas' },
-    { icon: Lock, text: 'Cifrado SSL' },
-];
-
-/** Una fila del resumen: etiqueta pequeña a la izquierda y valor a la derecha. */
-function SummaryRow({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="flex items-center justify-between font-medium whitespace-nowrap">
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="text-base">{value}</p>
-        </div>
-    );
-}
 
 interface CartSummaryProps {
     /** Suma de las líneas, en céntimos (`cartSubtotalCents`). */
@@ -59,13 +47,7 @@ export function CartSummary({ subtotalCents, delivery }: CartSummaryProps) {
         : null;
 
     return (
-        <aside
-            aria-labelledby="cart-summary-title"
-            className="flex max-w-120 flex-col gap-8 self-start rounded-sm bg-muted p-10 max-xl:max-w-none"
-        >
-            <h2 id="cart-summary-title" className="text-xl font-medium">
-                Resumen del pedido
-            </h2>
+        <SummaryPanel titleId="cart-summary-title">
             <SummaryRow label="Subtotal" value={formatCents(subtotalCents)} />
             {delivery && (
                 <SummaryRow
@@ -79,33 +61,14 @@ export function CartSummary({ subtotalCents, delivery }: CartSummaryProps) {
             )}
             {time && <SummaryRow label="Entrega estimada" value={time} />}
             <SummaryRow label="IVA" value="Incluido" />
-            <Separator />
-            {/* Región en vivo: al cambiar una cantidad o quitar una línea, el lector anuncia "Total …". */}
-            <div
-                aria-live="polite"
-                aria-atomic="true"
-                className="flex items-center justify-between text-xl font-medium whitespace-nowrap"
-            >
-                <p>Total</p>
-                <p>{formatCents(subtotalCents)}</p>
-            </div>
+            <SummaryTotal value={formatCents(subtotalCents)} />
             <Button asChild variant="brand" size="lg" className="w-full">
                 <Link href="/checkout">
                     Continuar
                     <ArrowRight aria-hidden="true" />
                 </Link>
             </Button>
-            <ul className="flex flex-col gap-2.5">
-                {TRUST_BADGES.map(({ icon: Icon, text }) => (
-                    <li
-                        key={text}
-                        className="flex items-center gap-3 text-sm text-muted-foreground"
-                    >
-                        <Icon aria-hidden="true" className="size-4 shrink-0" />
-                        {text}
-                    </li>
-                ))}
-            </ul>
-        </aside>
+            <TrustBadges />
+        </SummaryPanel>
     );
 }

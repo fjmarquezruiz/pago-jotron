@@ -4,6 +4,7 @@ import { addItem, mergeCarts, removeItem, setQuantity, type Cart } from '@/lib/c
 import { reconcileCart, type CartChange, type StockInfo } from '@/lib/cart/reconcile';
 import { sameCart } from '@/lib/cart/sync';
 import { persistedCartSchema } from '@/lib/validations/cart';
+import { browserStorage, withValidJson } from '@/stores/storage';
 
 /** Clave de `localStorage` donde se guarda el carrito. */
 export const CART_STORAGE_KEY = 'pago-jotron-cart';
@@ -15,66 +16,6 @@ export const CART_STORAGE_VERSION = 1;
  * Lo único que se guarda en `localStorage`: las líneas y de quién son (`owner`). Ni precio ni stock.
  */
 type PersistedCart = { items: Cart; owner: number | null };
-
-/**
- * `localStorage` que nunca lanza. Sin él, `persist` se queda sin `store.persist` si leer
- * `localStorage` falla (en el servidor no existe; en un navegador con los datos del sitio
- * bloqueados lanza `SecurityError`), y una escritura sin espacio rompería la acción que la
- * provoca. Si no se puede guardar, el carrito sigue funcionando en memoria.
- */
-function browserStorage(): StateStorage {
-    return {
-        getItem: (name) => {
-            try {
-                return localStorage.getItem(name);
-            } catch {
-                return null;
-            }
-        },
-        setItem: (name, value) => {
-            try {
-                localStorage.setItem(name, value);
-            } catch {
-                // Bloqueado o sin espacio: no se guarda, y el carrito sigue en memoria.
-            }
-        },
-        removeItem: (name) => {
-            try {
-                localStorage.removeItem(name);
-            } catch {
-                // Igual que en `setItem`.
-            }
-        },
-    };
-}
-
-/**
- * Envuelve un almacenamiento para que `getItem` devuelva `null` si lo guardado no es JSON. Sin
- * esto, `JSON.parse` lanza dentro de `persist` y la recuperación termina en su `catch`, que ni
- * marca el carrito como recuperado (`hasHydrated`) ni avisa a quien espera: la página del carrito
- * se quedaría para siempre en el esqueleto.
- */
-function withValidJson(storage: StateStorage): StateStorage {
-    const valid = (raw: string | null): string | null => {
-        if (raw === null) return null;
-        try {
-            JSON.parse(raw);
-            return raw;
-        } catch {
-            return null;
-        }
-    };
-    return {
-        getItem: (name) => {
-            const value = storage.getItem(name);
-            return typeof value === 'string' || value === null
-                ? valid(value)
-                : Promise.resolve(value).then(valid);
-        },
-        setItem: (name, value) => storage.setItem(name, value),
-        removeItem: (name) => storage.removeItem(name),
-    };
-}
 
 /**
  * Estado del carrito y sus acciones. Cada acción aplica la función pura de `src/lib/cart/` que le
@@ -110,6 +51,12 @@ export interface CartState {
     adopt: (userId: number, items: Cart) => void;
     /** Vacía el carrito y lo deja sin dueño (anónimo). Si ya estaba así, no escribe ni avisa. */
     clear: () => void;
+    /**
+     * Vacía las líneas conservando el dueño (`owner`): es lo que pasa al cerrar una compra, cuando
+     * el servidor ya vació el carrito de la cuenta y el local debe ir con él. Con el carrito ya
+     * vacío no escribe ni avisa, así que llamarla de más es inocuo.
+     */
+    empty: () => void;
 }
 
 /**
@@ -175,13 +122,16 @@ export function createCartStore(storage?: StateStorage) {
                         const { items, owner } = get();
                         if (items.length > 0 || owner !== null) set({ items: [], owner: null });
                     },
+                    empty: () => {
+                        if (get().items.length > 0) set({ items: [] });
+                    },
                 };
             },
             {
                 name: CART_STORAGE_KEY,
                 version: CART_STORAGE_VERSION,
                 storage: createJSONStorage<PersistedCart>(() =>
-                    withValidJson(storage ?? browserStorage()),
+                    withValidJson(storage ?? browserStorage('local')),
                 ),
                 partialize: ({ items, owner }) => ({ items, owner }),
                 merge: (persisted, current) => {

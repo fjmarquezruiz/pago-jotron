@@ -39,6 +39,7 @@ export const addresses = mysqlTable('addresses', {
     userId: int('user_id')
         .notNull()
         .references(() => users.id, { onUpdate: 'cascade' }),
+    recipientName: varchar('recipient_name', { length: 200 }).notNull(), // Nombre y apellidos de quien recibe: la mensajería lo necesita
     phone: varchar('phone', { length: 20 }).notNull(),
     streetType: mysqlEnum('street_type', [
         'Calle',
@@ -402,6 +403,9 @@ export const orders = mysqlTable(
             .notNull()
             .default(sql`CURRENT_TIMESTAMP`),
         shippingDate: date('shipping_date', { mode: 'string' }),
+        // PaymentIntent de Stripe: enlaza el pedido con el cobro y, al ser único, impide duplicarlo
+        // si la confirmación llega dos veces. Nulo en los pedidos que no se pagan con Stripe.
+        paymentIntentId: varchar('payment_intent_id', { length: 64 }).unique(),
     },
     (t) => ({
         fkShippingAddress: foreignKey({

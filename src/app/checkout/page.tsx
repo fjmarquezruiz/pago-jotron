@@ -1,38 +1,40 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { SiteHeader } from '@/components/shop/site-header';
-import { Button } from '@/components/ui/button';
-import { EmptyState } from '@/components/ui/empty-state';
+import { Suspense } from 'react';
+import { CartSuggestions } from '@/components/shop/cart-suggestions';
+import { CatalogHero } from '@/components/shop/catalog-hero';
+import { CheckoutDataView } from '@/components/shop/checkout-data-view';
+import { ProductRelatedSkeleton } from '@/components/shop/product-skeleton';
+import { deliveryOptions } from '@/lib/catalog/shipping';
+import { getShippingTypes } from '@/lib/db/queries';
 
-export const metadata: Metadata = { title: 'Finalizar compra | Pago de Jotrón' };
+/** Las modalidades de envío cambian desde el panel de administración, y las sugerencias son al azar: no se cachea. */
+export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = { title: 'Datos | Pago de Jotrón' };
 
 /**
- * Marcador de "Finalizar compra" hasta que llegue el checkout (A9: Datos, Pago y Confirmar).
- * Existe para que "Continuar" del carrito no acabe en un 404: el cliente con sesión llega aquí y
- * el que no la tiene pasa antes por `/auth/login?callbackUrl=/checkout` (el middleware protege la
- * ruta, que no es pública). Su carrito sigue intacto y tiene un enlace para volver a él.
+ * Checkout, paso 2: Datos (RF7, Figma: checkout-2-datos, -v2 y -error). Cabecera de la tienda, el
+ * formulario de contacto y dirección con el resumen del pedido (`CheckoutDataView`, de cliente
+ * porque el carrito y las elecciones viven en el navegador) y "También te puede gustar".
  *
- * Sin diseño en Figma: es el `EmptyState` del sistema de diseño tal cual. Hay que sustituirlo por
- * el checkout real.
+ * Es privada: el middleware manda a `/auth/login?callbackUrl=/checkout` a quien no tiene sesión.
+ * Del servidor salen las modalidades de envío con plazo; el resto lo carga el cliente (cuenta,
+ * direcciones y líneas del carrito). "También te puede gustar" va en un `Suspense`: carga aparte.
  */
-export default function CheckoutPage() {
+export default async function CheckoutPage() {
+    const shippingOptions = deliveryOptions(await getShippingTypes());
+
     return (
-        <>
-            <SiteHeader />
-            <main className="px-6 py-16 lg:py-40">
-                <div className="mx-auto w-full max-w-9xl">
-                    <EmptyState
-                        titleAs="h1"
-                        title="Próximamente"
-                        description="Todavía no se puede finalizar la compra. Tus productos siguen en el carrito."
-                        action={
-                            <Button asChild variant="brand">
-                                <Link href="/carrito">Volver al carrito</Link>
-                            </Button>
-                        }
-                    />
+        <main>
+            <CatalogHero titleAs="p" />
+            <div className="px-6 py-16 lg:py-40">
+                <div className="mx-auto flex w-full max-w-9xl flex-col gap-16 lg:gap-40">
+                    <CheckoutDataView shippingOptions={shippingOptions} />
+                    <Suspense fallback={<ProductRelatedSkeleton />}>
+                        <CartSuggestions />
+                    </Suspense>
                 </div>
-            </main>
-        </>
+            </div>
+        </main>
     );
 }

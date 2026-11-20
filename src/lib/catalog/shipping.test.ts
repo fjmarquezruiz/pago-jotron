@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { cheapestDelivery, formatDeliveryTime, formatShippingOption } from './shipping';
+import {
+    cheapestDelivery,
+    deliveryOptions,
+    formatBusinessDeliveryTime,
+    formatDeliveryTime,
+    formatShippingChoice,
+    formatShippingOption,
+} from './shipping';
 
 describe('formatDeliveryTime', () => {
     it.each([
@@ -189,5 +196,46 @@ describe('cheapestDelivery', () => {
         const snapshot = structuredClone(options);
         cheapestDelivery(options);
         expect(options).toEqual(snapshot);
+    });
+});
+
+describe('deliveryOptions', () => {
+    const standard = { name: 'Estándar', cost: '4.95', minDeliveryDays: 3, maxDeliveryDays: 5 };
+    const pickup = { name: 'Recogida', cost: '0.00', minDeliveryDays: null, maxDeliveryDays: null };
+    const oneEnd = { name: 'Solo máximo', cost: '6.00', minDeliveryDays: null, maxDeliveryDays: 2 };
+
+    it('deja fuera lo que no tiene plazo y conserva el orden', () => {
+        expect(deliveryOptions([pickup, standard, oneEnd])).toEqual([standard, oneEnd]);
+    });
+
+    it('devuelve una lista vacía si ninguna tiene plazo o no hay ninguna', () => {
+        expect(deliveryOptions([pickup])).toEqual([]);
+        expect(deliveryOptions([])).toEqual([]);
+    });
+});
+
+describe('formatBusinessDeliveryTime', () => {
+    it.each([
+        [3, 5, '3-5 días laborables'],
+        [1, 1, '1 día laborable'],
+        [2, 2, '2 días laborables'],
+        [null, 1, '1 día laborable'],
+        [null, null, null],
+    ] as const)('%s / %s → %s', (min, max, expected) => {
+        expect(formatBusinessDeliveryTime(min, max)).toBe(expected);
+    });
+});
+
+describe('formatShippingChoice', () => {
+    it('pone el precio entre paréntesis', () => {
+        expect(formatShippingChoice({ name: 'Envío estándar', cost: '4.95' })).toBe(
+            'Envío estándar (4,95\u00a0€)',
+        );
+    });
+
+    it('un coste de 0 es "gratis"', () => {
+        expect(formatShippingChoice({ name: 'Envío gratis', cost: '0.00' })).toBe(
+            'Envío gratis (gratis)',
+        );
     });
 });

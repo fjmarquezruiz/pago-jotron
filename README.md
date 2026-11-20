@@ -28,6 +28,14 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
   servidor de `http://localhost:3000` si ya está en marcha (`E2E_BASE_URL` lo cambia) y, si no,
   arrancan `pnpm dev`. En local usan el Chrome del sistema. Tocan solo el carrito del cliente
   `user@jotron.com` y lo vacían antes y después.
+- E2E del checkout (`e2e/checkout.spec.ts`): compran de verdad en modo prueba, así que necesitan las
+  claves de PRUEBA de Stripe en `.env.local` (`STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`)
+  y la BD sembrada. La transferencia es de MVP2 y está apagada: su prueba necesita que el servidor tenga
+  `BANK_TRANSFER_ENABLED=true`, `BANK_TRANSFER_HOLDER` y `BANK_TRANSFER_IBAN` (si no, se salta). Cada prueba reembolsa el cobro, borra el pedido y la
+  dirección que crea y devuelve el stock y el perfil de `user@jotron.com`. Si el `pnpm dev` de siempre
+  ya está ocupado, arranca otro servidor (`BANK_TRANSFER_ENABLED=true BANK_TRANSFER_HOLDER=… BANK_TRANSFER_IBAN=…
+NEXTAUTH_URL=http://localhost:3100 pnpm exec next dev -p 3100`) y lanza
+  `E2E_BASE_URL=http://localhost:3100 pnpm test:e2e`.
 
 ## Learn More
 

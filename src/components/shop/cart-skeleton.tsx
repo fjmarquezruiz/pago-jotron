@@ -1,4 +1,4 @@
-import { CartSteps } from '@/components/shop/cart-steps';
+import { CheckoutSteps } from '@/components/shop/checkout-steps';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
@@ -16,7 +16,7 @@ export function CartSkeleton() {
             <span role="status" className="sr-only">
                 Cargando tu carrito…
             </span>
-            <CartSteps />
+            <CheckoutSteps />
             <Skeleton className="h-10 w-72" />
             <div className="grid gap-x-16 gap-y-12 xl:grid-cols-3">
                 <div className="flex flex-col xl:col-span-2">

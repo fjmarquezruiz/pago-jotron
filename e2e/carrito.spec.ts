@@ -48,7 +48,7 @@ test.describe('RF6: el carrito del cliente', () => {
         // 3. Inicio sesión con el formulario: el carrito anónimo pasa a ser el de la cuenta.
         await signInWithForm(page);
         await expect(page).toHaveURL(/\/checkout$/);
-        await expect(page.getByRole('heading', { name: 'Próximamente' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Información de contacto' })).toBeVisible();
 
         await page.goto('/carrito');
         await expect(page.locator('tbody tr')).toHaveCount(1);
