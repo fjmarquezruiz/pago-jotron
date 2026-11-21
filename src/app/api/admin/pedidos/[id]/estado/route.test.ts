@@ -23,9 +23,13 @@ let consoleError: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
     getSessionUser.mockReset().mockResolvedValue({ id: 1, role: 'Administrador' });
-    changeOrderStatus
-        .mockReset()
-        .mockResolvedValue({ ok: true, from: 'Confirmado', to: 'En proceso', refund: 'none' });
+    changeOrderStatus.mockReset().mockResolvedValue({
+        ok: true,
+        from: 'Confirmado',
+        to: 'En proceso',
+        refund: 'none',
+        invoiceNumber: null,
+    });
     consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -38,13 +42,33 @@ describe('PATCH /api/admin/pedidos/[id]/estado', () => {
         const response = await patch('5', { status: 'En proceso' });
         expect(response.status).toBe(200);
         expect(response.headers.get('Cache-Control')).toBe('no-store');
-        expect(await response.json()).toEqual({ status: 'En proceso', refund: 'none' });
+        expect(await response.json()).toEqual({
+            status: 'En proceso',
+            refund: 'none',
+            invoiceNumber: null,
+        });
         expect(changeOrderStatus).toHaveBeenCalledWith(
             5,
             'En proceso',
             { role: 'Administrador', userId: 1 },
             { cancellationTypeId: undefined },
         );
+    });
+
+    it('al entregar devuelve el número de la factura emitida', async () => {
+        changeOrderStatus.mockResolvedValue({
+            ok: true,
+            from: 'Enviado',
+            to: 'Entregado',
+            refund: 'none',
+            invoiceNumber: 'F-2026-0001',
+        });
+        const response = await patch('5', { status: 'Entregado' });
+        expect(await response.json()).toEqual({
+            status: 'Entregado',
+            refund: 'none',
+            invoiceNumber: 'F-2026-0001',
+        });
     });
 
     it('pasa el motivo al anular', async () => {

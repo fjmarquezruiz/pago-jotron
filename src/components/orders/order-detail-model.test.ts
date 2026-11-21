@@ -10,29 +10,61 @@ import {
 
 describe('orderActions', () => {
     it('Cancelar sale solo si el servidor dice que se puede', () => {
-        expect(orderActions({ status: S.CONFIRMED, canCancel: true }).cancel).toBe(true);
-        expect(orderActions({ status: S.CONFIRMED, canCancel: false }).cancel).toBe(false);
+        expect(
+            orderActions({ status: S.CONFIRMED, canCancel: true, invoiceNumber: null }).cancel,
+        ).toBe(true);
+        expect(
+            orderActions({ status: S.CONFIRMED, canCancel: false, invoiceNumber: null }).cancel,
+        ).toBe(false);
     });
 
     it('nunca hay Cancelar en Bloqueado, Entregado, Anulado, Preparado ni Enviado', () => {
         for (const status of [S.BLOCKED, S.DELIVERED, S.CANCELLED, S.PREPARED, S.SHIPPED]) {
             // `canCancel` viene de `canCustomerCancel`, que es false en estos estados.
-            expect(orderActions({ status, canCancel: false }).cancel).toBe(false);
+            expect(orderActions({ status, canCancel: false, invoiceNumber: null }).cancel).toBe(
+                false,
+            );
         }
     });
 
     it('la frase del plazo sale en Confirmado y En proceso, no en Pendiente de pago', () => {
-        expect(orderActions({ status: S.CONFIRMED, canCancel: true }).cancelHint).toBe(true);
-        expect(orderActions({ status: S.PROCESSING, canCancel: true }).cancelHint).toBe(true);
-        expect(orderActions({ status: S.PENDING, canCancel: true }).cancelHint).toBe(false);
-        expect(orderActions({ status: S.CONFIRMED, canCancel: false }).cancelHint).toBe(false);
+        expect(
+            orderActions({ status: S.CONFIRMED, canCancel: true, invoiceNumber: null }).cancelHint,
+        ).toBe(true);
+        expect(
+            orderActions({ status: S.PROCESSING, canCancel: true, invoiceNumber: null }).cancelHint,
+        ).toBe(true);
+        expect(
+            orderActions({ status: S.PENDING, canCancel: true, invoiceNumber: null }).cancelHint,
+        ).toBe(false);
+        expect(
+            orderActions({ status: S.CONFIRMED, canCancel: false, invoiceNumber: null }).cancelHint,
+        ).toBe(false);
     });
 
-    it('Factura solo en Entregado, y deshabilitada', () => {
-        expect(orderActions({ status: S.DELIVERED, canCancel: false }).invoice).toBe('disabled');
+    it('Factura solo en Entregado: descargable si ya se emitió', () => {
+        expect(
+            orderActions({ status: S.DELIVERED, canCancel: false, invoiceNumber: 'F-2026-0001' })
+                .invoice,
+        ).toBe('download');
         for (const status of [S.PENDING, S.CONFIRMED, S.SHIPPED, S.BLOCKED, S.CANCELLED]) {
-            expect(orderActions({ status, canCancel: false }).invoice).toBeNull();
+            expect(
+                orderActions({ status, canCancel: false, invoiceNumber: null }).invoice,
+            ).toBeNull();
         }
+    });
+
+    it('Entregado sin factura emitida: botón deshabilitado, no un enlace roto', () => {
+        expect(
+            orderActions({ status: S.DELIVERED, canCancel: false, invoiceNumber: null }).invoice,
+        ).toBe('unavailable');
+    });
+
+    it('un pedido que no está Entregado nunca enseña la factura, aunque la tuviera', () => {
+        expect(
+            orderActions({ status: S.SHIPPED, canCancel: false, invoiceNumber: 'F-2026-0001' })
+                .invoice,
+        ).toBeNull();
     });
 });
 

@@ -19,6 +19,7 @@ const detail = (overrides: Partial<OrderDetail> = {}): OrderDetail => ({
     createdAt: '2026-10-15 07:12:00',
     statusUpdatedAt: '2026-10-15 07:12:00',
     blockedFrom: null,
+    invoiceNumber: null,
     cancelledBy: null,
     canCancel: true,
     shippingAddress: {
@@ -90,11 +91,19 @@ describe('OrderDetailView', () => {
         expect(out).not.toContain('Puedes cancelar');
     });
 
-    it('Entregado: Factura deshabilitada y sin Cancelar', () => {
-        const out = of(S.DELIVERED, { canCancel: false });
+    it('Entregado con factura: enlace de descarga al PDF y sin Cancelar', () => {
+        const out = of(S.DELIVERED, { canCancel: false, invoiceNumber: 'F-2026-0001' });
         expect(out).toContain('Factura (PDF)');
-        expect(out).toMatch(/<button[^>]*disabled[^>]*>.*Factura \(PDF\)/);
+        expect(out).toContain('href="/api/pedidos/4521/factura"');
+        expect(out).toContain('download="F-2026-0001.pdf"');
+        expect(out).not.toMatch(/<button[^>]*disabled[^>]*>.*Factura \(PDF\)/);
         expect(out).not.toContain('Cancelar pedido');
+    });
+
+    it('Entregado sin factura emitida: Factura deshabilitada, sin enlace', () => {
+        const out = of(S.DELIVERED, { canCancel: false, invoiceNumber: null });
+        expect(out).toMatch(/<button[^>]*disabled[^>]*>.*Factura \(PDF\)/);
+        expect(out).not.toContain('/factura');
     });
 
     it('Bloqueado: aviso de revisión y nunca Cancelar ni Factura', () => {

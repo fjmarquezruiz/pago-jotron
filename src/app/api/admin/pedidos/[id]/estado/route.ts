@@ -27,7 +27,9 @@ const bodySchema = z.object({
  * reglas son las de `canTransition` (no se saltan estados). Al anular se devuelve el stock y, si
  * era de tarjeta, se reembolsa.
  *
- * Respuestas: 200 `{ status, refund }`; 400 id o cuerpo no válidos o motivo inexistente; 401 sin
+ * Al pasar a 'Entregado' se emite la factura en la misma transacción y se devuelve su número.
+ *
+ * Respuestas: 200 `{ status, refund, invoiceNumber }` (`invoiceNumber` solo al entregar); 400 id o cuerpo no válidos o motivo inexistente; 401 sin
  * sesión; 403 sin el rol; 404 no existe; 409 transición no permitida o el pedido cambió a la
  * vez; 500 error interno.
  */
@@ -60,7 +62,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         );
         if (!result.ok)
             return respond({ message: result.message }, CHANGE_STATUS_HTTP[result.code]);
-        return respond({ status: result.to, refund: result.refund });
+        return respond({
+            status: result.to,
+            refund: result.refund,
+            invoiceNumber: result.invoiceNumber,
+        });
     } catch (error) {
         console.error(error);
         return respond({ message: 'Error interno del servidor' }, 500);

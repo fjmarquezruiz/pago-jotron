@@ -19,6 +19,7 @@ import {
     userOrdersPageQuery,
     decrementStockQuery,
     insertAuditLogQuery,
+    insertInvoiceQuery,
     restoreStockQuery,
     insertOrderLinesQuery,
     insertOrderQuery,
@@ -1116,6 +1117,27 @@ describe('orderStockLinesQuery', () => {
         expect(sql).toContain('from `order_products` where `order_products`.`order_id` = ?');
         expect(sql).toContain('order by `order_products`.`variant_id` asc');
         expect(params).toEqual([5]);
+    });
+});
+
+describe('insertInvoiceQuery', () => {
+    const { sql, params } = insertInvoiceQuery(db, {
+        orderId: 5,
+        number: 'F-2026-0001',
+        issueDate: '2026-11-21 10:00:00',
+        taxBase: '23.10',
+        taxAmount: '4.85',
+        total: '27.95',
+        kind: 'Completa',
+        snapshot: { number: 'F-2026-0001' } as never,
+    }).toSQL();
+
+    it('inserta la factura con su tipo y la copia congelada', () => {
+        expect(sql).toContain('insert into `invoices`');
+        expect(sql).toContain('`kind`');
+        expect(sql).toContain('`snapshot`');
+        expect(params).toContain('F-2026-0001');
+        expect(params).toContain('Completa');
     });
 });
 

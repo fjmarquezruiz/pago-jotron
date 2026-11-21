@@ -41,7 +41,7 @@ export function OrderDetailView({ detail }: { detail: OrderDetail }) {
                         <h1 className="text-2xl font-medium">Pedido #{detail.number}</h1>
                         <OrderStatusBadge status={detail.status} />
                     </div>
-                    {(actions.cancel || actions.invoice) && (
+                    {(actions.cancel || actions.invoice !== null) && (
                         <div className="flex items-center gap-3">
                             {actions.cancel && (
                                 <CancelOrderDialog
@@ -50,7 +50,18 @@ export function OrderDetailView({ detail }: { detail: OrderDetail }) {
                                     paymentMethod={detail.paymentMethod}
                                 />
                             )}
-                            {actions.invoice && (
+                            {actions.invoice === 'download' && (
+                                <Button asChild variant="outline">
+                                    <a
+                                        href={`/api/pedidos/${detail.id}/factura`}
+                                        download={`${detail.invoiceNumber}.pdf`}
+                                    >
+                                        <Download aria-hidden="true" />
+                                        Factura (PDF)
+                                    </a>
+                                </Button>
+                            )}
+                            {actions.invoice === 'unavailable' && (
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <span tabIndex={0} className="inline-flex rounded-sm">
@@ -61,7 +72,7 @@ export function OrderDetailView({ detail }: { detail: OrderDetail }) {
                                         </span>
                                     </TooltipTrigger>
                                     <TooltipContent>
-                                        La factura estará disponible próximamente
+                                        La factura aún no está disponible
                                     </TooltipContent>
                                 </Tooltip>
                             )}

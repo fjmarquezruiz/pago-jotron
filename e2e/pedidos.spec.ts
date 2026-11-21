@@ -18,6 +18,7 @@ const OTHER_USER_ID = 5;
 let addressId: number;
 let stockBefore: number;
 let lastAuditId: number;
+let seriesBefore: { year: number; last_number: number }[];
 const created: number[] = [];
 
 /** Hace `ageHours` horas que el pedido nació y entró en su estado. */
@@ -102,6 +103,24 @@ async function stock(): Promise<number> {
     return Number(row.stock);
 }
 
+/** Inicia sesión como administrador con la API de next-auth (solo para preparar la prueba). */
+async function signInAsAdmin(context: BrowserContext): Promise<void> {
+    const { csrfToken } = await (await context.request.get('/api/auth/csrf')).json();
+    const response = await context.request.post('/api/auth/callback/credentials', {
+        form: { csrfToken, email: 'admin@jotron.com', password: 'Admin1234', json: 'true' },
+    });
+    expect(response.ok()).toBeTruthy();
+}
+
+/** Año actual en la hora de la tienda: el de la serie de facturas. */
+function shopYear(): number {
+    return Number(
+        new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric' }).format(
+            new Date(),
+        ),
+    );
+}
+
 /** Abre una página privada y entra por el formulario de login, como lo haría una persona. */
 async function signInAndOpen(page: Page, url: string): Promise<void> {
     await page.goto(url);
@@ -131,6 +150,7 @@ test.describe('Pedidos del cliente (RF8)', () => {
             'SELECT COALESCE(MAX(audit_log_id), 0) AS id FROM audit_logs',
         );
         lastAuditId = Number(id);
+        seriesBefore = await sql('SELECT year, last_number FROM invoice_series');
         context = await newDevice(browser);
         page = await context.newPage();
     });
@@ -138,8 +158,17 @@ test.describe('Pedidos del cliente (RF8)', () => {
     test.afterEach(async () => {
         await context.close();
         for (const orderId of created.splice(0)) {
+            await sql('DELETE FROM invoices WHERE order_id = ?', [orderId]);
             await sql('DELETE FROM orders WHERE order_id = ?', [orderId]); // las líneas caen en cascada
         }
+        // El contador de facturas vuelve a como estaba, y el NIF del cliente de prueba, a ninguno.
+        await sql('DELETE FROM invoice_series');
+        for (const { year, last_number } of seriesBefore)
+            await sql('INSERT INTO invoice_series (year, last_number) VALUES (?, ?)', [
+                year,
+                last_number,
+            ]);
+        await sql('UPDATE users SET id_card = NULL WHERE user_id = ?', [TEST_USER_ID]);
         await sql('DELETE FROM audit_logs WHERE audit_log_id > ?', [lastAuditId]);
         await sql('UPDATE product_variants SET stock = ? WHERE variant_id = ?', [
             stockBefore,
@@ -249,7 +278,66 @@ test.describe('Pedidos del cliente (RF8)', () => {
         expect((await orderRow(id)).status).toBe('Bloqueado');
     });
 
-    test('Entregado: la factura sale deshabilitada y no hay Cancelar', async () => {
+    test('al entregar se emite la factura (correlativa, completa o simplificada) y el cliente la descarga', async ({
+        browser,
+    }) => {
+        const year = shopYear();
+        const first = await seedOrder({ status: 'Enviado', ageHours: 48 });
+        const second = await seedOrder({ status: 'Enviado', ageHours: 48 });
+        const notDelivered = await seedOrder({ status: 'Confirmado', ageHours: 2 });
+
+        // Administración entrega el primer pedido: el cliente no tiene NIF → factura simplificada.
+        const admin = await newDevice(browser);
+        await signInAsAdmin(admin);
+        const deliver = (id: number) =>
+            admin.request.patch(`/api/admin/pedidos/${id}/estado`, {
+                data: { status: 'Entregado' },
+            });
+
+        const r1 = await deliver(first);
+        expect(r1.ok()).toBeTruthy();
+        expect((await r1.json()).invoiceNumber).toBe(`F-${year}-0001`);
+
+        // Con NIF, la siguiente es completa; la numeración sigue sin huecos.
+        await sql('UPDATE users SET id_card = ? WHERE user_id = ?', ['12345678Z', TEST_USER_ID]);
+        const r2 = await deliver(second);
+        expect((await r2.json()).invoiceNumber).toBe(`F-${year}-0002`);
+
+        const rows = await sql<{ order_id: number; number: string; kind: string; total: string }>(
+            'SELECT order_id, number, kind, total FROM invoices WHERE order_id IN (?, ?) ORDER BY number',
+            [first, second],
+        );
+        expect(rows.map(({ number, kind }) => [number, kind])).toEqual([
+            [`F-${year}-0001`, 'Simplificada'],
+            [`F-${year}-0002`, 'Completa'],
+        ]);
+        const [series] = await sql<{ last_number: number }>(
+            'SELECT last_number FROM invoice_series WHERE year = ?',
+            [year],
+        );
+        expect(Number(series.last_number)).toBe(2);
+
+        // El cliente ve el botón, descarga el PDF y es de verdad un PDF con su número en el nombre.
+        await signInAndOpen(page, `/pedidos/${first}`);
+        const link = page.getByRole('link', { name: 'Factura (PDF)' });
+        await expect(link).toBeVisible();
+        const downloading = page.waitForEvent('download');
+        await link.click();
+        const download = await downloading;
+        expect(download.suggestedFilename()).toBe(`F-${year}-0001.pdf`);
+        const file = await download.createReadStream();
+        const chunks: Buffer[] = [];
+        for await (const chunk of file) chunks.push(chunk as Buffer);
+        expect(Buffer.concat(chunks).subarray(0, 5).toString()).toBe('%PDF-');
+
+        // La factura es solo del dueño y solo de un pedido Entregado.
+        expect((await admin.request.get(`/api/pedidos/${first}/factura`)).status()).toBe(404);
+        const mine = await context.request.get(`/api/pedidos/${notDelivered}/factura`);
+        expect(mine.status()).toBe(404);
+        await admin.close();
+    });
+
+    test('Entregado sin factura emitida: el botón sale deshabilitado y no hay Cancelar', async () => {
         const id = await seedOrder({ status: 'Entregado', ageHours: 24 * 10 });
         await signInAndOpen(page, `/pedidos/${id}`);
 

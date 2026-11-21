@@ -32,6 +32,8 @@ export interface OrderDetail {
     statusUpdatedAt: string;
     /** Estado que tenía al bloquearse; `null` si no está Bloqueado. */
     blockedFrom: OrderStatus | null;
+    /** Número de su factura (`F-2026-0001`); `null` si aún no tiene (solo la tiene un pedido Entregado). */
+    invoiceNumber: string | null;
     /** Quién lo anuló (`orders.cancelled_by`); `null` si no está anulado o fue el sistema. */
     cancelledBy: 'Cliente' | 'Administrador' | null;
     /** Si el cliente puede cancelarlo ahora (`canCustomerCancel`, comprobado en el servidor). */
@@ -93,6 +95,7 @@ export function buildOrderDetail(found: UserOrder, now: Date = new Date()): Orde
         createdAt: order.createdAt,
         statusUpdatedAt: order.statusUpdatedAt,
         blockedFrom: order.blockedFrom as OrderStatus | null,
+        invoiceNumber: order.invoiceNumber,
         cancelledBy: order.cancelledBy,
         canCancel: canCustomerCancel(
             { status, createdAt: order.createdAt, statusUpdatedAt: order.statusUpdatedAt },

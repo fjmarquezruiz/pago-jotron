@@ -3,6 +3,7 @@ import {
     cancellationTypeExists,
     changeOrderStatusQuery,
     getCancellationTypeIdByDescription,
+    getInvoiceSource,
     getOrderForStatusChange,
     getOrderStatuses,
     insertAuditLogQuery,
@@ -10,6 +11,7 @@ import {
     restoreStockQuery,
     type OrderStatusExtras,
 } from '@/lib/db/queries';
+import { issueInvoice } from '@/lib/invoices/issue';
 import { refund } from '@/lib/payments';
 import { CUSTOMER_CANCELLATION_DESCRIPTION } from './cancellation';
 import { orderNumber } from './format';
@@ -49,7 +51,14 @@ export type ChangeStatusFailureCode =
 export type RefundOutcome = 'none' | 'done' | 'failed';
 
 export type ChangeStatusResult =
-    | { ok: true; from: OrderStatus; to: OrderStatus; refund: RefundOutcome }
+    | {
+          ok: true;
+          from: OrderStatus;
+          to: OrderStatus;
+          refund: RefundOutcome;
+          /** Número de la factura emitida al pasar a Entregado; `null` en cualquier otro cambio. */
+          invoiceNumber: string | null;
+      }
     | { ok: false; code: ChangeStatusFailureCode; message: string };
 
 const fail = (code: ChangeStatusFailureCode, message: string): ChangeStatusResult => ({
@@ -172,6 +181,12 @@ export async function changeOrderStatus(
     }
     if (from === ORDER_STATUS.BLOCKED) extras.blockedFromStatusId = null;
 
+    // Se lee antes de la transacción (las líneas del pedido no cambian) y se emite dentro.
+    const delivering = to === ORDER_STATUS.DELIVERED;
+    const invoiceSource = delivering ? await getInvoiceSource(orderId) : null;
+    if (delivering && invoiceSource === null) return fail('not_found', 'El pedido no existe');
+
+    let invoiceNumber: string | null = null;
     const moved = await db.transaction(async (tx) => {
         const [result] = await changeOrderStatusQuery(tx, orderId, order.statusId, toId, extras);
         // Otro proceso ya movió el pedido: no se devuelve el stock dos veces.
@@ -181,6 +196,7 @@ export async function changeOrderStatus(
             for (const { variantId, quantity } of await orderStockLinesQuery(tx, orderId))
                 await restoreStockQuery(tx, variantId, quantity);
         }
+        if (invoiceSource !== null) invoiceNumber = await issueInvoice(tx, invoiceSource, now);
         await insertAuditLogQuery(tx, {
             userId: actor.userId,
             action: `Pedido ${orderNumber(orderId)}: ${from} → ${to}`,
@@ -192,7 +208,7 @@ export async function changeOrderStatus(
                               : ''
                       }`
                     : ''
-            }`,
+            }${invoiceNumber ? `; factura ${invoiceNumber}` : ''}`,
         });
         return true;
     });
@@ -205,5 +221,5 @@ export async function changeOrderStatus(
         order.paymentIntentId !== null
             ? await refundQuietly(orderId, order.userId, order.paymentIntentId)
             : 'none';
-    return { ok: true, from, to, refund: refunded };
+    return { ok: true, from, to, refund: refunded, invoiceNumber };
 }

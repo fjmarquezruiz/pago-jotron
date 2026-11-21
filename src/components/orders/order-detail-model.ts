@@ -10,8 +10,11 @@ export interface OrderActions {
     cancel: boolean;
     /** Frase "Puedes cancelar el pedido durante las 24 h…": solo donde hay plazo (no en Pendiente de pago). */
     cancelHint: boolean;
-    /** "Factura (PDF)": solo en Entregado, y deshabilitado hasta que exista la factura. */
-    invoice: 'disabled' | null;
+    /**
+     * "Factura (PDF)": solo en Entregado. `download` si ya tiene factura; `unavailable` (botón
+     * deshabilitado) si está Entregado pero aún no se emitió, que no debería pasar.
+     */
+    invoice: 'download' | 'unavailable' | null;
 }
 
 /**
@@ -21,12 +24,19 @@ export interface OrderActions {
  * @param detail - El pedido (`buildOrderDetail`).
  * @returns Qué botones y avisos enseñar.
  */
-export function orderActions(detail: Pick<OrderDetail, 'status' | 'canCancel'>): OrderActions {
+export function orderActions(
+    detail: Pick<OrderDetail, 'status' | 'canCancel' | 'invoiceNumber'>,
+): OrderActions {
     return {
         cancel: detail.canCancel,
         cancelHint:
             detail.canCancel && (detail.status === S.CONFIRMED || detail.status === S.PROCESSING),
-        invoice: detail.status === S.DELIVERED ? 'disabled' : null,
+        invoice:
+            detail.status !== S.DELIVERED
+                ? null
+                : detail.invoiceNumber !== null
+                  ? 'download'
+                  : 'unavailable',
     };
 }
 

@@ -21,6 +21,8 @@ import {
 } from 'drizzle-orm';
 import { alias, type MySqlSelect } from 'drizzle-orm/mysql-core';
 import { db } from '@/db';
+import type { InvoiceSource } from '@/lib/invoices/build';
+import type { InvoiceDocument } from '@/lib/invoices/types';
 import type { Cart } from '@/lib/cart/cart';
 import { orderLinesByVariantIds } from '@/lib/cart/lines';
 import { NEW_PRODUCT_DAYS } from '@/lib/catalog/novelty';
@@ -42,6 +44,8 @@ import {
     cartProducts,
     grapes,
     guaranteesOfOrigin,
+    invoices,
+    invoiceSeries,
     orderProducts,
     orderStatuses,
     orders,
@@ -1263,6 +1267,149 @@ export function clearUserCartQuery(writer: OrderWriter, userId: number) {
     return writer.delete(cartProducts).where(eq(cartProducts.userId, userId));
 }
 
+/** Cliente de BD o transacción con lo que necesita la emisión de una factura. */
+export type InvoiceTx = Pick<typeof db, 'select' | 'insert' | 'update'>;
+
+/**
+ * Reserva el siguiente número de factura del año (RF8). Tiene que llamarse DENTRO de la transacción
+ * que emite la factura: crea la fila del año si no existe, la bloquea con `SELECT … FOR UPDATE`
+ * (dos emisiones a la vez se esperan una a otra), le suma 1 y devuelve el nuevo valor. Si la
+ * transacción se deshace, el contador también, así que la numeración no deja huecos (un
+ * `AUTO_INCREMENT` sí los deja).
+ *
+ * @param tx - La transacción en la que se emite la factura.
+ * @param year - Año de la serie (el de la fecha de expedición, hora de Madrid).
+ * @returns El número de orden dentro del año, empezando en 1.
+ */
+export async function reserveInvoiceSequence(tx: InvoiceTx, year: number): Promise<number> {
+    await tx.insert(invoiceSeries).values({ year, lastNumber: 0 }).onDuplicateKeyUpdate({
+        set: { year },
+    });
+    const [row] = await tx
+        .select({ lastNumber: invoiceSeries.lastNumber })
+        .from(invoiceSeries)
+        .where(eq(invoiceSeries.year, year))
+        .for('update');
+    const next = row.lastNumber + 1;
+    await tx.update(invoiceSeries).set({ lastNumber: next }).where(eq(invoiceSeries.year, year));
+    return next;
+}
+
+/** Lo que se guarda al emitir una factura. Los importes van como texto decimal (`'33.45'`). */
+export interface NewInvoice {
+    orderId: number;
+    number: string;
+    /** `datetime` de la BD (UTC): la misma fecha que lleva el documento. */
+    issueDate: string;
+    taxBase: string;
+    taxAmount: string;
+    total: string;
+    kind: 'Completa' | 'Simplificada';
+    snapshot: InvoiceDocument;
+}
+
+/**
+ * Consulta que inserta una factura. `invoices.order_id` es único: un pedido no puede tener dos.
+ *
+ * @param writer - La transacción en la que se emite.
+ * @param invoice - La factura.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function insertInvoiceQuery(writer: InvoiceTx, invoice: NewInvoice) {
+    return writer.insert(invoices).values(invoice);
+}
+
+/**
+ * Lo necesario para emitir la factura de un pedido: el cliente (nombre y NIF), la dirección de
+ * facturación, el envío y las líneas con el precio y el IVA guardados en el pedido.
+ *
+ * @param orderId - `orders.order_id`.
+ * @returns La fuente de la factura, o `null` si el pedido no existe.
+ */
+export async function getInvoiceSource(orderId: number): Promise<InvoiceSource | null> {
+    const [row] = await db
+        .select({
+            orderId: orders.id,
+            name: users.name,
+            lastName: users.lastName,
+            idCard: users.idCard,
+            shippingCost: orders.shippingCost,
+            shippingName: shippingTypes.name,
+            billingRecipientName: addresses.recipientName,
+            streetType: addresses.streetType,
+            streetName: addresses.streetName,
+            number: addresses.number,
+            floor: addresses.floor,
+            postalCode: addresses.postalCode,
+            city: addresses.city,
+            province: addresses.province,
+            country: addresses.country,
+            hasBilling: orders.billingAddressId,
+        })
+        .from(orders)
+        .innerJoin(users, eq(users.id, orders.userId))
+        .innerJoin(shippingTypes, eq(shippingTypes.id, orders.shippingTypeId))
+        .leftJoin(addresses, eq(addresses.id, orders.billingAddressId))
+        .where(eq(orders.id, orderId));
+    if (!row) return null;
+
+    const lines = await orderLinesQuery(orderId);
+    return {
+        orderId: row.orderId,
+        user: { name: row.name, lastName: row.lastName, idCard: row.idCard },
+        billingAddress:
+            row.hasBilling === null
+                ? null
+                : {
+                      recipientName: row.billingRecipientName,
+                      streetType: row.streetType,
+                      streetName: row.streetName,
+                      number: row.number,
+                      floor: row.floor,
+                      postalCode: row.postalCode,
+                      city: row.city,
+                      province: row.province,
+                      country: row.country,
+                  },
+        shippingCost: row.shippingCost,
+        shippingName: row.shippingName,
+        lines: lines.map(
+            ({ name, vintage, format, capacity, capacityUnit, quantity, unitPrice, taxRate }) => ({
+                name,
+                vintage,
+                format,
+                capacity,
+                capacityUnit,
+                quantity,
+                unitPrice,
+                taxRate,
+            }),
+        ),
+    };
+}
+
+/**
+ * La factura de un pedido de un usuario, con el estado del pedido: para descargarla (CU8). Filtra
+ * por usuario: la factura de otra cuenta no se devuelve aunque exista.
+ *
+ * @param userId - Id del usuario, el de la sesión.
+ * @param orderId - `orders.order_id`.
+ * @returns El estado del pedido y el documento congelado al emitir la factura, o `null` si el
+ * pedido no existe, es de otra cuenta o aún no tiene factura.
+ */
+export async function getUserInvoice(
+    userId: number,
+    orderId: number,
+): Promise<{ status: string; document: InvoiceDocument } | null> {
+    const [row] = await db
+        .select({ status: orderStatuses.name, snapshot: invoices.snapshot })
+        .from(invoices)
+        .innerJoin(orders, eq(orders.id, invoices.orderId))
+        .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
+        .where(and(eq(orders.id, orderId), eq(orders.userId, userId)));
+    return row ? { status: row.status, document: row.snapshot as InvoiceDocument } : null;
+}
+
 /** `order_statuses` por segunda vez: el estado del que venía un pedido Bloqueado. */
 const blockedFromStatus = alias(orderStatuses, 'blocked_from_status');
 
@@ -1286,6 +1433,8 @@ export function userOrderQuery(userId: number, orderId: number) {
             statusUpdatedAt: orders.statusUpdatedAt,
             /** Estado que tenía al bloquearse; `null` si no está Bloqueado. */
             blockedFrom: blockedFromStatus.name,
+            /** Número de su factura (`F-2026-0001`); `null` si aún no tiene. */
+            invoiceNumber: invoices.number,
             /** Quién anuló el pedido; `null` si no está anulado o lo anuló el sistema (cobro fallido). */
             cancelledBy: orders.cancelledBy,
             shippingCost: orders.shippingCost,
@@ -1306,6 +1455,7 @@ export function userOrderQuery(userId: number, orderId: number) {
         .from(orders)
         .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
         .leftJoin(blockedFromStatus, eq(blockedFromStatus.id, orders.blockedFromStatusId))
+        .leftJoin(invoices, eq(invoices.orderId, orders.id))
         .innerJoin(shippingTypes, eq(shippingTypes.id, orders.shippingTypeId))
         .leftJoin(addresses, eq(addresses.id, orders.shippingAddressId))
         .where(and(eq(orders.id, orderId), eq(orders.userId, userId)));

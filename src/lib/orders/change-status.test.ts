@@ -8,6 +8,7 @@ vi.mock('@/db', () => ({
 
 const getOrderForStatusChange = vi.fn();
 const getCancellationTypeIdByDescription = vi.fn();
+const getInvoiceSource = vi.fn();
 const getOrderStatuses = vi.fn();
 const cancellationTypeExists = vi.fn();
 const changeOrderStatusQuery = vi.fn();
@@ -18,6 +19,7 @@ vi.mock('@/lib/db/queries', () => ({
     getOrderForStatusChange: (...a: unknown[]) => getOrderForStatusChange(...a),
     getCancellationTypeIdByDescription: (...a: unknown[]) =>
         getCancellationTypeIdByDescription(...a),
+    getInvoiceSource: (...a: unknown[]) => getInvoiceSource(...a),
     getOrderStatuses: (...a: unknown[]) => getOrderStatuses(...a),
     cancellationTypeExists: (...a: unknown[]) => cancellationTypeExists(...a),
     changeOrderStatusQuery: (...a: unknown[]) => changeOrderStatusQuery(...a),
@@ -25,6 +27,9 @@ vi.mock('@/lib/db/queries', () => ({
     restoreStockQuery: (...a: unknown[]) => restoreStockQuery(...a),
     insertAuditLogQuery: (...a: unknown[]) => insertAuditLogQuery(...a),
 }));
+
+const issueInvoice = vi.fn();
+vi.mock('@/lib/invoices/issue', () => ({ issueInvoice: (...a: unknown[]) => issueInvoice(...a) }));
 
 const refund = vi.fn();
 vi.mock('@/lib/payments', () => ({ refund: (...a: unknown[]) => refund(...a) }));
@@ -74,6 +79,8 @@ beforeEach(() => {
         .mockResolvedValue(Object.entries(STATUS_IDS).map(([name, id]) => ({ id, name })));
     cancellationTypeExists.mockReset().mockResolvedValue(true);
     getCancellationTypeIdByDescription.mockReset().mockResolvedValue(CUSTOMER_TYPE_ID);
+    getInvoiceSource.mockReset().mockResolvedValue({ orderId: 5, source: true });
+    issueInvoice.mockReset().mockResolvedValue('F-2026-0001');
     changeOrderStatusQuery.mockReset().mockResolvedValue([{ affectedRows: 1 }]);
     orderStockLinesQuery.mockReset().mockResolvedValue([
         { variantId: 4, quantity: 2 },
@@ -93,7 +100,13 @@ describe('changeOrderStatus: cambios de estado', () => {
     it('hace el cambio con un UPDATE condicionado al estado esperado y lo anota en la auditoría', async () => {
         const result = await changeOrderStatus(5, S.PROCESSING, ADMIN, { now: NOW });
 
-        expect(result).toEqual({ ok: true, from: S.CONFIRMED, to: S.PROCESSING, refund: 'none' });
+        expect(result).toEqual({
+            ok: true,
+            from: S.CONFIRMED,
+            to: S.PROCESSING,
+            refund: 'none',
+            invoiceNumber: null,
+        });
         expect(changeOrderStatusQuery).toHaveBeenCalledWith(
             tx,
             5,
@@ -167,6 +180,101 @@ describe('changeOrderStatus: cambios de estado', () => {
             ok: false,
             code: 'invalid_transition',
         });
+    });
+});
+
+describe('changeOrderStatus: Entregado emite la factura (RF8)', () => {
+    const delivered = () =>
+        getOrderForStatusChange.mockResolvedValue(order({ statusId: STATUS_IDS[S.SHIPPED] }));
+
+    it('la emite en la MISMA transacción que el cambio de estado, y la devuelve', async () => {
+        delivered();
+        const result = await changeOrderStatus(5, S.DELIVERED, ADMIN, { now: NOW });
+
+        expect(result).toMatchObject({ ok: true, to: S.DELIVERED, invoiceNumber: 'F-2026-0001' });
+        expect(issueInvoice).toHaveBeenCalledWith(tx, { orderId: 5, source: true }, NOW);
+        expect(transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('anota el número de la factura en la auditoría', async () => {
+        delivered();
+        await changeOrderStatus(5, S.DELIVERED, ADMIN, { now: NOW });
+        expect(insertAuditLogQuery).toHaveBeenCalledWith(
+            tx,
+            expect.objectContaining({
+                action: 'Pedido PJ-5: Enviado → Entregado',
+                details: expect.stringContaining('factura F-2026-0001'),
+            }),
+        );
+    });
+
+    it('cambia primero el estado y emite después, ya con el pedido movido', async () => {
+        delivered();
+        const calls: string[] = [];
+        changeOrderStatusQuery.mockImplementation(async () => {
+            calls.push('estado');
+            return [{ affectedRows: 1 }];
+        });
+        issueInvoice.mockImplementation(async () => {
+            calls.push('factura');
+            return 'F-2026-0001';
+        });
+        await changeOrderStatus(5, S.DELIVERED, ADMIN, { now: NOW });
+        expect(calls).toEqual(['estado', 'factura']);
+    });
+
+    it('si no se puede emitir, falla todo: no queda Entregado ni se anota nada', async () => {
+        delivered();
+        issueInvoice.mockRejectedValue(new Error('sin nombre'));
+        await expect(changeOrderStatus(5, S.DELIVERED, ADMIN, { now: NOW })).rejects.toThrow(
+            'sin nombre',
+        );
+        expect(insertAuditLogQuery).not.toHaveBeenCalled();
+    });
+
+    it('si otro proceso movió el pedido (conflict), no emite factura', async () => {
+        delivered();
+        changeOrderStatusQuery.mockResolvedValue([{ affectedRows: 0 }]);
+        expect(await changeOrderStatus(5, S.DELIVERED, ADMIN, { now: NOW })).toMatchObject({
+            ok: false,
+            code: 'conflict',
+        });
+        expect(issueInvoice).not.toHaveBeenCalled();
+    });
+
+    it('un cambio a Entregado no permitido no lee ni emite nada', async () => {
+        // Confirmado → Entregado se salta estados.
+        expect(await changeOrderStatus(5, S.DELIVERED, ADMIN, { now: NOW })).toMatchObject({
+            ok: false,
+            code: 'invalid_transition',
+        });
+        expect(getInvoiceSource).not.toHaveBeenCalled();
+        expect(issueInvoice).not.toHaveBeenCalled();
+    });
+
+    it('un pedido sin datos para la factura responde not_found', async () => {
+        delivered();
+        getInvoiceSource.mockResolvedValue(null);
+        expect(await changeOrderStatus(5, S.DELIVERED, ADMIN, { now: NOW })).toMatchObject({
+            ok: false,
+            code: 'not_found',
+        });
+        expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it('ningún otro cambio de estado emite factura', async () => {
+        const result = await changeOrderStatus(5, S.PROCESSING, ADMIN, { now: NOW });
+        expect(result).toMatchObject({ ok: true, invoiceNumber: null });
+        expect(getInvoiceSource).not.toHaveBeenCalled();
+        expect(issueInvoice).not.toHaveBeenCalled();
+    });
+
+    it('un cliente no puede entregar, así que no hay factura por esa vía', async () => {
+        expect(await changeOrderStatus(5, S.DELIVERED, OWNER, { now: NOW })).toMatchObject({
+            ok: false,
+            code: 'forbidden',
+        });
+        expect(issueInvoice).not.toHaveBeenCalled();
     });
 });
 
