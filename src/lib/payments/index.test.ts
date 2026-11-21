@@ -5,9 +5,11 @@ const create = vi.fn();
 const capturePI = vi.fn();
 const cancelPI = vi.fn();
 const retrievePI = vi.fn();
+const createRefund = vi.fn();
 vi.mock('./stripe', () => ({
     getStripe: () => ({
         paymentIntents: { create, capture: capturePI, cancel: cancelPI, retrieve: retrievePI },
+        refunds: { create: createRefund },
     }),
 }));
 
@@ -18,6 +20,7 @@ import {
     getAuthorization,
     MIN_AMOUNT_CENTS,
     PaymentError,
+    refund,
 } from './index';
 
 const input = { amountCents: 3345, userId: 12, cartFingerprint: 'a'.repeat(64) };
@@ -25,6 +28,7 @@ const stripeError = (code?: string) =>
     new Stripe.errors.StripeError({ message: 'detalle interno', type: 'api_error', code });
 
 beforeEach(() => {
+    createRefund.mockReset().mockResolvedValue({ id: 're_1', status: 'succeeded', amount: 3345 });
     create
         .mockReset()
         .mockResolvedValue({ id: 'pi_1', client_secret: 'pi_1_secret_x', amount: 3345 });
@@ -172,5 +176,27 @@ describe('getAuthorization', () => {
         expect(error).toBeInstanceOf(PaymentError);
         expect(error.code).toBe('resource_missing');
         expect(error.message).toBe('No se ha podido consultar el pago');
+    });
+});
+
+describe('refund', () => {
+    it('reembolsa el pago completo con una clave de idempotencia por PaymentIntent', async () => {
+        await expect(refund('pi_1')).resolves.toEqual({
+            id: 're_1',
+            status: 'succeeded',
+            amountCents: 3345,
+        });
+        expect(createRefund).toHaveBeenCalledWith(
+            { payment_intent: 'pi_1' },
+            { idempotencyKey: 'refund_pi_1' },
+        );
+    });
+
+    it('si Stripe falla, sale como PaymentError con su código', async () => {
+        createRefund.mockRejectedValue(stripeError('charge_already_refunded'));
+        await expect(refund('pi_1')).rejects.toMatchObject({
+            name: 'PaymentError',
+            code: 'charge_already_refunded',
+        });
     });
 });

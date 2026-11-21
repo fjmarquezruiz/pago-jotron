@@ -14,6 +14,7 @@ import {
     cartLinesQuery,
     clearUserCartQuery,
     changeOrderStatusQuery,
+    orderStockLinesQuery,
     decrementStockQuery,
     insertAuditLogQuery,
     restoreStockQuery,
@@ -990,6 +991,36 @@ describe('changeOrderStatusQuery', () => {
         );
         expect(sql).toContain('where (`orders`.`order_id` = ? and `orders`.`status_id` = ?)');
         expect(params).toEqual([7, 12, 2]);
+    });
+});
+
+describe('changeOrderStatusQuery con extras', () => {
+    it('guarda quién anula y por qué en el mismo UPDATE', () => {
+        const { sql, params } = changeOrderStatusQuery(db, 12, 2, 7, {
+            cancelledBy: 'Cliente',
+            cancellationTypeId: 1,
+        }).toSQL();
+        expect(sql).toContain('`cancelled_by` = ?');
+        expect(sql).toContain('`cancellation_type_id` = ?');
+        expect(params).toEqual([7, 'Cliente', 1, 12, 2]);
+    });
+
+    it('al desbloquear borra el estado de origen del bloqueo', () => {
+        const { sql, params } = changeOrderStatusQuery(db, 12, 8, 3, {
+            blockedFromStatusId: null,
+        }).toSQL();
+        expect(sql).toContain('`blocked_from_status_id` = ?');
+        expect(params).toEqual([3, null, 12, 8]);
+    });
+});
+
+describe('orderStockLinesQuery', () => {
+    const { sql, params } = orderStockLinesQuery(db, 5).toSQL();
+
+    it('lee las unidades de cada presentación del pedido, ordenadas por presentación', () => {
+        expect(sql).toContain('from `order_products` where `order_products`.`order_id` = ?');
+        expect(sql).toContain('order by `order_products`.`variant_id` asc');
+        expect(params).toEqual([5]);
     });
 });
 

@@ -397,6 +397,8 @@ export const orders = mysqlTable(
         statusUpdatedAt: datetime('status_updated_at', { mode: 'string' })
             .notNull()
             .default(sql`CURRENT_TIMESTAMP`),
+        // Estado que tenía el pedido al bloquearse: el desbloqueo vuelve al siguiente. Nulo si no está Bloqueado.
+        blockedFromStatusId: int('blocked_from_status_id'),
         cancelledBy: mysqlEnum('cancelled_by', ['Cliente', 'Administrador']),
         cancellationTypeId: int('cancellation_type_id'),
         createdAt: datetime('created_at', { mode: 'string' })
@@ -428,6 +430,13 @@ export const orders = mysqlTable(
             columns: [t.statusId],
             foreignColumns: [orderStatuses.id],
         }).onUpdate('cascade'),
+        fkBlockedFromStatus: foreignKey({
+            name: 'fk_order_blocked_from_status',
+            columns: [t.blockedFromStatusId],
+            foreignColumns: [orderStatuses.id],
+        })
+            .onUpdate('cascade')
+            .onDelete('set null'),
         fkCancellationType: foreignKey({
             name: 'fk_order_cancellation_type',
             columns: [t.cancellationTypeId],

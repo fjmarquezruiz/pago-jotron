@@ -26,7 +26,14 @@ const AGE_GATE_EXEMPT = [
     '/privacidad',
     '/cookies',
 ];
-const ADMIN_ONLY = ['/admin/usuarios', '/admin/pedidos', '/admin/auditoria', '/sistema-diseno'];
+const ADMIN_ONLY = [
+    '/admin/usuarios',
+    '/admin/pedidos',
+    '/admin/auditoria',
+    '/sistema-diseno',
+    // La API de pedidos de administración (la ruta comprueba además el rol por su cuenta).
+    '/api/admin/pedidos',
+];
 
 /** Comprueba si `path` es `prefix` o cuelga de él (`/admin` sí, `/administracion` no). */
 function matches(path: string, prefix: string): boolean {

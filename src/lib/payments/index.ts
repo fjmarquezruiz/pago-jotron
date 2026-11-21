@@ -167,3 +167,32 @@ export async function cancel(paymentIntentId: string): Promise<PaymentResult> {
         return { id: intent.id, status: 'canceled', amountCents: intent.amount };
     });
 }
+
+/** Resultado de un reembolso. */
+export interface RefundResult {
+    /** Id del reembolso (`re_…`). */
+    id: string;
+    /** `succeeded` o `pending` (el banco aún lo tramita); lo demás es un fallo. */
+    status: string;
+    amountCents: number;
+}
+
+/**
+ * Devuelve al cliente el importe completo de un pago ya cobrado (`succeeded`). Se llama cuando se
+ * anula un pedido de tarjeta cobrado. Lleva clave de idempotencia por PaymentIntent: si se
+ * reintenta tras un fallo de red que sí llegó a Stripe, no se devuelve el dinero dos veces.
+ *
+ * @param paymentIntentId - Id del PaymentIntent (`pi_…`) del pedido.
+ * @returns El reembolso creado.
+ * @throws {PaymentError} Si Stripe falla o el pago no se puede reembolsar (sin cobrar, ya
+ * reembolsado del todo).
+ */
+export async function refund(paymentIntentId: string): Promise<RefundResult> {
+    return callStripe('reembolsar', async (stripe) => {
+        const result = await stripe.refunds.create(
+            { payment_intent: paymentIntentId },
+            { idempotencyKey: `refund_${paymentIntentId}` },
+        );
+        return { id: result.id, status: result.status ?? 'unknown', amountCents: result.amount };
+    });
+}

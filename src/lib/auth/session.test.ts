@@ -7,7 +7,7 @@ vi.mock('next-auth', () => ({
 // Las opciones de NextAuth importan el cliente de BD: aquí solo hace falta que sean reconocibles.
 vi.mock('@/lib/auth-options', () => ({ authOptions: { marker: 'auth-options' } }));
 
-import { getSessionUserId } from './session';
+import { getSessionUser, getSessionUserId } from './session';
 
 describe('getSessionUserId', () => {
     beforeEach(() => {
@@ -52,5 +52,26 @@ describe('getSessionUserId', () => {
     it('deja pasar el error si NextAuth falla (lo trata quien llama)', async () => {
         getServerSession.mockRejectedValue(new Error('NEXTAUTH_SECRET missing'));
         await expect(getSessionUserId()).rejects.toThrow('NEXTAUTH_SECRET missing');
+    });
+});
+
+describe('getSessionUser', () => {
+    beforeEach(() => {
+        getServerSession.mockReset();
+    });
+
+    it('devuelve el id y el rol de la sesión', async () => {
+        getServerSession.mockResolvedValue({ user: { id: '7', role: 'Administrador' } });
+        await expect(getSessionUser()).resolves.toEqual({ id: 7, role: 'Administrador' });
+    });
+
+    it.each([
+        ['no hay sesión', null],
+        ['el id no es válido', { user: { id: 'abc', role: 'Administrador' } }],
+        ['falta el rol', { user: { id: '7' } }],
+        ['el rol no existe', { user: { id: '7', role: 'Superusuario' } }],
+    ])('devuelve null si %s', async (_, session) => {
+        getServerSession.mockResolvedValue(session);
+        await expect(getSessionUser()).resolves.toBeNull();
     });
 });

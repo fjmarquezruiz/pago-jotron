@@ -38,6 +38,7 @@ import {
 import {
     addresses,
     auditLogs,
+    cancellationTypes,
     cartProducts,
     grapes,
     guaranteesOfOrigin,
@@ -1072,16 +1073,26 @@ export function restoreStockQuery(writer: OrderWriter, variantId: number, quanti
         .where(eq(productVariants.id, variantId));
 }
 
+/** Columnas de `orders` que pueden cambiar a la vez que el estado (anulación, desbloqueo). */
+export interface OrderStatusExtras {
+    cancelledBy?: 'Cliente' | 'Administrador';
+    cancellationTypeId?: number;
+    /** `null` borra el estado de origen de un bloqueo (al salir de Bloqueado). */
+    blockedFromStatusId?: number | null;
+}
+
 /**
  * Consulta que marca un pedido con un estado nuevo (`status_id` y `status_updated_at`). Se usa
- * para anularlo cuando falla el cobro de la tarjeta. Solo cambia el pedido que está en
- * `fromStatusId`: si otro proceso ya lo movió a otro estado, no pisa ese cambio
- * (`affectedRows = 0`).
+ * para anularlo cuando falla el cobro de la tarjeta y en todos los cambios de estado. Solo cambia
+ * el pedido que está en `fromStatusId`: si otro proceso ya lo movió a otro estado, no pisa ese
+ * cambio (`affectedRows = 0`).
  *
  * @param writer - El cliente de BD o la transacción en la que se ejecuta.
  * @param orderId - `orders.order_id`.
  * @param fromStatusId - Estado en el que debe estar ahora.
  * @param toStatusId - Estado al que pasa.
+ * @param extras - Otras columnas que cambian en el mismo `UPDATE` (quién anula y por qué, o el
+ * estado de origen de un bloqueo).
  * @returns La consulta, lista para ejecutar con `await`.
  */
 export function changeOrderStatusQuery(
@@ -1089,11 +1100,76 @@ export function changeOrderStatusQuery(
     orderId: number,
     fromStatusId: number,
     toStatusId: number,
+    extras: OrderStatusExtras = {},
 ) {
     return writer
         .update(orders)
-        .set({ statusId: toStatusId, statusUpdatedAt: sql`CURRENT_TIMESTAMP` })
+        .set({ statusId: toStatusId, statusUpdatedAt: sql`CURRENT_TIMESTAMP`, ...extras })
         .where(and(eq(orders.id, orderId), eq(orders.statusId, fromStatusId)));
+}
+
+/**
+ * Estados de pedido sembrados, por nombre: lo que hace falta para pasar del nombre al id y al
+ * revés en una sola consulta.
+ *
+ * @returns Los pares `{ id, name }` de `order_statuses`.
+ */
+export async function getOrderStatuses() {
+    return db.select({ id: orderStatuses.id, name: orderStatuses.name }).from(orderStatuses);
+}
+
+/**
+ * Lo necesario de un pedido para cambiarle el estado, sin filtrar por cuenta: quien llama decide
+ * si es el dueño (cliente) o tiene el rol (administración).
+ *
+ * @param orderId - `orders.order_id`.
+ * @returns El pedido, o `null` si no existe.
+ */
+export async function getOrderForStatusChange(orderId: number) {
+    const [row] = await db
+        .select({
+            id: orders.id,
+            userId: orders.userId,
+            statusId: orders.statusId,
+            paymentMethod: orders.paymentMethod,
+            paymentIntentId: orders.paymentIntentId,
+            createdAt: orders.createdAt,
+            statusUpdatedAt: orders.statusUpdatedAt,
+            blockedFromStatusId: orders.blockedFromStatusId,
+        })
+        .from(orders)
+        .where(eq(orders.id, orderId));
+    return row ?? null;
+}
+
+/**
+ * Consulta de las unidades de cada presentación de un pedido, por orden de presentación: lo que
+ * se devuelve al stock al anularlo. Se lee con el mismo cliente que escribe (la transacción).
+ *
+ * @param reader - El cliente de BD o la transacción en la que se ejecuta.
+ * @param orderId - `orders.order_id`.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function orderStockLinesQuery(reader: Pick<typeof db, 'select'>, orderId: number) {
+    return reader
+        .select({ variantId: orderProducts.variantId, quantity: orderProducts.quantity })
+        .from(orderProducts)
+        .where(eq(orderProducts.orderId, orderId))
+        .orderBy(asc(orderProducts.variantId));
+}
+
+/**
+ * Indica si existe un motivo de cancelación.
+ *
+ * @param id - `cancellation_types.cancellation_type_id`.
+ * @returns `true` si existe.
+ */
+export async function cancellationTypeExists(id: number): Promise<boolean> {
+    const [row] = await db
+        .select({ id: cancellationTypes.id })
+        .from(cancellationTypes)
+        .where(eq(cancellationTypes.id, id));
+    return row !== undefined;
 }
 
 /**
