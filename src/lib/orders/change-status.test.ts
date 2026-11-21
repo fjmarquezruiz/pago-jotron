@@ -7,6 +7,7 @@ vi.mock('@/db', () => ({
 }));
 
 const getOrderForStatusChange = vi.fn();
+const getCancellationTypeIdByDescription = vi.fn();
 const getOrderStatuses = vi.fn();
 const cancellationTypeExists = vi.fn();
 const changeOrderStatusQuery = vi.fn();
@@ -15,6 +16,8 @@ const restoreStockQuery = vi.fn();
 const insertAuditLogQuery = vi.fn();
 vi.mock('@/lib/db/queries', () => ({
     getOrderForStatusChange: (...a: unknown[]) => getOrderForStatusChange(...a),
+    getCancellationTypeIdByDescription: (...a: unknown[]) =>
+        getCancellationTypeIdByDescription(...a),
     getOrderStatuses: (...a: unknown[]) => getOrderStatuses(...a),
     cancellationTypeExists: (...a: unknown[]) => cancellationTypeExists(...a),
     changeOrderStatusQuery: (...a: unknown[]) => changeOrderStatusQuery(...a),
@@ -26,7 +29,11 @@ vi.mock('@/lib/db/queries', () => ({
 const refund = vi.fn();
 vi.mock('@/lib/payments', () => ({ refund: (...a: unknown[]) => refund(...a) }));
 
-import { changeOrderStatus, CUSTOMER_CANCELLATION_TYPE_ID } from './change-status';
+import { CUSTOMER_CANCELLATION_DESCRIPTION } from './cancellation';
+import { changeOrderStatus } from './change-status';
+
+/** Id que tiene el motivo del cliente en esta prueba: a propósito no es 1. */
+const CUSTOMER_TYPE_ID = 4;
 import { ORDER_STATUS as S } from './status';
 
 const STATUS_IDS = {
@@ -66,6 +73,7 @@ beforeEach(() => {
         .mockReset()
         .mockResolvedValue(Object.entries(STATUS_IDS).map(([name, id]) => ({ id, name })));
     cancellationTypeExists.mockReset().mockResolvedValue(true);
+    getCancellationTypeIdByDescription.mockReset().mockResolvedValue(CUSTOMER_TYPE_ID);
     changeOrderStatusQuery.mockReset().mockResolvedValue([{ affectedRows: 1 }]);
     orderStockLinesQuery.mockReset().mockResolvedValue([
         { variantId: 4, quantity: 2 },
@@ -275,7 +283,7 @@ describe('changeOrderStatus: el cliente (CU7, RNF3)', () => {
             5,
             STATUS_IDS[S.CONFIRMED],
             STATUS_IDS[S.CANCELLED],
-            { cancelledBy: 'Cliente', cancellationTypeId: CUSTOMER_CANCELLATION_TYPE_ID },
+            { cancelledBy: 'Cliente', cancellationTypeId: CUSTOMER_TYPE_ID },
         );
     });
 
@@ -314,6 +322,21 @@ describe('changeOrderStatus: el cliente (CU7, RNF3)', () => {
         expect(transaction).not.toHaveBeenCalled();
     });
 
+    it('busca el motivo por descripción, no por id', async () => {
+        await changeOrderStatus(5, S.CANCELLED, OWNER, { now: NOW });
+        expect(getCancellationTypeIdByDescription).toHaveBeenCalledWith(
+            CUSTOMER_CANCELLATION_DESCRIPTION,
+        );
+    });
+
+    it('si el motivo del cliente no está sembrado, falla sin tocar el pedido', async () => {
+        getCancellationTypeIdByDescription.mockResolvedValue(null);
+        await expect(changeOrderStatus(5, S.CANCELLED, OWNER, { now: NOW })).rejects.toThrow(
+            'Falta el motivo',
+        );
+        expect(transaction).not.toHaveBeenCalled();
+    });
+
     it('no puede elegir el motivo', async () => {
         await changeOrderStatus(5, S.CANCELLED, OWNER, { cancellationTypeId: 3, now: NOW });
         expect(changeOrderStatusQuery).toHaveBeenCalledWith(
@@ -321,7 +344,7 @@ describe('changeOrderStatus: el cliente (CU7, RNF3)', () => {
             5,
             expect.anything(),
             expect.anything(),
-            expect.objectContaining({ cancellationTypeId: CUSTOMER_CANCELLATION_TYPE_ID }),
+            expect.objectContaining({ cancellationTypeId: CUSTOMER_TYPE_ID }),
         );
     });
 });

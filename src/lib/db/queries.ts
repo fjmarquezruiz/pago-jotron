@@ -1159,6 +1159,22 @@ export function orderStockLinesQuery(reader: Pick<typeof db, 'select'>, orderId:
 }
 
 /**
+ * Id de un motivo de cancelación por su descripción: no depende del orden del seed.
+ *
+ * @param description - Texto exacto de `cancellation_types.description`.
+ * @returns El id, o `null` si no existe.
+ */
+export async function getCancellationTypeIdByDescription(
+    description: string,
+): Promise<number | null> {
+    const [row] = await db
+        .select({ id: cancellationTypes.id })
+        .from(cancellationTypes)
+        .where(eq(cancellationTypes.description, description));
+    return row?.id ?? null;
+}
+
+/**
  * Indica si existe un motivo de cancelación.
  *
  * @param id - `cancellation_types.cancellation_type_id`.

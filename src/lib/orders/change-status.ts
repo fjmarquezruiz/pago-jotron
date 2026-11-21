@@ -2,6 +2,7 @@ import { db } from '@/db';
 import {
     cancellationTypeExists,
     changeOrderStatusQuery,
+    getCancellationTypeIdByDescription,
     getOrderForStatusChange,
     getOrderStatuses,
     insertAuditLogQuery,
@@ -10,11 +11,9 @@ import {
     type OrderStatusExtras,
 } from '@/lib/db/queries';
 import { refund } from '@/lib/payments';
+import { CUSTOMER_CANCELLATION_DESCRIPTION } from './cancellation';
 import { orderNumber } from './format';
 import { canCustomerCancel, canTransition, ORDER_STATUS, type OrderStatus } from './status';
-
-/** Motivo (`cancellation_types`, sembrado) con el que se anota la anulación hecha por el cliente. */
-export const CUSTOMER_CANCELLATION_TYPE_ID = 1;
 
 /** Quién pide el cambio: el cliente dueño del pedido o la administración. */
 export interface StatusActor {
@@ -145,10 +144,17 @@ export async function changeOrderStatus(
         return fail('cancel_window_closed', 'Ya no puedes cancelar este pedido');
 
     const cancelling = to === ORDER_STATUS.CANCELLED;
-    const cancellationTypeId =
-        actor.role === 'Cliente' ? CUSTOMER_CANCELLATION_TYPE_ID : options.cancellationTypeId;
+    let cancellationTypeId = options.cancellationTypeId;
     if (cancelling) {
-        if (cancellationTypeId === undefined || !(await cancellationTypeExists(cancellationTypeId)))
+        if (actor.role === 'Cliente') {
+            // El cliente no elige el motivo: se busca por descripción, no por id.
+            const id = await getCancellationTypeIdByDescription(CUSTOMER_CANCELLATION_DESCRIPTION);
+            if (id === null) throw new Error('Falta el motivo de cancelación del cliente');
+            cancellationTypeId = id;
+        } else if (
+            cancellationTypeId === undefined ||
+            !(await cancellationTypeExists(cancellationTypeId))
+        )
             return fail('invalid_cancellation_type', 'El motivo de la anulación no es válido');
     }
 
