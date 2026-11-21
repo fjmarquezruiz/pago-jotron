@@ -31,6 +31,9 @@ const NEXT: Partial<Record<OrderStatus, OrderStatus>> = {
 /** Estados desde los que aún se puede anular. */
 const CANCELLABLE = new Set<OrderStatus>([S.PENDING, S.CONFIRMED, S.PROCESSING]);
 
+/** Estados en los que las botellas del pedido siguen en el almacén y vuelven al stock al anular. */
+const RESTOCKABLE = new Set<OrderStatus>([S.PENDING, S.CONFIRMED, S.PROCESSING]);
+
 /** Estados finales: no admiten ningún cambio. */
 const FINAL = new Set<OrderStatus>([S.DELIVERED, S.CANCELLED]);
 
@@ -80,6 +83,17 @@ export function canTransition(
     if (to === S.CANCELLED) return CANCELLABLE.has(from);
     if (NEXT[from] === to) return true;
     return onlyEvents && to === S.DELIVERED && from !== S.PENDING;
+}
+
+/**
+ * Indica si al anular el pedido hay que devolver sus unidades al stock: solo si todavía no han
+ * salido del almacén, es decir, si estaba en Pendiente de pago, Confirmado o En proceso. Un pedido
+ * Bloqueado cuenta por el estado que tenía al bloquearse (`blockedFrom`); si no se sabe cuál era,
+ * no se devuelve nada, porque sumar unidades que quizá ya salieron inflaría el stock.
+ */
+export function returnsStockOnCancel(from: OrderStatus, blockedFrom: OrderStatus | null): boolean {
+    const origin = from === S.BLOCKED ? blockedFrom : from;
+    return origin !== null && RESTOCKABLE.has(origin);
 }
 
 /** Convierte una fecha de la base de datos (`YYYY-MM-DD HH:MM:SS`, sin zona, tratada como UTC) a ms. */

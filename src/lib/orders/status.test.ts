@@ -3,6 +3,7 @@ import {
     canCustomerCancel,
     canTransition,
     ORDER_STATUS as S,
+    returnsStockOnCancel,
     shouldBlock,
     type OrderStatus,
 } from './status';
@@ -155,5 +156,32 @@ describe('shouldBlock', () => {
         for (const status of [S.DELIVERED, S.CANCELLED, S.BLOCKED]) {
             expect(shouldBlock(order(status), at('2027-06-01T00:00:00Z'))).toBe(false);
         }
+    });
+});
+
+describe('returnsStockOnCancel', () => {
+    it('devuelve el stock si las botellas siguen en el almacén', () => {
+        for (const from of [S.PENDING, S.CONFIRMED, S.PROCESSING]) {
+            expect(returnsStockOnCancel(from, null)).toBe(true);
+        }
+    });
+
+    it('no lo devuelve si ya salieron o están preparadas', () => {
+        for (const from of [S.PREPARED, S.SHIPPED]) {
+            expect(returnsStockOnCancel(from, null)).toBe(false);
+        }
+    });
+
+    it('un pedido Bloqueado cuenta por el estado del que venía', () => {
+        for (const blockedFrom of [S.PENDING, S.CONFIRMED, S.PROCESSING]) {
+            expect(returnsStockOnCancel(S.BLOCKED, blockedFrom)).toBe(true);
+        }
+        for (const blockedFrom of [S.PREPARED, S.SHIPPED]) {
+            expect(returnsStockOnCancel(S.BLOCKED, blockedFrom)).toBe(false);
+        }
+    });
+
+    it('un pedido Bloqueado sin estado de origen no devuelve nada', () => {
+        expect(returnsStockOnCancel(S.BLOCKED, null)).toBe(false);
     });
 });

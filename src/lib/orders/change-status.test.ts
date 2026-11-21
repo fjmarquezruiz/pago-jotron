@@ -274,6 +274,52 @@ describe('changeOrderStatus: anular (stock, motivo y reembolso)', () => {
     });
 });
 
+describe('changeOrderStatus: anular un pedido Bloqueado', () => {
+    const blocked = (from: string) =>
+        order({ statusId: STATUS_IDS[S.BLOCKED], blockedFromStatusId: STATUS_IDS[from as never] });
+    const cancel = () =>
+        changeOrderStatus(5, S.CANCELLED, ADMIN, { cancellationTypeId: 2, now: NOW });
+
+    it.each([S.PENDING, S.CONFIRMED, S.PROCESSING])(
+        'devuelve el stock si venía de %s',
+        async (from) => {
+            getOrderForStatusChange.mockResolvedValue(blocked(from));
+            expect(await cancel()).toMatchObject({ ok: true, from: S.BLOCKED, to: S.CANCELLED });
+            expect(restoreStockQuery).toHaveBeenCalledTimes(2);
+        },
+    );
+
+    it.each([S.PREPARED, S.SHIPPED])(
+        'NO devuelve el stock si venía de %s: las botellas ya salieron del almacén',
+        async (from) => {
+            getOrderForStatusChange.mockResolvedValue(blocked(from));
+            expect(await cancel()).toMatchObject({ ok: true, to: S.CANCELLED });
+            expect(orderStockLinesQuery).not.toHaveBeenCalled();
+            expect(restoreStockQuery).not.toHaveBeenCalled();
+        },
+    );
+
+    it('sin estado de origen conocido tampoco devuelve stock', async () => {
+        getOrderForStatusChange.mockResolvedValue(
+            order({ statusId: STATUS_IDS[S.BLOCKED], blockedFromStatusId: null }),
+        );
+        expect(await cancel()).toMatchObject({ ok: true });
+        expect(restoreStockQuery).not.toHaveBeenCalled();
+    });
+
+    it('anota en la auditoría de qué estado venía y sigue reembolsando', async () => {
+        getOrderForStatusChange.mockResolvedValue(blocked(S.SHIPPED));
+        const result = await cancel();
+        expect(result).toMatchObject({ ok: true, refund: 'done' });
+        expect(insertAuditLogQuery).toHaveBeenCalledWith(
+            tx,
+            expect.objectContaining({
+                details: expect.stringContaining('bloqueado desde Enviado'),
+            }),
+        );
+    });
+});
+
 describe('changeOrderStatus: el cliente (CU7, RNF3)', () => {
     it('cancela dentro de las primeras 24 h, con el motivo del cliente', async () => {
         const result = await changeOrderStatus(5, S.CANCELLED, OWNER, { now: NOW });

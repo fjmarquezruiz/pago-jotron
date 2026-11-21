@@ -13,7 +13,13 @@ import {
 import { refund } from '@/lib/payments';
 import { CUSTOMER_CANCELLATION_DESCRIPTION } from './cancellation';
 import { orderNumber } from './format';
-import { canCustomerCancel, canTransition, ORDER_STATUS, type OrderStatus } from './status';
+import {
+    canCustomerCancel,
+    canTransition,
+    ORDER_STATUS,
+    returnsStockOnCancel,
+    type OrderStatus,
+} from './status';
 
 /** Quién pide el cambio: el cliente dueño del pedido o la administración. */
 export interface StatusActor {
@@ -91,7 +97,8 @@ async function refundQuietly(
  *
  * - Un solo `UPDATE … WHERE status_id = <el esperado>`: si otro proceso movió el pedido entre
  *   medias, no se pisa y se responde `conflict`.
- * - Anular: en la MISMA transacción se devuelve el stock y se guardan `cancelled_by` y
+ * - Anular: en la MISMA transacción se devuelve el stock (solo si las botellas no han salido del
+ *   almacén, ver `returnsStockOnCancel`) y se guardan `cancelled_by` y
  *   `cancellation_type_id`. Después del `COMMIT`, si el pedido era de tarjeta, se reembolsa; si
  *   Stripe falla, queda anotado como crítico en la auditoría y el pedido sigue Anulado.
  * - Cada cambio queda en `audit_logs`, dentro de la transacción.
@@ -169,7 +176,7 @@ export async function changeOrderStatus(
         const [result] = await changeOrderStatusQuery(tx, orderId, order.statusId, toId, extras);
         // Otro proceso ya movió el pedido: no se devuelve el stock dos veces.
         if (result.affectedRows === 0) return false;
-        if (cancelling) {
+        if (cancelling && returnsStockOnCancel(from, blockedFrom)) {
             // Por presentación, como al descontar: sin bloqueos cruzados.
             for (const { variantId, quantity } of await orderStockLinesQuery(tx, orderId))
                 await restoreStockQuery(tx, variantId, quantity);
@@ -178,7 +185,13 @@ export async function changeOrderStatus(
             userId: actor.userId,
             action: `Pedido ${orderNumber(orderId)}: ${from} → ${to}`,
             details: `pedido ${orderId} de la cuenta ${order.userId}; lo cambia ${actor.role} (cuenta ${actor.userId})${
-                cancelling ? `; motivo ${cancellationTypeId}` : ''
+                cancelling
+                    ? `; motivo ${cancellationTypeId}${
+                          from === ORDER_STATUS.BLOCKED
+                              ? `; bloqueado desde ${blockedFrom ?? 'un estado desconocido'}`
+                              : ''
+                      }`
+                    : ''
             }`,
         });
         return true;
