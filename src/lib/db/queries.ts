@@ -19,7 +19,7 @@ import {
     type SQL,
     type SQLWrapper,
 } from 'drizzle-orm';
-import type { MySqlSelect } from 'drizzle-orm/mysql-core';
+import { alias, type MySqlSelect } from 'drizzle-orm/mysql-core';
 import { db } from '@/db';
 import type { Cart } from '@/lib/cart/cart';
 import { orderLinesByVariantIds } from '@/lib/cart/lines';
@@ -1263,6 +1263,9 @@ export function clearUserCartQuery(writer: OrderWriter, userId: number) {
     return writer.delete(cartProducts).where(eq(cartProducts.userId, userId));
 }
 
+/** `order_statuses` por segunda vez: el estado del que venía un pedido Bloqueado. */
+const blockedFromStatus = alias(orderStatuses, 'blocked_from_status');
+
 /**
  * Consulta de un pedido de un usuario con su estado, su tipo de envío y su dirección de envío.
  * Filtra por usuario: el pedido de otra cuenta no se devuelve aunque exista. La dirección se lee
@@ -1279,6 +1282,12 @@ export function userOrderQuery(userId: number, orderId: number) {
             status: orderStatuses.name,
             paymentMethod: orders.paymentMethod,
             createdAt: orders.createdAt,
+            /** Cuándo entró en el estado actual. */
+            statusUpdatedAt: orders.statusUpdatedAt,
+            /** Estado que tenía al bloquearse; `null` si no está Bloqueado. */
+            blockedFrom: blockedFromStatus.name,
+            /** Quién anuló el pedido; `null` si no está anulado o lo anuló el sistema (cobro fallido). */
+            cancelledBy: orders.cancelledBy,
             shippingCost: orders.shippingCost,
             shippingTypeName: shippingTypes.name,
             minDeliveryDays: shippingTypes.minDeliveryDays,
@@ -1296,6 +1305,7 @@ export function userOrderQuery(userId: number, orderId: number) {
         })
         .from(orders)
         .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
+        .leftJoin(blockedFromStatus, eq(blockedFromStatus.id, orders.blockedFromStatusId))
         .innerJoin(shippingTypes, eq(shippingTypes.id, orders.shippingTypeId))
         .leftJoin(addresses, eq(addresses.id, orders.shippingAddressId))
         .where(and(eq(orders.id, orderId), eq(orders.userId, userId)));
@@ -1314,6 +1324,10 @@ export function orderLinesQuery(orderId: number) {
             variantId: orderProducts.variantId,
             name: products.name,
             vintage: products.vintage,
+            /** Imagen del producto (id de Cloudinary), como en las tarjetas; puede faltar. */
+            image: products.image,
+            /** Nombre de la D.O.: lo que el catálogo pinta bajo el nombre. */
+            originName: guaranteesOfOrigin.name,
             format: productVariants.format,
             capacity: productVariants.capacity,
             capacityUnit: productVariants.capacityUnit,
@@ -1324,6 +1338,7 @@ export function orderLinesQuery(orderId: number) {
         .from(orderProducts)
         .innerJoin(productVariants, eq(productVariants.id, orderProducts.variantId))
         .innerJoin(products, eq(products.id, productVariants.productId))
+        .innerJoin(guaranteesOfOrigin, eq(guaranteesOfOrigin.id, products.guaranteeOfOriginId))
         .where(eq(orderProducts.orderId, orderId))
         .orderBy(asc(orderProducts.variantId));
 }
@@ -1343,3 +1358,93 @@ export async function getUserOrder(userId: number, orderId: number) {
 
 /** Un pedido con sus líneas tal como lo devuelve `getUserOrder`. */
 export type UserOrder = NonNullable<Awaited<ReturnType<typeof getUserOrder>>>;
+
+/** Filtros del historial de pedidos (ya validados, ver `parseOrderHistoryParams`). */
+export interface OrderHistoryFilters {
+    /** Nombre del estado (`order_statuses.name`). */
+    status?: string;
+    /** Primer día incluido, `AAAA-MM-DD`. */
+    from?: string;
+    /** Último día incluido, `AAAA-MM-DD`. */
+    to?: string;
+}
+
+/** Día siguiente a uno `AAAA-MM-DD`, para comparar con `< día + 1` y que `to` entre entero. */
+function nextDay(isoDate: string): string {
+    const date = new Date(`${isoDate}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + 1);
+    return date.toISOString().slice(0, 10);
+}
+
+/** Condición `WHERE` del historial: del usuario y, si se piden, por estado y por fecha de alta. */
+function userOrdersCondition(userId: number, { status, from, to }: OrderHistoryFilters): SQL {
+    const conditions: SQL[] = [eq(orders.userId, userId)];
+    if (status) conditions.push(eq(orderStatuses.name, status));
+    if (from) conditions.push(gte(orders.createdAt, `${from} 00:00:00`));
+    if (to) conditions.push(lt(orders.createdAt, `${nextDay(to)} 00:00:00`));
+    return and(...conditions)!;
+}
+
+/**
+ * Consulta de una página del historial de pedidos de un cliente: número, fecha, total y estado,
+ * del más reciente al más antiguo (`order_id` desempata). Una sola consulta, sin líneas.
+ *
+ * @param userId - Id del usuario, el de la sesión (`getSessionUserId`).
+ * @param params - Página (desde 1), tamaño y filtros.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function userOrdersPageQuery(
+    userId: number,
+    { page, pageSize, ...filters }: { page: number; pageSize: number } & OrderHistoryFilters,
+) {
+    return db
+        .select({
+            id: orders.id,
+            createdAt: orders.createdAt,
+            total: orders.total,
+            status: orderStatuses.name,
+        })
+        .from(orders)
+        .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
+        .where(userOrdersCondition(userId, filters))
+        .orderBy(desc(orders.createdAt), desc(orders.id))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize);
+}
+
+/**
+ * Consulta que cuenta los pedidos de un cliente que cumplen los filtros del historial.
+ *
+ * @param userId - Id del usuario, el de la sesión.
+ * @param filters - Estado y rango de fechas.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function userOrdersCountQuery(userId: number, filters: OrderHistoryFilters = {}) {
+    return db
+        .select({ total: count() })
+        .from(orders)
+        .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
+        .where(userOrdersCondition(userId, filters));
+}
+
+/**
+ * Una página del historial de pedidos de un cliente (RF8).
+ *
+ * @param userId - Id del usuario, el de la sesión.
+ * @param params - Página (desde 1), tamaño de página y filtros.
+ * @returns Los pedidos de la página y el total que cumple los filtros (para paginar).
+ */
+export async function getUserOrdersPage(
+    userId: number,
+    params: { page: number; pageSize: number } & OrderHistoryFilters,
+) {
+    const { status, from, to } = params;
+    const [items, [counted]] = await Promise.all([
+        userOrdersPageQuery(userId, params),
+        userOrdersCountQuery(userId, { status, from, to }),
+    ]);
+    return { items, total: counted?.total ?? 0 };
+}
+
+/** Una página del historial, tal como la devuelve `getUserOrdersPage`. */
+export type UserOrdersPage = Awaited<ReturnType<typeof getUserOrdersPage>>;

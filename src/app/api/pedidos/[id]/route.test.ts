@@ -20,6 +20,8 @@ const found = {
         status: 'Confirmado',
         paymentMethod: 'Tarjeta',
         createdAt: '2026-10-16 18:30:00',
+        statusUpdatedAt: '2026-10-16 18:30:00',
+        blockedFrom: null,
         shippingCost: '4.95',
         shippingTypeName: 'Estándar',
         minDeliveryDays: 1,
@@ -40,6 +42,8 @@ const found = {
             variantId: 4,
             name: 'Tinto Roble',
             vintage: 2020,
+            image: 'tinto-roble',
+            originName: 'Sierras de Málaga',
             format: 'Botella',
             capacity: '75.00',
             capacityUnit: 'cl',
@@ -51,6 +55,8 @@ const found = {
             variantId: 9,
             name: 'Dulce',
             vintage: null,
+            image: null,
+            originName: 'Málaga',
             format: 'Botella',
             capacity: '50.00',
             capacityUnit: 'cl',
@@ -108,12 +114,51 @@ describe('GET /api/pedidos/[id]', () => {
         });
     });
 
+    it('incluye cuándo entró en el estado actual y de cuál venía si está bloqueado', async () => {
+        const { order } = await (await get('12')).json();
+        expect(order.statusUpdatedAt).toBe('2026-10-16 18:30:00');
+        expect(order.blockedFrom).toBeNull();
+
+        getUserOrder.mockResolvedValue({
+            ...found,
+            order: { ...found.order, status: 'Bloqueado', blockedFrom: 'Enviado' },
+        });
+        expect((await (await get('12')).json()).order.blockedFrom).toBe('Enviado');
+    });
+
+    describe('canCancel', () => {
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it('es true dentro de las 24 h de un pedido Confirmado', async () => {
+            vi.useFakeTimers({ now: new Date('2026-10-17T10:00:00Z') });
+            expect((await (await get('12')).json()).order.canCancel).toBe(true);
+        });
+
+        it('es false pasadas las 24 h', async () => {
+            vi.useFakeTimers({ now: new Date('2026-10-17T19:00:00Z') });
+            expect((await (await get('12')).json()).order.canCancel).toBe(false);
+        });
+
+        it('es false en un pedido Bloqueado, aunque sea reciente', async () => {
+            vi.useFakeTimers({ now: new Date('2026-10-17T10:00:00Z') });
+            getUserOrder.mockResolvedValue({
+                ...found,
+                order: { ...found.order, status: 'Bloqueado', blockedFrom: 'Confirmado' },
+            });
+            expect((await (await get('12')).json()).order.canCancel).toBe(false);
+        });
+    });
+
     it('las líneas llevan el precio guardado y no el IVA', async () => {
         const { order } = await (await get('12')).json();
         expect(order.lines[0]).toEqual({
             variantId: 4,
             name: 'Tinto Roble',
             vintage: 2020,
+            image: 'tinto-roble',
+            originName: 'Sierras de Málaga',
             format: 'Botella',
             capacity: '75.00',
             capacityUnit: 'cl',
