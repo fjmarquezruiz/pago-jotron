@@ -1,43 +1,30 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { signOut } from 'next-auth/react';
+import { LogOut } from 'lucide-react';
 import { NavbarItem } from '@/components/ui/navbar';
-import { prepareCartSignOut } from '@/stores/cart-sync';
+import { useSignOut } from '@/components/shop/use-sign-out';
 
 /**
- * "Cerrar sesión" de la cabecera, en el sitio de "Iniciar sesión" cuando hay sesión. Antes de
- * cerrarla guarda en el servidor lo último que se cambió en el carrito y vacía el carrito del
- * navegador (`prepareCartSignOut`): en un ordenador compartido, la persona siguiente no debe ver el
- * carrito de la anterior. El del cliente sigue guardado en su cuenta para la próxima vez.
+ * "Cerrar sesión" de la cabecera, en el sitio de "Iniciar sesión" cuando hay sesión (`header`, solo
+ * escritorio), o al final de la sección "Mi cuenta" del drawer móvil (`drawer`). El cierre (carrito
+ * incluido) está en `useSignOut`, que comparte con el menú de la cuenta.
  *
- * Vuelve a `/productos` (con la sesión cerrada, desde `/checkout` o una página privada no habría
- * adónde quedarse) y refresca, para que la cabecera vuelva a decir "Iniciar sesión".
+ * @param props.placement - Dónde va: `header` (por defecto) o `drawer`.
  *
  * @example
  * <SignOutButton />
+ * <SignOutButton placement="drawer" />
  */
-export function SignOutButton() {
-    const router = useRouter();
-    const [pending, setPending] = useState(false);
-
-    async function handleSignOut() {
-        setPending(true);
-        try {
-            await prepareCartSignOut();
-            // Sin redirección de next-auth (que usa NEXTAUTH_URL): se navega desde aquí, como en el login.
-            await signOut({ redirect: false });
-            router.push('/productos');
-            router.refresh();
-        } finally {
-            // Si falla (sin red), el botón vuelve a poder pulsarse en vez de quedar bloqueado.
-            setPending(false);
-        }
-    }
+export function SignOutButton({ placement = 'header' }: { placement?: 'header' | 'drawer' }) {
+    const { pending, handleSignOut } = useSignOut();
+    const drawer = placement === 'drawer';
 
     return (
-        <NavbarItem asChild className="hidden lg:inline-flex">
+        <NavbarItem
+            asChild
+            icon={drawer ? <LogOut /> : undefined}
+            className={drawer ? 'lg:hidden' : 'hidden lg:inline-flex'}
+        >
             <button type="button" onClick={handleSignOut} disabled={pending}>
                 Cerrar sesión
             </button>

@@ -14,6 +14,7 @@ import {
     primaryKey,
     foreignKey,
     tinyint,
+    json,
 } from 'drizzle-orm/mysql-core';
 
 /** Usuarios de la tienda: clientes, editores y administradores (RF1, RF2). */
@@ -397,6 +398,8 @@ export const orders = mysqlTable(
         statusUpdatedAt: datetime('status_updated_at', { mode: 'string' })
             .notNull()
             .default(sql`CURRENT_TIMESTAMP`),
+        // Estado que tenía el pedido al bloquearse: el desbloqueo vuelve al siguiente. Nulo si no está Bloqueado.
+        blockedFromStatusId: int('blocked_from_status_id'),
         cancelledBy: mysqlEnum('cancelled_by', ['Cliente', 'Administrador']),
         cancellationTypeId: int('cancellation_type_id'),
         createdAt: datetime('created_at', { mode: 'string' })
@@ -428,6 +431,13 @@ export const orders = mysqlTable(
             columns: [t.statusId],
             foreignColumns: [orderStatuses.id],
         }).onUpdate('cascade'),
+        fkBlockedFromStatus: foreignKey({
+            name: 'fk_order_blocked_from_status',
+            columns: [t.blockedFromStatusId],
+            foreignColumns: [orderStatuses.id],
+        })
+            .onUpdate('cascade')
+            .onDelete('set null'),
         fkCancellationType: foreignKey({
             name: 'fk_order_cancellation_type',
             columns: [t.cancellationTypeId],
@@ -480,6 +490,11 @@ export const invoices = mysqlTable(
         taxBase: decimal('tax_base', { precision: 10, scale: 2 }).notNull(),
         taxAmount: decimal('tax_amount', { precision: 10, scale: 2 }).notNull(),
         total: decimal('total', { precision: 10, scale: 2 }).notNull(),
+        // Completa (con los datos del destinatario) o simplificada (hasta 400 € con IVA, sin NIF).
+        kind: mysqlEnum('kind', ['Completa', 'Simplificada']).notNull().default('Completa'),
+        // Todo lo que enseña la factura (`InvoiceDocument`), copiado al emitirla: una factura emitida no
+        // cambia aunque después cambien el nombre del producto, el perfil o la dirección.
+        snapshot: json('snapshot').notNull(),
     },
     (t) => ({
         fkOrder: foreignKey({
@@ -490,6 +505,17 @@ export const invoices = mysqlTable(
         ckTotal: check('ck_invoice_total', sql`${t.total} = ${t.taxBase} + ${t.taxAmount}`),
     }),
 );
+
+/**
+ * Contador de facturas por año (RF8). La numeración tiene que ser correlativa y sin huecos
+ * (Real Decreto 1619/2012): un `AUTO_INCREMENT` deja huecos si una transacción se deshace, así que
+ * el siguiente número se toma de aquí con `SELECT … FOR UPDATE` dentro de la misma transacción que
+ * emite la factura: si se deshace, el contador también.
+ */
+export const invoiceSeries = mysqlTable('invoice_series', {
+    year: int('year').primaryKey(),
+    lastNumber: int('last_number').notNull().default(0),
+});
 
 /** Carrito guardado del cliente: se recupera en cualquier dispositivo (RF6). */
 export const cartProducts = mysqlTable(

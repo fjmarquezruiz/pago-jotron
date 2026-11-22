@@ -14,8 +14,12 @@ import {
     cartLinesQuery,
     clearUserCartQuery,
     changeOrderStatusQuery,
+    orderStockLinesQuery,
+    userOrdersCountQuery,
+    userOrdersPageQuery,
     decrementStockQuery,
     insertAuditLogQuery,
+    insertInvoiceQuery,
     restoreStockQuery,
     insertOrderLinesQuery,
     insertOrderQuery,
@@ -955,6 +959,99 @@ describe('userOrderQuery', () => {
     });
 });
 
+describe('userOrderQuery: estado', () => {
+    const { sql } = userOrderQuery(12, 5).toSQL();
+
+    it('trae cuándo entró en el estado actual', () => {
+        expect(sql).toContain('`orders`.`status_updated_at`');
+    });
+
+    it('trae el nombre del estado del que venía, sin exigir que esté bloqueado', () => {
+        expect(sql).toContain(
+            'left join `order_statuses` `blocked_from_status` on `blocked_from_status`.`status_id` = `orders`.`blocked_from_status_id`',
+        );
+        expect(sql).toContain('`blocked_from_status`.`name`');
+    });
+});
+
+describe('orderLinesQuery: producto', () => {
+    const { sql } = orderLinesQuery(5).toSQL();
+
+    it('trae la imagen del producto y el nombre de su D.O.', () => {
+        expect(sql).toContain('`products`.`image`');
+        expect(sql).toContain('`guarantees_of_origin`.`name`');
+        expect(sql).toContain(
+            'inner join `guarantees_of_origin` on `guarantees_of_origin`.`guarantee_of_origin_id` = `products`.`guarantee_of_origin_id`',
+        );
+    });
+});
+
+describe('userOrdersPageQuery', () => {
+    const page = (extra = {}) =>
+        userOrdersPageQuery(12, { page: 3, pageSize: 10, ...extra }).toSQL();
+
+    it('lee número, fecha, total y estado en una sola consulta, sin líneas', () => {
+        const { sql } = page();
+        expect(sql).toContain('`orders`.`order_id`');
+        expect(sql).toContain('`orders`.`created_at`');
+        expect(sql).toContain('`orders`.`total`');
+        expect(sql).toContain('`order_statuses`.`name`');
+        expect(sql).toContain('inner join `order_statuses`');
+        expect(sql).not.toContain('order_products');
+    });
+
+    it('solo trae pedidos del usuario', () => {
+        const { sql, params } = page();
+        expect(sql).toContain('where `orders`.`user_id` = ?');
+        expect(params[0]).toBe(12);
+    });
+
+    it('ordena del más reciente al más antiguo, con el id como desempate', () => {
+        expect(page().sql).toContain(
+            'order by `orders`.`created_at` desc, `orders`.`order_id` desc',
+        );
+    });
+
+    it('pagina con limit y offset', () => {
+        const { sql, params } = page();
+        expect(sql).toContain('limit ? offset ?');
+        expect(params.slice(-2)).toEqual([10, 20]);
+    });
+
+    it('filtra por estado', () => {
+        const { sql, params } = page({ status: 'Enviado' });
+        expect(sql).toContain('`order_statuses`.`name` = ?');
+        expect(params).toContain('Enviado');
+    });
+
+    it('filtra por fecha: desde el inicio del primer día hasta antes del día siguiente al último', () => {
+        const { sql, params } = page({ from: '2026-01-31', to: '2026-02-28' });
+        expect(sql).toContain('`orders`.`created_at` >= ?');
+        expect(sql).toContain('`orders`.`created_at` < ?');
+        expect(params).toContain('2026-01-31 00:00:00');
+        expect(params).toContain('2026-03-01 00:00:00');
+    });
+
+    it('sin filtros solo condiciona por usuario', () => {
+        const { sql } = page();
+        expect(sql).not.toContain('`order_statuses`.`name` = ?');
+        expect(sql).not.toContain('created_at` >=');
+    });
+});
+
+describe('userOrdersCountQuery', () => {
+    it('cuenta con los mismos filtros que la página', () => {
+        const { sql, params } = userOrdersCountQuery(12, {
+            status: 'Anulado',
+            from: '2026-01-01',
+            to: '2026-12-31',
+        }).toSQL();
+        expect(sql).toContain('count(*)');
+        expect(sql).toContain('`order_statuses`.`name` = ?');
+        expect(params).toEqual([12, 'Anulado', '2026-01-01 00:00:00', '2027-01-01 00:00:00']);
+    });
+});
+
 describe('orderLinesQuery', () => {
     const { sql, params } = orderLinesQuery(5).toSQL();
 
@@ -990,6 +1087,57 @@ describe('changeOrderStatusQuery', () => {
         );
         expect(sql).toContain('where (`orders`.`order_id` = ? and `orders`.`status_id` = ?)');
         expect(params).toEqual([7, 12, 2]);
+    });
+});
+
+describe('changeOrderStatusQuery con extras', () => {
+    it('guarda quién anula y por qué en el mismo UPDATE', () => {
+        const { sql, params } = changeOrderStatusQuery(db, 12, 2, 7, {
+            cancelledBy: 'Cliente',
+            cancellationTypeId: 1,
+        }).toSQL();
+        expect(sql).toContain('`cancelled_by` = ?');
+        expect(sql).toContain('`cancellation_type_id` = ?');
+        expect(params).toEqual([7, 'Cliente', 1, 12, 2]);
+    });
+
+    it('al desbloquear borra el estado de origen del bloqueo', () => {
+        const { sql, params } = changeOrderStatusQuery(db, 12, 8, 3, {
+            blockedFromStatusId: null,
+        }).toSQL();
+        expect(sql).toContain('`blocked_from_status_id` = ?');
+        expect(params).toEqual([3, null, 12, 8]);
+    });
+});
+
+describe('orderStockLinesQuery', () => {
+    const { sql, params } = orderStockLinesQuery(db, 5).toSQL();
+
+    it('lee las unidades de cada presentación del pedido, ordenadas por presentación', () => {
+        expect(sql).toContain('from `order_products` where `order_products`.`order_id` = ?');
+        expect(sql).toContain('order by `order_products`.`variant_id` asc');
+        expect(params).toEqual([5]);
+    });
+});
+
+describe('insertInvoiceQuery', () => {
+    const { sql, params } = insertInvoiceQuery(db, {
+        orderId: 5,
+        number: 'F-2026-0001',
+        issueDate: '2026-11-21 10:00:00',
+        taxBase: '23.10',
+        taxAmount: '4.85',
+        total: '27.95',
+        kind: 'Completa',
+        snapshot: { number: 'F-2026-0001' } as never,
+    }).toSQL();
+
+    it('inserta la factura con su tipo y la copia congelada', () => {
+        expect(sql).toContain('insert into `invoices`');
+        expect(sql).toContain('`kind`');
+        expect(sql).toContain('`snapshot`');
+        expect(params).toContain('F-2026-0001');
+        expect(params).toContain('Completa');
     });
 });
 

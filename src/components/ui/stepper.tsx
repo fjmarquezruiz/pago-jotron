@@ -30,6 +30,13 @@ export interface StepperProps extends React.OlHTMLAttributes<HTMLOListElement> {
      * está en marcha, por ejemplo el checkout con el carrito vacío.
      */
     disabled?: boolean;
+    /**
+     * Seguimiento de un pedido (Figma: account-order-*, `checkout-steps`): el paso `current` es el
+     * último ALCANZADO y se ve completado (con check), no activo; los pasos por venir atenúan su
+     * indicador al 40 %; los pasos van centrados con su texto y los conectores ocupan el espacio
+     * que sobra entre ellos. Solo en horizontal y sin `variant="progress-bar"`.
+     */
+    tracking?: boolean;
 }
 
 const indicatorSizes = {
@@ -72,18 +79,21 @@ const Stepper = React.forwardRef<HTMLOListElement, StepperProps>(
             variant = 'default',
             size = 'md',
             disabled = false,
+            tracking: trackingProp = false,
             ...props
         },
         ref,
     ) => {
         const bar = variant === 'progress-bar' && orientation === 'horizontal';
+        const tracking = trackingProp && !bar && orientation === 'horizontal';
         return (
             <ol
                 ref={ref}
                 className={cn(
                     'flex',
-                    gapClass[size],
-                    orientation === 'horizontal' ? 'flex-row items-start' : 'flex-col',
+                    tracking ? 'items-center gap-gap-sm' : gapClass[size],
+                    orientation === 'horizontal' ? 'flex-row' : 'flex-col',
+                    orientation === 'horizontal' && !tracking && 'items-start',
                     className,
                 )}
                 {...props}
@@ -92,129 +102,156 @@ const Stepper = React.forwardRef<HTMLOListElement, StepperProps>(
                     const status: StepStatus =
                         i === errorStep
                             ? 'error'
-                            : i < current
+                            : i < current || (tracking && i === current)
                               ? 'completed'
                               : i === current
                                 ? 'active'
                                 : 'upcoming';
                     const isLast = i === steps.length - 1;
                     const isFirst = i === 0;
+                    const isCurrent = i === current && status !== 'error';
                     return (
-                        <li
-                            key={step.label}
-                            aria-current={status === 'active' ? 'step' : undefined}
-                            className={cn(
-                                'flex',
-                                gapClass[size],
-                                bar
-                                    ? 'relative flex-1 flex-col items-center text-center'
-                                    : orientation === 'horizontal'
-                                      ? 'flex-1 items-start'
-                                      : 'items-start',
-                                !bar && isLast && 'flex-none',
-                                // Figma: el último paso de tamaño lg mide 128 px fijos.
-                                !bar &&
-                                    isLast &&
-                                    size === 'lg' &&
-                                    orientation === 'horizontal' &&
-                                    'sm:w-32',
-                            )}
-                        >
-                            {bar && (
-                                <span
-                                    aria-hidden="true"
-                                    className="flex w-full items-center gap-gap-xs"
-                                >
-                                    <span
-                                        className={cn(
-                                            'h-0.5 flex-1 rounded-full',
-                                            isFirst
-                                                ? 'invisible'
-                                                : i <= current
-                                                  ? 'bg-brand'
-                                                  : 'bg-muted',
-                                        )}
-                                    />
-                                    <span className={cn('rounded-full', indicatorSizes[size])} />
-                                    <span
-                                        className={cn(
-                                            'h-0.5 flex-1 rounded-full',
-                                            isLast
-                                                ? 'invisible'
-                                                : i < current
-                                                  ? 'bg-brand'
-                                                  : 'bg-muted',
-                                        )}
-                                    />
-                                </span>
-                            )}
-                            <span
+                        <React.Fragment key={step.label}>
+                            <li
+                                aria-current={
+                                    status === 'active' || (tracking && isCurrent)
+                                        ? 'step'
+                                        : undefined
+                                }
                                 className={cn(
-                                    'flex shrink-0 items-center justify-center rounded-full font-medium',
-                                    indicatorSizes[size],
-                                    bar && 'absolute',
-                                    disabled && 'opacity-40',
-                                    status === 'upcoming' &&
-                                        'border border-input bg-muted text-muted-foreground',
-                                    (status === 'active' || status === 'completed') &&
-                                        'bg-brand text-brand-foreground',
-                                    status === 'error' && 'bg-destructive-subtle text-destructive',
+                                    'flex',
+                                    gapClass[size],
+                                    bar
+                                        ? 'relative flex-1 flex-col items-center text-center'
+                                        : tracking
+                                          ? 'flex-none items-center'
+                                          : orientation === 'horizontal'
+                                            ? 'flex-1 items-start'
+                                            : 'items-start',
+                                    !bar && isLast && 'flex-none',
+                                    // Figma: el último paso de tamaño lg mide 128 px fijos.
+                                    !bar &&
+                                        isLast &&
+                                        size === 'lg' &&
+                                        orientation === 'horizontal' &&
+                                        'sm:w-32',
                                 )}
                             >
-                                {status === 'completed' ? (
-                                    <CircleCheck aria-hidden="true" />
-                                ) : (
-                                    (step.icon ?? i + 1)
-                                )}
-                                <span className="sr-only">
-                                    {status === 'completed'
-                                        ? ' (completado)'
-                                        : status === 'error'
-                                          ? ' (con error)'
-                                          : ''}
-                                </span>
-                            </span>
-                            <span
-                                className={cn(
-                                    'flex min-w-0 flex-col',
-                                    !bar && labelOffset[size],
-                                    orientation === 'horizontal' &&
-                                        status !== 'active' &&
-                                        'max-sm:sr-only',
-                                )}
-                            >
-                                <span
-                                    className={cn(
-                                        'font-medium',
-                                        labelSizes[size],
-                                        status === 'upcoming' && 'text-muted-foreground',
-                                        status === 'error' && 'text-destructive',
-                                        (status === 'active' || status === 'completed') &&
-                                            'text-foreground',
-                                    )}
-                                >
-                                    {step.label}
-                                </span>
-                                {step.description && (
-                                    <span className={cn('text-muted-foreground', descSizes[size])}>
-                                        {step.description}
+                                {bar && (
+                                    <span
+                                        aria-hidden="true"
+                                        className="flex w-full items-center gap-gap-xs"
+                                    >
+                                        <span
+                                            className={cn(
+                                                'h-0.5 flex-1 rounded-full',
+                                                isFirst
+                                                    ? 'invisible'
+                                                    : i <= current
+                                                      ? 'bg-brand'
+                                                      : 'bg-muted',
+                                            )}
+                                        />
+                                        <span
+                                            className={cn('rounded-full', indicatorSizes[size])}
+                                        />
+                                        <span
+                                            className={cn(
+                                                'h-0.5 flex-1 rounded-full',
+                                                isLast
+                                                    ? 'invisible'
+                                                    : i < current
+                                                      ? 'bg-brand'
+                                                      : 'bg-muted',
+                                            )}
+                                        />
                                     </span>
                                 )}
-                            </span>
-                            {!bar && !isLast && orientation === 'horizontal' && (
                                 <span
+                                    className={cn(
+                                        'flex shrink-0 items-center justify-center rounded-full font-medium',
+                                        indicatorSizes[size],
+                                        bar && 'absolute',
+                                        (disabled || (tracking && status === 'upcoming')) &&
+                                            'opacity-40',
+                                        status === 'upcoming' &&
+                                            'border border-input bg-muted text-muted-foreground',
+                                        (status === 'active' || status === 'completed') &&
+                                            'bg-brand text-brand-foreground',
+                                        status === 'error' &&
+                                            'bg-destructive-subtle text-destructive',
+                                    )}
+                                >
+                                    {status === 'completed' ? (
+                                        <CircleCheck aria-hidden="true" />
+                                    ) : (
+                                        (step.icon ?? i + 1)
+                                    )}
+                                    <span className="sr-only">
+                                        {status === 'completed'
+                                            ? ' (completado)'
+                                            : status === 'error'
+                                              ? ' (con error)'
+                                              : ''}
+                                    </span>
+                                </span>
+                                <span
+                                    className={cn(
+                                        'flex min-w-0 flex-col',
+                                        !bar && !tracking && labelOffset[size],
+                                        orientation === 'horizontal' &&
+                                            status !== 'active' &&
+                                            !(tracking && isCurrent) &&
+                                            'max-sm:sr-only',
+                                    )}
+                                >
+                                    <span
+                                        className={cn(
+                                            'font-medium',
+                                            labelSizes[size],
+                                            status === 'upcoming' && 'text-muted-foreground',
+                                            status === 'error' && 'text-destructive',
+                                            (status === 'active' || status === 'completed') &&
+                                                'text-foreground',
+                                        )}
+                                    >
+                                        {step.label}
+                                    </span>
+                                    {step.description && (
+                                        <span
+                                            className={cn('text-muted-foreground', descSizes[size])}
+                                        >
+                                            {step.description}
+                                        </span>
+                                    )}
+                                </span>
+                                {!bar && !tracking && !isLast && orientation === 'horizontal' && (
+                                    <span
+                                        aria-hidden="true"
+                                        className={cn(
+                                            'h-0.5 min-w-2 flex-1 rounded-full',
+                                            connectorOffset[size],
+                                            // Llega a un paso alcanzado: marca al 20 %; si no (por venir o con error), tinta al 10 %.
+                                            i + 1 <= current && i + 1 !== errorStep
+                                                ? 'bg-brand/20'
+                                                : 'bg-primary/10',
+                                        )}
+                                    />
+                                )}
+                            </li>
+                            {tracking && !isLast && (
+                                // Conector entre pasos (solo seguimiento): `li` decorativo que ocupa lo que sobra.
+                                <li
                                     aria-hidden="true"
                                     className={cn(
                                         'h-0.5 min-w-2 flex-1 rounded-full',
-                                        connectorOffset[size],
-                                        // Llega a un paso alcanzado: marca al 20 %; si no (por venir o con error), tinta al 10 %.
                                         i + 1 <= current && i + 1 !== errorStep
                                             ? 'bg-brand/20'
                                             : 'bg-primary/10',
                                     )}
                                 />
                             )}
-                        </li>
+                        </React.Fragment>
                     );
                 })}
             </ol>

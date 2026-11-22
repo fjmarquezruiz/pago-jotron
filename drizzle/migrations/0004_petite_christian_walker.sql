@@ -1,0 +1,2 @@
+ALTER TABLE `orders` ADD `blocked_from_status_id` int;--> statement-breakpoint
+ALTER TABLE `orders` ADD CONSTRAINT `fk_order_blocked_from_status` FOREIGN KEY (`blocked_from_status_id`) REFERENCES `order_statuses`(`status_id`) ON DELETE set null ON UPDATE cascade;

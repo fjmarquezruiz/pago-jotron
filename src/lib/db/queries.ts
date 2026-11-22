@@ -19,8 +19,10 @@ import {
     type SQL,
     type SQLWrapper,
 } from 'drizzle-orm';
-import type { MySqlSelect } from 'drizzle-orm/mysql-core';
+import { alias, type MySqlSelect } from 'drizzle-orm/mysql-core';
 import { db } from '@/db';
+import type { InvoiceSource } from '@/lib/invoices/build';
+import type { InvoiceDocument } from '@/lib/invoices/types';
 import type { Cart } from '@/lib/cart/cart';
 import { orderLinesByVariantIds } from '@/lib/cart/lines';
 import { NEW_PRODUCT_DAYS } from '@/lib/catalog/novelty';
@@ -38,9 +40,12 @@ import {
 import {
     addresses,
     auditLogs,
+    cancellationTypes,
     cartProducts,
     grapes,
     guaranteesOfOrigin,
+    invoices,
+    invoiceSeries,
     orderProducts,
     orderStatuses,
     orders,
@@ -1072,16 +1077,26 @@ export function restoreStockQuery(writer: OrderWriter, variantId: number, quanti
         .where(eq(productVariants.id, variantId));
 }
 
+/** Columnas de `orders` que pueden cambiar a la vez que el estado (anulación, desbloqueo). */
+export interface OrderStatusExtras {
+    cancelledBy?: 'Cliente' | 'Administrador';
+    cancellationTypeId?: number;
+    /** `null` borra el estado de origen de un bloqueo (al salir de Bloqueado). */
+    blockedFromStatusId?: number | null;
+}
+
 /**
  * Consulta que marca un pedido con un estado nuevo (`status_id` y `status_updated_at`). Se usa
- * para anularlo cuando falla el cobro de la tarjeta. Solo cambia el pedido que está en
- * `fromStatusId`: si otro proceso ya lo movió a otro estado, no pisa ese cambio
- * (`affectedRows = 0`).
+ * para anularlo cuando falla el cobro de la tarjeta y en todos los cambios de estado. Solo cambia
+ * el pedido que está en `fromStatusId`: si otro proceso ya lo movió a otro estado, no pisa ese
+ * cambio (`affectedRows = 0`).
  *
  * @param writer - El cliente de BD o la transacción en la que se ejecuta.
  * @param orderId - `orders.order_id`.
  * @param fromStatusId - Estado en el que debe estar ahora.
  * @param toStatusId - Estado al que pasa.
+ * @param extras - Otras columnas que cambian en el mismo `UPDATE` (quién anula y por qué, o el
+ * estado de origen de un bloqueo).
  * @returns La consulta, lista para ejecutar con `await`.
  */
 export function changeOrderStatusQuery(
@@ -1089,11 +1104,92 @@ export function changeOrderStatusQuery(
     orderId: number,
     fromStatusId: number,
     toStatusId: number,
+    extras: OrderStatusExtras = {},
 ) {
     return writer
         .update(orders)
-        .set({ statusId: toStatusId, statusUpdatedAt: sql`CURRENT_TIMESTAMP` })
+        .set({ statusId: toStatusId, statusUpdatedAt: sql`CURRENT_TIMESTAMP`, ...extras })
         .where(and(eq(orders.id, orderId), eq(orders.statusId, fromStatusId)));
+}
+
+/**
+ * Estados de pedido sembrados, por nombre: lo que hace falta para pasar del nombre al id y al
+ * revés en una sola consulta.
+ *
+ * @returns Los pares `{ id, name }` de `order_statuses`.
+ */
+export async function getOrderStatuses() {
+    return db.select({ id: orderStatuses.id, name: orderStatuses.name }).from(orderStatuses);
+}
+
+/**
+ * Lo necesario de un pedido para cambiarle el estado, sin filtrar por cuenta: quien llama decide
+ * si es el dueño (cliente) o tiene el rol (administración).
+ *
+ * @param orderId - `orders.order_id`.
+ * @returns El pedido, o `null` si no existe.
+ */
+export async function getOrderForStatusChange(orderId: number) {
+    const [row] = await db
+        .select({
+            id: orders.id,
+            userId: orders.userId,
+            statusId: orders.statusId,
+            paymentMethod: orders.paymentMethod,
+            paymentIntentId: orders.paymentIntentId,
+            createdAt: orders.createdAt,
+            statusUpdatedAt: orders.statusUpdatedAt,
+            blockedFromStatusId: orders.blockedFromStatusId,
+        })
+        .from(orders)
+        .where(eq(orders.id, orderId));
+    return row ?? null;
+}
+
+/**
+ * Consulta de las unidades de cada presentación de un pedido, por orden de presentación: lo que
+ * se devuelve al stock al anularlo. Se lee con el mismo cliente que escribe (la transacción).
+ *
+ * @param reader - El cliente de BD o la transacción en la que se ejecuta.
+ * @param orderId - `orders.order_id`.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function orderStockLinesQuery(reader: Pick<typeof db, 'select'>, orderId: number) {
+    return reader
+        .select({ variantId: orderProducts.variantId, quantity: orderProducts.quantity })
+        .from(orderProducts)
+        .where(eq(orderProducts.orderId, orderId))
+        .orderBy(asc(orderProducts.variantId));
+}
+
+/**
+ * Id de un motivo de cancelación por su descripción: no depende del orden del seed.
+ *
+ * @param description - Texto exacto de `cancellation_types.description`.
+ * @returns El id, o `null` si no existe.
+ */
+export async function getCancellationTypeIdByDescription(
+    description: string,
+): Promise<number | null> {
+    const [row] = await db
+        .select({ id: cancellationTypes.id })
+        .from(cancellationTypes)
+        .where(eq(cancellationTypes.description, description));
+    return row?.id ?? null;
+}
+
+/**
+ * Indica si existe un motivo de cancelación.
+ *
+ * @param id - `cancellation_types.cancellation_type_id`.
+ * @returns `true` si existe.
+ */
+export async function cancellationTypeExists(id: number): Promise<boolean> {
+    const [row] = await db
+        .select({ id: cancellationTypes.id })
+        .from(cancellationTypes)
+        .where(eq(cancellationTypes.id, id));
+    return row !== undefined;
 }
 
 /**
@@ -1171,6 +1267,152 @@ export function clearUserCartQuery(writer: OrderWriter, userId: number) {
     return writer.delete(cartProducts).where(eq(cartProducts.userId, userId));
 }
 
+/** Cliente de BD o transacción con lo que necesita la emisión de una factura. */
+export type InvoiceTx = Pick<typeof db, 'select' | 'insert' | 'update'>;
+
+/**
+ * Reserva el siguiente número de factura del año (RF8). Tiene que llamarse DENTRO de la transacción
+ * que emite la factura: crea la fila del año si no existe, la bloquea con `SELECT … FOR UPDATE`
+ * (dos emisiones a la vez se esperan una a otra), le suma 1 y devuelve el nuevo valor. Si la
+ * transacción se deshace, el contador también, así que la numeración no deja huecos (un
+ * `AUTO_INCREMENT` sí los deja).
+ *
+ * @param tx - La transacción en la que se emite la factura.
+ * @param year - Año de la serie (el de la fecha de expedición, hora de Madrid).
+ * @returns El número de orden dentro del año, empezando en 1.
+ */
+export async function reserveInvoiceSequence(tx: InvoiceTx, year: number): Promise<number> {
+    await tx.insert(invoiceSeries).values({ year, lastNumber: 0 }).onDuplicateKeyUpdate({
+        set: { year },
+    });
+    const [row] = await tx
+        .select({ lastNumber: invoiceSeries.lastNumber })
+        .from(invoiceSeries)
+        .where(eq(invoiceSeries.year, year))
+        .for('update');
+    const next = row.lastNumber + 1;
+    await tx.update(invoiceSeries).set({ lastNumber: next }).where(eq(invoiceSeries.year, year));
+    return next;
+}
+
+/** Lo que se guarda al emitir una factura. Los importes van como texto decimal (`'33.45'`). */
+export interface NewInvoice {
+    orderId: number;
+    number: string;
+    /** `datetime` de la BD (UTC): la misma fecha que lleva el documento. */
+    issueDate: string;
+    taxBase: string;
+    taxAmount: string;
+    total: string;
+    kind: 'Completa' | 'Simplificada';
+    snapshot: InvoiceDocument;
+}
+
+/**
+ * Consulta que inserta una factura. `invoices.order_id` es único: un pedido no puede tener dos.
+ *
+ * @param writer - La transacción en la que se emite.
+ * @param invoice - La factura.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function insertInvoiceQuery(writer: InvoiceTx, invoice: NewInvoice) {
+    return writer.insert(invoices).values(invoice);
+}
+
+/**
+ * Lo necesario para emitir la factura de un pedido: el cliente (nombre y NIF), la dirección de
+ * facturación, el envío y las líneas con el precio y el IVA guardados en el pedido.
+ *
+ * @param orderId - `orders.order_id`.
+ * @returns La fuente de la factura, o `null` si el pedido no existe.
+ */
+export async function getInvoiceSource(orderId: number): Promise<InvoiceSource | null> {
+    const [row] = await db
+        .select({
+            orderId: orders.id,
+            name: users.name,
+            lastName: users.lastName,
+            idCard: users.idCard,
+            shippingCost: orders.shippingCost,
+            shippingName: shippingTypes.name,
+            billingRecipientName: addresses.recipientName,
+            streetType: addresses.streetType,
+            streetName: addresses.streetName,
+            number: addresses.number,
+            floor: addresses.floor,
+            postalCode: addresses.postalCode,
+            city: addresses.city,
+            province: addresses.province,
+            country: addresses.country,
+            hasBilling: orders.billingAddressId,
+        })
+        .from(orders)
+        .innerJoin(users, eq(users.id, orders.userId))
+        .innerJoin(shippingTypes, eq(shippingTypes.id, orders.shippingTypeId))
+        .leftJoin(addresses, eq(addresses.id, orders.billingAddressId))
+        .where(eq(orders.id, orderId));
+    if (!row) return null;
+
+    const lines = await orderLinesQuery(orderId);
+    return {
+        orderId: row.orderId,
+        user: { name: row.name, lastName: row.lastName, idCard: row.idCard },
+        billingAddress:
+            row.hasBilling === null
+                ? null
+                : {
+                      recipientName: row.billingRecipientName,
+                      streetType: row.streetType,
+                      streetName: row.streetName,
+                      number: row.number,
+                      floor: row.floor,
+                      postalCode: row.postalCode,
+                      city: row.city,
+                      province: row.province,
+                      country: row.country,
+                  },
+        shippingCost: row.shippingCost,
+        shippingName: row.shippingName,
+        lines: lines.map(
+            ({ name, vintage, format, capacity, capacityUnit, quantity, unitPrice, taxRate }) => ({
+                name,
+                vintage,
+                format,
+                capacity,
+                capacityUnit,
+                quantity,
+                unitPrice,
+                taxRate,
+            }),
+        ),
+    };
+}
+
+/**
+ * La factura de un pedido de un usuario, con el estado del pedido: para descargarla (CU8). Filtra
+ * por usuario: la factura de otra cuenta no se devuelve aunque exista.
+ *
+ * @param userId - Id del usuario, el de la sesión.
+ * @param orderId - `orders.order_id`.
+ * @returns El estado del pedido y el documento congelado al emitir la factura, o `null` si el
+ * pedido no existe, es de otra cuenta o aún no tiene factura.
+ */
+export async function getUserInvoice(
+    userId: number,
+    orderId: number,
+): Promise<{ status: string; document: InvoiceDocument } | null> {
+    const [row] = await db
+        .select({ status: orderStatuses.name, snapshot: invoices.snapshot })
+        .from(invoices)
+        .innerJoin(orders, eq(orders.id, invoices.orderId))
+        .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
+        .where(and(eq(orders.id, orderId), eq(orders.userId, userId)));
+    return row ? { status: row.status, document: row.snapshot as InvoiceDocument } : null;
+}
+
+/** `order_statuses` por segunda vez: el estado del que venía un pedido Bloqueado. */
+const blockedFromStatus = alias(orderStatuses, 'blocked_from_status');
+
 /**
  * Consulta de un pedido de un usuario con su estado, su tipo de envío y su dirección de envío.
  * Filtra por usuario: el pedido de otra cuenta no se devuelve aunque exista. La dirección se lee
@@ -1187,6 +1429,14 @@ export function userOrderQuery(userId: number, orderId: number) {
             status: orderStatuses.name,
             paymentMethod: orders.paymentMethod,
             createdAt: orders.createdAt,
+            /** Cuándo entró en el estado actual. */
+            statusUpdatedAt: orders.statusUpdatedAt,
+            /** Estado que tenía al bloquearse; `null` si no está Bloqueado. */
+            blockedFrom: blockedFromStatus.name,
+            /** Número de su factura (`F-2026-0001`); `null` si aún no tiene. */
+            invoiceNumber: invoices.number,
+            /** Quién anuló el pedido; `null` si no está anulado o lo anuló el sistema (cobro fallido). */
+            cancelledBy: orders.cancelledBy,
             shippingCost: orders.shippingCost,
             shippingTypeName: shippingTypes.name,
             minDeliveryDays: shippingTypes.minDeliveryDays,
@@ -1204,6 +1454,8 @@ export function userOrderQuery(userId: number, orderId: number) {
         })
         .from(orders)
         .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
+        .leftJoin(blockedFromStatus, eq(blockedFromStatus.id, orders.blockedFromStatusId))
+        .leftJoin(invoices, eq(invoices.orderId, orders.id))
         .innerJoin(shippingTypes, eq(shippingTypes.id, orders.shippingTypeId))
         .leftJoin(addresses, eq(addresses.id, orders.shippingAddressId))
         .where(and(eq(orders.id, orderId), eq(orders.userId, userId)));
@@ -1222,6 +1474,10 @@ export function orderLinesQuery(orderId: number) {
             variantId: orderProducts.variantId,
             name: products.name,
             vintage: products.vintage,
+            /** Imagen del producto (id de Cloudinary), como en las tarjetas; puede faltar. */
+            image: products.image,
+            /** Nombre de la D.O.: lo que el catálogo pinta bajo el nombre. */
+            originName: guaranteesOfOrigin.name,
             format: productVariants.format,
             capacity: productVariants.capacity,
             capacityUnit: productVariants.capacityUnit,
@@ -1232,6 +1488,7 @@ export function orderLinesQuery(orderId: number) {
         .from(orderProducts)
         .innerJoin(productVariants, eq(productVariants.id, orderProducts.variantId))
         .innerJoin(products, eq(products.id, productVariants.productId))
+        .innerJoin(guaranteesOfOrigin, eq(guaranteesOfOrigin.id, products.guaranteeOfOriginId))
         .where(eq(orderProducts.orderId, orderId))
         .orderBy(asc(orderProducts.variantId));
 }
@@ -1251,3 +1508,168 @@ export async function getUserOrder(userId: number, orderId: number) {
 
 /** Un pedido con sus líneas tal como lo devuelve `getUserOrder`. */
 export type UserOrder = NonNullable<Awaited<ReturnType<typeof getUserOrder>>>;
+
+/** Filtros del historial de pedidos (ya validados, ver `parseOrderHistoryParams`). */
+export interface OrderHistoryFilters {
+    /** Nombre del estado (`order_statuses.name`). */
+    status?: string;
+    /** Primer día incluido, `AAAA-MM-DD`. */
+    from?: string;
+    /** Último día incluido, `AAAA-MM-DD`. */
+    to?: string;
+}
+
+/** Día siguiente a uno `AAAA-MM-DD`, para comparar con `< día + 1` y que `to` entre entero. */
+function nextDay(isoDate: string): string {
+    const date = new Date(`${isoDate}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + 1);
+    return date.toISOString().slice(0, 10);
+}
+
+/** Condición `WHERE` del historial: del usuario y, si se piden, por estado y por fecha de alta. */
+function userOrdersCondition(userId: number, { status, from, to }: OrderHistoryFilters): SQL {
+    const conditions: SQL[] = [eq(orders.userId, userId)];
+    if (status) conditions.push(eq(orderStatuses.name, status));
+    if (from) conditions.push(gte(orders.createdAt, `${from} 00:00:00`));
+    if (to) conditions.push(lt(orders.createdAt, `${nextDay(to)} 00:00:00`));
+    return and(...conditions)!;
+}
+
+/**
+ * Consulta de una página del historial de pedidos de un cliente: número, fecha, total y estado,
+ * del más reciente al más antiguo (`order_id` desempata). Una sola consulta, sin líneas.
+ *
+ * @param userId - Id del usuario, el de la sesión (`getSessionUserId`).
+ * @param params - Página (desde 1), tamaño y filtros.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function userOrdersPageQuery(
+    userId: number,
+    { page, pageSize, ...filters }: { page: number; pageSize: number } & OrderHistoryFilters,
+) {
+    return db
+        .select({
+            id: orders.id,
+            createdAt: orders.createdAt,
+            total: orders.total,
+            status: orderStatuses.name,
+        })
+        .from(orders)
+        .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
+        .where(userOrdersCondition(userId, filters))
+        .orderBy(desc(orders.createdAt), desc(orders.id))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize);
+}
+
+/**
+ * Consulta que cuenta los pedidos de un cliente que cumplen los filtros del historial.
+ *
+ * @param userId - Id del usuario, el de la sesión.
+ * @param filters - Estado y rango de fechas.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function userOrdersCountQuery(userId: number, filters: OrderHistoryFilters = {}) {
+    return db
+        .select({ total: count() })
+        .from(orders)
+        .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
+        .where(userOrdersCondition(userId, filters));
+}
+
+/**
+ * Una página del historial de pedidos de un cliente (RF8).
+ *
+ * @param userId - Id del usuario, el de la sesión.
+ * @param params - Página (desde 1), tamaño de página y filtros.
+ * @returns Los pedidos de la página y el total que cumple los filtros (para paginar).
+ */
+export async function getUserOrdersPage(
+    userId: number,
+    params: { page: number; pageSize: number } & OrderHistoryFilters,
+) {
+    const { status, from, to } = params;
+    const [items, [counted]] = await Promise.all([
+        userOrdersPageQuery(userId, params),
+        userOrdersCountQuery(userId, { status, from, to }),
+    ]);
+    return { items, total: counted?.total ?? 0 };
+}
+
+/** Una página del historial, tal como la devuelve `getUserOrdersPage`. */
+export type UserOrdersPage = Awaited<ReturnType<typeof getUserOrdersPage>>;
+
+/** Lo que necesitan los correos de un pedido: a quién escribir y qué decirle. */
+export interface OrderEmailData {
+    orderId: number;
+    email: string;
+    /** Nombre del cliente; puede faltar (la cuenta no lo exige). */
+    name: string | null;
+    /** Importe decimal (`'189.00'`). */
+    total: string;
+    shippingCost: string;
+    paymentMethod: 'Tarjeta' | 'PayPal' | 'Transferencia';
+    /** `datetime` de la BD (UTC). */
+    createdAt: string;
+    lines: { name: string; vintage: number | null; quantity: number; unitPrice: string }[];
+}
+
+/**
+ * Datos de un pedido para sus correos (RF7, RF8): correo y nombre del cliente, importes y líneas.
+ *
+ * @param orderId - `orders.order_id`.
+ * @returns Los datos, o `null` si el pedido no existe.
+ */
+export async function getOrderEmailData(orderId: number): Promise<OrderEmailData | null> {
+    const [row] = await db
+        .select({
+            orderId: orders.id,
+            email: users.email,
+            name: users.name,
+            total: orders.total,
+            shippingCost: orders.shippingCost,
+            paymentMethod: orders.paymentMethod,
+            createdAt: orders.createdAt,
+        })
+        .from(orders)
+        .innerJoin(users, eq(users.id, orders.userId))
+        .where(eq(orders.id, orderId));
+    if (!row) return null;
+    const lines = await orderLinesQuery(orderId);
+    return {
+        ...row,
+        lines: lines.map(({ name, vintage, quantity, unitPrice }) => ({
+            name,
+            vintage,
+            quantity,
+            unitPrice,
+        })),
+    };
+}
+
+/** Tope de pedidos que mira cada pasada del cron de bloqueo: el resto cae en la del día siguiente. */
+export const BLOCK_BATCH_LIMIT = 500;
+
+/**
+ * Pedidos que podrían bloquearse (RF8): no están ni Entregados, ni Anulados, ni ya Bloqueados y su
+ * último cambio de estado es anterior a `cutoff`. Es solo una preselección: `blockOrder` vuelve a
+ * comprobar `shouldBlock` con la fecha de la BD antes de tocar nada.
+ *
+ * @param cutoff - Fecha límite como `datetime` UTC (`AAAA-MM-DD HH:MM:SS`).
+ * @returns Los ids, del que lleva más tiempo parado al que menos, hasta `BLOCK_BATCH_LIMIT`.
+ */
+export async function getBlockCandidateIds(cutoff: string): Promise<number[]> {
+    const rows = await db
+        .select({ id: orders.id })
+        .from(orders)
+        .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
+        .where(
+            and(
+                notInArray(orderStatuses.name, ['Entregado', 'Anulado', 'Bloqueado']),
+                lt(orders.statusUpdatedAt, cutoff),
+            ),
+        )
+        .orderBy(asc(orders.statusUpdatedAt), asc(orders.id))
+        .limit(BLOCK_BATCH_LIMIT);
+    return rows.map(({ id }) => id);
+}

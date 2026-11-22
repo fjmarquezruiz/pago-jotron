@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { CUSTOMER_CANCELLATION_DESCRIPTION } from '../lib/orders/cancellation';
 import { db, pool } from './index';
 import {
     cancellationTypes,
@@ -44,7 +45,7 @@ async function main() {
     await db
         .insert(cancellationTypes)
         .values([
-            { description: 'El cliente decidió cancelar el pedido antes de que se enviara.' },
+            { description: CUSTOMER_CANCELLATION_DESCRIPTION },
             { description: 'Pedido duplicado por error.' },
             { description: 'El cliente se arrepintió de la compra.' },
             { description: 'Error en la dirección de envío proporcionada.' },
