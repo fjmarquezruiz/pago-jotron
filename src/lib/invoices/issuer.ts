@@ -1,12 +1,6 @@
-/** Datos fiscales del emisor de las facturas: la tienda. */
-export interface InvoiceIssuer {
-    /** Nombre o razón social (`INVOICE_ISSUER_NAME`). */
-    name: string;
-    /** NIF o CIF (`INVOICE_ISSUER_TAX_ID`). */
-    taxId: string;
-    /** Domicilio fiscal en una línea (`INVOICE_ISSUER_ADDRESS`). */
-    address: string;
-}
+import type { InvoiceIssuer } from './types';
+
+export type { InvoiceIssuer };
 
 const VARIABLES = {
     name: 'INVOICE_ISSUER_NAME',
@@ -16,7 +10,9 @@ const VARIABLES = {
 
 /**
  * Datos fiscales de la tienda para las facturas (Real Decreto 1619/2012), leídos del entorno
- * (`INVOICE_ISSUER_NAME`, `INVOICE_ISSUER_TAX_ID` e `INVOICE_ISSUER_ADDRESS`). No hay valores por
+ * (`INVOICE_ISSUER_NAME`, `INVOICE_ISSUER_TAX_ID` e `INVOICE_ISSUER_ADDRESS`). Solo se lee AL EMITIR una
+ * factura (`changeOrderStatus`, al pasar a Entregado): desde ahí el emisor vive dentro de la factura
+ * (`InvoiceDocument.issuer`) y descargarla no vuelve a mirar el entorno. No hay valores por
  * defecto: son datos reales de la tienda y no deben vivir en el código. Un valor vacío o solo de
  * espacios cuenta como que falta.
  *

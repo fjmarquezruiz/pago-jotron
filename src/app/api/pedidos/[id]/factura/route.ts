@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionUserId } from '@/lib/auth/session';
 import { getUserInvoice } from '@/lib/db/queries';
-import { getInvoiceIssuer } from '@/lib/invoices/issuer';
 import { renderInvoicePdf } from '@/lib/invoices/pdf';
 import { ORDER_STATUS } from '@/lib/orders/status';
 import { MAX_ID } from '@/lib/validations/ids';
@@ -28,8 +27,9 @@ function fileName(number: string): string {
  * datos vivos, así que no cambia aunque cambie el perfil o el producto.
  *
  * Respuestas: 200 el PDF (`application/pdf`, como descarga); 400 el id no es un entero válido; 401
- * sin sesión; 404 no existe, es de otra cuenta, no tiene factura o no está Entregado; 503 faltan los
- * datos fiscales de la tienda (`INVOICE_ISSUER_*`); 500 error interno.
+ * sin sesión; 404 no existe, es de otra cuenta, no tiene factura o no está Entregado; 500 error
+ * interno. El emisor (nombre, NIF y domicilio) también va dentro de la copia: descargar la factura no
+ * lee el entorno, así que un cambio de domicilio de la tienda no altera facturas ya emitidas.
  */
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
     try {
@@ -44,15 +44,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         if (found === null || found.status !== ORDER_STATUS.DELIVERED)
             return respond({ message: 'El pedido no existe' }, 404);
 
-        let issuer;
-        try {
-            issuer = getInvoiceIssuer();
-        } catch (error) {
-            console.error(error);
-            return respond({ message: 'La factura no está disponible ahora mismo' }, 503);
-        }
-
-        const pdf = await renderInvoicePdf(found.document, issuer);
+        const pdf = await renderInvoicePdf(found.document);
         return new NextResponse(new Uint8Array(pdf), {
             status: 200,
             headers: {

@@ -6,6 +6,16 @@ import type { VatBreakdownRow } from '@/lib/orders/quote';
  */
 export type InvoiceKind = 'Completa' | 'Simplificada';
 
+/** Datos fiscales del emisor (la tienda), copiados al emitir: un cambio de domicilio no altera facturas ya emitidas. */
+export interface InvoiceIssuer {
+    /** Nombre o razón social. */
+    name: string;
+    /** NIF o CIF. */
+    taxId: string;
+    /** Domicilio fiscal en una línea. */
+    address: string;
+}
+
 /** Una línea de la factura: un producto del pedido, con el precio y el IVA que tenía al comprarlo. */
 export interface InvoiceLine {
     /** Nombre del producto con su añada y presentación, tal como estaba al emitir la factura. */
@@ -41,6 +51,8 @@ export interface InvoiceDocument {
     issueDate: string;
     /** Número de pedido que ve el cliente (`PJ-12`). */
     orderNumber: string;
+    /** El emisor tal como era al emitir la factura. */
+    issuer: InvoiceIssuer;
     recipient: InvoiceRecipient;
     lines: InvoiceLine[];
     /** Gastos de envío con IVA incluido, o `null` si no hubo (recogida en bodega, gratis). */

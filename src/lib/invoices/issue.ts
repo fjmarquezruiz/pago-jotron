@@ -2,6 +2,7 @@ import { insertInvoiceQuery, reserveInvoiceSequence, type InvoiceTx } from '@/li
 import { centsToDecimal } from '@/lib/orders/format';
 import { buildInvoiceDocument, type InvoiceSource } from './build';
 import { formatInvoiceNumber, invoiceYear } from './number';
+import type { InvoiceIssuer } from './types';
 
 /** `Date` → `datetime` de la BD (`AAAA-MM-DD HH:MM:SS`, UTC: la conexión fuerza `time_zone = '+00:00'`). */
 function toDbDate(date: Date): string {
@@ -19,6 +20,7 @@ function toDbDate(date: Date): string {
  *
  * @param tx - La transacción del cambio de estado.
  * @param source - El pedido (`getInvoiceSource`).
+ * @param issuer - Datos fiscales de la tienda (`getInvoiceIssuer`): se copian a la factura.
  * @param now - Fecha de expedición.
  * @returns El número de la factura, por ejemplo `F-2026-0001`.
  * @throws {Error} Si el documento no se puede montar (falta el destinatario de una factura
@@ -27,12 +29,13 @@ function toDbDate(date: Date): string {
 export async function issueInvoice(
     tx: InvoiceTx,
     source: InvoiceSource,
+    issuer: InvoiceIssuer,
     now: Date = new Date(),
 ): Promise<string> {
     const year = invoiceYear(now);
     const number = formatInvoiceNumber(year, await reserveInvoiceSequence(tx, year));
     const issueDate = toDbDate(now);
-    const document = buildInvoiceDocument(source, { number, issueDate });
+    const document = buildInvoiceDocument(source, { number, issueDate, issuer });
     await insertInvoiceQuery(tx, {
         orderId: source.orderId,
         number,

@@ -311,6 +311,12 @@ test.describe('Pedidos del cliente (RF8)', () => {
             [`F-${year}-0001`, 'Simplificada'],
             [`F-${year}-0002`, 'Completa'],
         ]);
+        // El emisor se copia a la factura al emitirla: descargarla no vuelve a leer el entorno.
+        const [frozen] = await sql<{ issuer: string }>(
+            "SELECT JSON_UNQUOTE(JSON_EXTRACT(snapshot, '$.issuer.taxId')) AS issuer FROM invoices WHERE order_id = ?",
+            [first],
+        );
+        expect(frozen.issuer).toBeTruthy();
         const [series] = await sql<{ last_number: number }>(
             'SELECT last_number FROM invoice_series WHERE year = ?',
             [year],

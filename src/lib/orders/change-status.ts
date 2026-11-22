@@ -12,6 +12,7 @@ import {
     type OrderStatusExtras,
 } from '@/lib/db/queries';
 import { issueInvoice } from '@/lib/invoices/issue';
+import { getInvoiceIssuer } from '@/lib/invoices/issuer';
 import { refund } from '@/lib/payments';
 import { CUSTOMER_CANCELLATION_DESCRIPTION } from './cancellation';
 import { orderNumber } from './format';
@@ -181,8 +182,11 @@ export async function changeOrderStatus(
     }
     if (from === ORDER_STATUS.BLOCKED) extras.blockedFromStatusId = null;
 
-    // Se lee antes de la transacción (las líneas del pedido no cambian) y se emite dentro.
+    // Los datos fiscales de la tienda se leen ahora, antes de tocar la BD: si faltan, la entrega
+    // falla sin cambiar nada y la factura ya nace con ellos (no se vuelve a mirar el entorno).
     const delivering = to === ORDER_STATUS.DELIVERED;
+    const issuer = delivering ? getInvoiceIssuer() : null;
+    // Las líneas del pedido no cambian: se leen antes de la transacción y la factura se emite dentro.
     const invoiceSource = delivering ? await getInvoiceSource(orderId) : null;
     if (delivering && invoiceSource === null) return fail('not_found', 'El pedido no existe');
 
@@ -196,7 +200,8 @@ export async function changeOrderStatus(
             for (const { variantId, quantity } of await orderStockLinesQuery(tx, orderId))
                 await restoreStockQuery(tx, variantId, quantity);
         }
-        if (invoiceSource !== null) invoiceNumber = await issueInvoice(tx, invoiceSource, now);
+        if (invoiceSource !== null && issuer !== null)
+            invoiceNumber = await issueInvoice(tx, invoiceSource, issuer, now);
         await insertAuditLogQuery(tx, {
             userId: actor.userId,
             action: `Pedido ${orderNumber(orderId)}: ${from} → ${to}`,

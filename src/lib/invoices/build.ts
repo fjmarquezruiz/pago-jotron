@@ -3,7 +3,7 @@ import { lineTotalCents, priceToCents } from '@/lib/cart/totals';
 import { orderNumber } from '@/lib/orders/format';
 import { quoteOrder, SHIPPING_TAX_RATE } from '@/lib/orders/quote';
 import { invoiceKind } from './kind';
-import type { InvoiceDocument } from './types';
+import type { InvoiceDocument, InvoiceIssuer } from './types';
 
 /** Una línea del pedido tal como la guarda `order_products` más los datos del producto. */
 export interface InvoiceSourceLine {
@@ -65,12 +65,13 @@ export function addressLine(address: InvoiceSourceAddress): string {
  * @param source - El pedido (`getInvoiceSource`).
  * @param input.number - Número de factura ya reservado (`F-2026-0001`).
  * @param input.issueDate - Fecha de expedición, como `datetime` de la BD (UTC).
+ * @param input.issuer - Datos fiscales de la tienda en este momento: quedan dentro de la factura.
  * @returns El documento de la factura.
  * @throws {Error} Si es una factura completa y no consta el nombre del destinatario.
  */
 export function buildInvoiceDocument(
     source: InvoiceSource,
-    { number, issueDate }: { number: string; issueDate: string },
+    { number, issueDate, issuer }: { number: string; issueDate: string; issuer: InvoiceIssuer },
 ): InvoiceDocument {
     const quote = quoteOrder(
         source.lines.map(({ quantity, unitPrice, taxRate }) => ({
@@ -102,6 +103,7 @@ export function buildInvoiceDocument(
         kind,
         issueDate,
         orderNumber: orderNumber(source.orderId),
+        issuer: { ...issuer },
         recipient: {
             name,
             taxId,

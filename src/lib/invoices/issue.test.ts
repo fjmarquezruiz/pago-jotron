@@ -32,6 +32,12 @@ const source: InvoiceSource = {
     ],
 };
 
+const issuer = {
+    name: 'Bodegas Jotrón S.L.',
+    taxId: 'B12345678',
+    address: 'Calle Larios 1, 29005 Málaga',
+};
+
 beforeEach(() => {
     reserveInvoiceSequence.mockReset().mockResolvedValue(7);
     insertInvoiceQuery.mockReset().mockResolvedValue(undefined);
@@ -39,7 +45,12 @@ beforeEach(() => {
 
 describe('issueInvoice', () => {
     it('reserva el número del año en la misma transacción y lo guarda con sus importes', async () => {
-        const number = await issueInvoice(tx as never, source, new Date('2026-11-21T10:00:00Z'));
+        const number = await issueInvoice(
+            tx as never,
+            source,
+            issuer,
+            new Date('2026-11-21T10:00:00Z'),
+        );
 
         expect(number).toBe('F-2026-0007');
         expect(reserveInvoiceSequence).toHaveBeenCalledWith(tx, 2026);
@@ -58,7 +69,7 @@ describe('issueInvoice', () => {
     });
 
     it('guarda una copia congelada del documento con el mismo número', async () => {
-        await issueInvoice(tx as never, source, new Date('2026-11-21T10:00:00Z'));
+        await issueInvoice(tx as never, source, issuer, new Date('2026-11-21T10:00:00Z'));
         const saved = insertInvoiceQuery.mock.calls[0][1];
         expect(saved.snapshot).toMatchObject({
             number: 'F-2026-0007',
@@ -68,8 +79,13 @@ describe('issueInvoice', () => {
         expect(saved.taxBase).toBe('23.10');
     });
 
+    it('el emisor queda dentro de la copia congelada, tal como era al emitir', async () => {
+        await issueInvoice(tx as never, source, issuer, new Date('2026-11-21T10:00:00Z'));
+        expect(insertInvoiceQuery.mock.calls[0][1].snapshot.issuer).toEqual(issuer);
+    });
+
     it('la base y la cuota suman el total (lo exige invoices.ck_invoice_total)', async () => {
-        await issueInvoice(tx as never, source);
+        await issueInvoice(tx as never, source, issuer);
         const { taxBase, taxAmount, total } = insertInvoiceQuery.mock.calls[0][1];
         expect(Math.round((Number(taxBase) + Number(taxAmount)) * 100)).toBe(
             Math.round(Number(total) * 100),
@@ -77,7 +93,7 @@ describe('issueInvoice', () => {
     });
 
     it('el año de la serie es el de Madrid: el 1 de enero de madrugada ya es el año nuevo', async () => {
-        await issueInvoice(tx as never, source, new Date('2026-12-31T23:30:00Z'));
+        await issueInvoice(tx as never, source, issuer, new Date('2026-12-31T23:30:00Z'));
         expect(reserveInvoiceSequence).toHaveBeenCalledWith(tx, 2027);
         expect(insertInvoiceQuery.mock.calls[0][1].number).toBe('F-2027-0007');
     });
@@ -90,6 +106,7 @@ describe('issueInvoice', () => {
                     ...source,
                     user: { name: null, lastName: null, idCard: '12345678Z' },
                 },
+                issuer,
                 new Date(),
             ),
         ).rejects.toThrow('Falta el nombre del destinatario');
@@ -98,6 +115,6 @@ describe('issueInvoice', () => {
 
     it('si la inserción falla, el error sube para que se deshaga la transacción entera', async () => {
         insertInvoiceQuery.mockRejectedValue(new Error('duplicate'));
-        await expect(issueInvoice(tx as never, source)).rejects.toThrow('duplicate');
+        await expect(issueInvoice(tx as never, source, issuer)).rejects.toThrow('duplicate');
     });
 });

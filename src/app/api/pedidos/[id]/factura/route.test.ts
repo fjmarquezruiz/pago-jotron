@@ -19,6 +19,11 @@ const document: InvoiceDocument = {
     kind: 'Completa',
     issueDate: '2026-10-15 07:12:00',
     orderNumber: 'PJ-12',
+    issuer: {
+        name: 'Bodegas Jotrón S.L.',
+        taxId: 'B12345678',
+        address: 'Calle Larios 1, 29005 Málaga',
+    },
     recipient: {
         name: 'Juan Moreno',
         taxId: '12345678Z',
@@ -43,9 +48,6 @@ const document: InvoiceDocument = {
 let consoleError: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
-    vi.stubEnv('INVOICE_ISSUER_NAME', 'Bodegas Jotrón S.L.');
-    vi.stubEnv('INVOICE_ISSUER_TAX_ID', 'B12345678');
-    vi.stubEnv('INVOICE_ISSUER_ADDRESS', 'Calle Larios 1, 29005 Málaga');
     getSessionUserId.mockReset().mockResolvedValue(12);
     getUserInvoice.mockReset().mockResolvedValue({ status: 'Entregado', document });
     consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -115,14 +117,17 @@ describe('GET /api/pedidos/[id]/factura', () => {
         expect(await response.json()).toEqual({ message: 'El pedido no existe' });
     });
 
-    it('responde 503 sin revelar datos si faltan los datos fiscales de la tienda', async () => {
+    it('no lee el entorno: descargar una factura emitida funciona aunque falten o cambien los datos del emisor', async () => {
+        vi.stubEnv('INVOICE_ISSUER_NAME', '');
         vi.stubEnv('INVOICE_ISSUER_TAX_ID', '');
+        vi.stubEnv('INVOICE_ISSUER_ADDRESS', '');
         const response = await get('12');
-        expect(response.status).toBe(503);
-        expect(await response.json()).toEqual({
-            message: 'La factura no está disponible ahora mismo',
-        });
-        expect(consoleError).toHaveBeenCalled();
+        expect(response.status).toBe(200);
+        expect(
+            Buffer.from(await response.arrayBuffer())
+                .subarray(0, 5)
+                .toString(),
+        ).toBe('%PDF-');
     });
 
     it('un fallo inesperado responde 500 sin detalles', async () => {

@@ -41,10 +41,26 @@ const source: InvoiceSource = {
         },
     ],
 };
-const input = { number: 'F-2026-0007', issueDate: '2026-11-21 10:00:00' };
+const issuer = {
+    name: 'Bodegas Jotrón S.L.',
+    taxId: 'B12345678',
+    address: 'Calle Larios 1, 29005 Málaga',
+};
+const input = { number: 'F-2026-0007', issueDate: '2026-11-21 10:00:00', issuer };
 
 describe('buildInvoiceDocument', () => {
     const doc = buildInvoiceDocument(source, input);
+
+    it('copia los datos fiscales del emisor dentro del documento', () => {
+        expect(doc.issuer).toEqual(issuer);
+    });
+
+    it('el emisor del documento es una copia: cambiar el original después no lo altera', () => {
+        const mutable = { ...issuer };
+        const frozen = buildInvoiceDocument(source, { ...input, issuer: mutable });
+        mutable.address = 'Otro domicilio nuevo';
+        expect(frozen.issuer.address).toBe('Calle Larios 1, 29005 Málaga');
+    });
 
     it('lleva número, fecha, pedido y tipo', () => {
         expect(doc).toMatchObject({

@@ -14,6 +14,7 @@ const complete: InvoiceDocument = {
     kind: 'Completa',
     issueDate: '2026-10-15 07:12:00',
     orderNumber: 'PJ-12',
+    issuer,
     recipient: {
         name: 'Juan Moreno Ñandú',
         taxId: '12345678Z',
@@ -58,13 +59,13 @@ const isPdf = (buffer: Buffer) => buffer.subarray(0, 5).toString('latin1') === '
 
 describe('renderInvoicePdf', () => {
     it('genera un PDF para una factura completa', async () => {
-        const pdf = await renderInvoicePdf(complete, issuer);
+        const pdf = await renderInvoicePdf(complete);
         expect(isPdf(pdf)).toBe(true);
         expect(pdf.length).toBeGreaterThan(1_000);
     });
 
     it('genera un PDF para una factura simplificada, sin destinatario ni envío', async () => {
-        const pdf = await renderInvoicePdf(simplified, issuer);
+        const pdf = await renderInvoicePdf(simplified);
         expect(isPdf(pdf)).toBe(true);
     });
 
@@ -79,7 +80,7 @@ describe('renderInvoicePdf', () => {
                 taxRate: '21.00',
             })),
         };
-        const pdf = await renderInvoicePdf(many, issuer);
+        const pdf = await renderInvoicePdf(many);
         expect(isPdf(pdf)).toBe(true);
         expect((pdf.toString('latin1').match(/\/Type \/Page[^s]/g) ?? []).length).toBeGreaterThan(
             1,

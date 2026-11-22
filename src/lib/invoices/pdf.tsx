@@ -2,7 +2,6 @@ import { Document, Page, renderToBuffer, StyleSheet, Text, View } from '@react-p
 import { formatCents } from '@/lib/cart/totals';
 import { formatShortDate } from '@/lib/orders/dates';
 import type { InvoiceDocument } from './types';
-import type { InvoiceIssuer } from './issuer';
 
 /**
  * Colores y medidas del PDF. Son propios del documento (no hay Tailwind ni tokens dentro de un PDF)
@@ -64,17 +63,10 @@ export function invoiceTitle(kind: InvoiceDocument['kind']): string {
  * envío, desglose de base y cuota por tipo y total. Sale solo de `document`, congelado al emitirla.
  * La fecha de la operación coincide con la de expedición (se emite al entregar), así que no se repite.
  *
- * @param props.document - La factura tal como se guardó al emitirla.
- * @param props.issuer - Datos fiscales de la tienda (`getInvoiceIssuer`).
+ * @param props.document - La factura tal como se guardó al emitirla, con el emisor que tenía entonces.
  */
-export function InvoicePdf({
-    document,
-    issuer,
-}: {
-    document: InvoiceDocument;
-    issuer: InvoiceIssuer;
-}) {
-    const { recipient, lines, shipping, vat } = document;
+export function InvoicePdf({ document }: { document: InvoiceDocument }) {
+    const { issuer, recipient, lines, shipping, vat } = document;
     const hasRecipient = Boolean(recipient.name || recipient.taxId || recipient.address);
 
     return (
@@ -241,16 +233,12 @@ export function InvoicePdf({
 /**
  * Genera el PDF de una factura.
  *
- * @param document - La factura tal como se guardó al emitirla (`invoices.snapshot`).
- * @param issuer - Datos fiscales de la tienda (`getInvoiceIssuer`).
+ * @param document - La factura tal como se guardó al emitirla (`invoices.snapshot`), con su emisor.
  * @returns El contenido del archivo PDF.
  *
  * @example
- * const pdf = await renderInvoicePdf(document, getInvoiceIssuer());
+ * const pdf = await renderInvoicePdf(found.document);
  */
-export async function renderInvoicePdf(
-    document: InvoiceDocument,
-    issuer: InvoiceIssuer,
-): Promise<Buffer> {
-    return renderToBuffer(<InvoicePdf document={document} issuer={issuer} />);
+export async function renderInvoicePdf(document: InvoiceDocument): Promise<Buffer> {
+    return renderToBuffer(<InvoicePdf document={document} />);
 }

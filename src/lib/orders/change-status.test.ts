@@ -31,6 +31,9 @@ vi.mock('@/lib/db/queries', () => ({
 const issueInvoice = vi.fn();
 vi.mock('@/lib/invoices/issue', () => ({ issueInvoice: (...a: unknown[]) => issueInvoice(...a) }));
 
+const getInvoiceIssuer = vi.fn();
+vi.mock('@/lib/invoices/issuer', () => ({ getInvoiceIssuer: () => getInvoiceIssuer() }));
+
 const refund = vi.fn();
 vi.mock('@/lib/payments', () => ({ refund: (...a: unknown[]) => refund(...a) }));
 
@@ -52,6 +55,7 @@ const STATUS_IDS = {
     [S.BLOCKED]: 8,
 };
 
+const ISSUER = { name: 'Bodegas Jotrón S.L.', taxId: 'B12345678', address: 'Calle Larios 1' };
 const OWNER = { role: 'Cliente', userId: 12 } as const;
 const ADMIN = { role: 'Administrador', userId: 1 } as const;
 const NOW = new Date('2026-11-01T20:00:00Z');
@@ -81,6 +85,7 @@ beforeEach(() => {
     getCancellationTypeIdByDescription.mockReset().mockResolvedValue(CUSTOMER_TYPE_ID);
     getInvoiceSource.mockReset().mockResolvedValue({ orderId: 5, source: true });
     issueInvoice.mockReset().mockResolvedValue('F-2026-0001');
+    getInvoiceIssuer.mockReset().mockReturnValue(ISSUER);
     changeOrderStatusQuery.mockReset().mockResolvedValue([{ affectedRows: 1 }]);
     orderStockLinesQuery.mockReset().mockResolvedValue([
         { variantId: 4, quantity: 2 },
@@ -192,7 +197,7 @@ describe('changeOrderStatus: Entregado emite la factura (RF8)', () => {
         const result = await changeOrderStatus(5, S.DELIVERED, ADMIN, { now: NOW });
 
         expect(result).toMatchObject({ ok: true, to: S.DELIVERED, invoiceNumber: 'F-2026-0001' });
-        expect(issueInvoice).toHaveBeenCalledWith(tx, { orderId: 5, source: true }, NOW);
+        expect(issueInvoice).toHaveBeenCalledWith(tx, { orderId: 5, source: true }, ISSUER, NOW);
         expect(transaction).toHaveBeenCalledTimes(1);
     });
 
@@ -221,6 +226,26 @@ describe('changeOrderStatus: Entregado emite la factura (RF8)', () => {
         });
         await changeOrderStatus(5, S.DELIVERED, ADMIN, { now: NOW });
         expect(calls).toEqual(['estado', 'factura']);
+    });
+
+    it('si faltan los datos fiscales de la tienda, falla la entrega sin tocar la BD', async () => {
+        delivered();
+        getInvoiceIssuer.mockImplementation(() => {
+            throw new Error(
+                'Faltan los datos fiscales del emisor de las facturas: INVOICE_ISSUER_NAME',
+            );
+        });
+        await expect(changeOrderStatus(5, S.DELIVERED, ADMIN, { now: NOW })).rejects.toThrow(
+            'INVOICE_ISSUER_NAME',
+        );
+        expect(getInvoiceSource).not.toHaveBeenCalled();
+        expect(transaction).not.toHaveBeenCalled();
+        expect(issueInvoice).not.toHaveBeenCalled();
+    });
+
+    it('los datos fiscales solo se leen al entregar', async () => {
+        await changeOrderStatus(5, S.PROCESSING, ADMIN, { now: NOW });
+        expect(getInvoiceIssuer).not.toHaveBeenCalled();
     });
 
     it('si no se puede emitir, falla todo: no queda Entregado ni se anota nada', async () => {
