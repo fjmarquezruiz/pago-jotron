@@ -95,7 +95,8 @@ describe('OrderDetailView', () => {
         const out = of(S.DELIVERED, { canCancel: false, invoiceNumber: 'F-2026-0001' });
         expect(out).toContain('Factura (PDF)');
         expect(out).toContain('href="/api/pedidos/4521/factura"');
-        expect(out).toContain('download="F-2026-0001.pdf"');
+        // Sin `download`: la descarga la fuerza la cabecera de la ruta y un error se ve en pantalla.
+        expect(out).not.toMatch(/<a[^>]*\sdownload[=\s>]/);
         expect(out).not.toMatch(/<button[^>]*disabled[^>]*>.*Factura \(PDF\)/);
         expect(out).not.toContain('Cancelar pedido');
     });

@@ -52,10 +52,8 @@ export function OrderDetailView({ detail }: { detail: OrderDetail }) {
                             )}
                             {actions.invoice === 'download' && (
                                 <Button asChild variant="outline">
-                                    <a
-                                        href={`/api/pedidos/${detail.id}/factura`}
-                                        download={`${detail.invoiceNumber}.pdf`}
-                                    >
+                                    {/* Sin `download`: la ruta ya manda `Content-Disposition: attachment`, y así un error se ve en la pestaña en vez de quedar escondido. */}
+                                    <a href={`/api/pedidos/${detail.id}/factura`}>
                                         <Download aria-hidden="true" />
                                         Factura (PDF)
                                     </a>
