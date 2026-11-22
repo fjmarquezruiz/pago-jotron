@@ -8,6 +8,8 @@ const PUBLIC_PREFIXES = [
     '/auth',
     '/api/auth',
     '/api/verificar-edad',
+    // Tareas programadas de Vercel: no llevan sesión; cada ruta exige `Authorization: Bearer ${CRON_SECRET}`.
+    '/api/cron',
     // Las líneas del carrito (precio y stock de las presentaciones): lo mismo que enseña el
     // catálogo, y el invitado también tiene carrito.
     '/api/carrito',

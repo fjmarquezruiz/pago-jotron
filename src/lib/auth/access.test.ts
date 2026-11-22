@@ -39,6 +39,7 @@ describe('checkAccess', () => {
         ['/api/admin/pedidos/4/estado', null, 'login'],
         ['/verificar-edad', null, 'ok'],
         ['/api/verificar-edad', null, 'ok'],
+        ['/api/cron/bloquear-pedidos', null, 'ok'],
         ['/api/carrito/lineas', null, 'ok'],
         ['/carrito', null, 'ok'],
         ['/checkout', null, 'login'],

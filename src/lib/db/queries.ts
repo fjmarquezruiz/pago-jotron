@@ -1646,3 +1646,30 @@ export async function getOrderEmailData(orderId: number): Promise<OrderEmailData
         })),
     };
 }
+
+/** Tope de pedidos que mira cada pasada del cron de bloqueo: el resto cae en la del día siguiente. */
+export const BLOCK_BATCH_LIMIT = 500;
+
+/**
+ * Pedidos que podrían bloquearse (RF8): no están ni Entregados, ni Anulados, ni ya Bloqueados y su
+ * último cambio de estado es anterior a `cutoff`. Es solo una preselección: `blockOrder` vuelve a
+ * comprobar `shouldBlock` con la fecha de la BD antes de tocar nada.
+ *
+ * @param cutoff - Fecha límite como `datetime` UTC (`AAAA-MM-DD HH:MM:SS`).
+ * @returns Los ids, del que lleva más tiempo parado al que menos, hasta `BLOCK_BATCH_LIMIT`.
+ */
+export async function getBlockCandidateIds(cutoff: string): Promise<number[]> {
+    const rows = await db
+        .select({ id: orders.id })
+        .from(orders)
+        .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
+        .where(
+            and(
+                notInArray(orderStatuses.name, ['Entregado', 'Anulado', 'Bloqueado']),
+                lt(orders.statusUpdatedAt, cutoff),
+            ),
+        )
+        .orderBy(asc(orders.statusUpdatedAt), asc(orders.id))
+        .limit(BLOCK_BATCH_LIMIT);
+    return rows.map(({ id }) => id);
+}
