@@ -15,5 +15,13 @@ services:
             retries: 20
         volumes:
             - db_data:/var/lib/mysql
+    # Correo de desarrollo (A10 punto 5): recibe todo lo que envía la tienda, no entrega nada.
+    # SMTP en localhost:1025 y bandeja web en http://localhost:8025.
+    mailpit:
+        image: axllent/mailpit:v1.21
+        restart: unless-stopped
+        ports:
+            - '1025:1025'
+            - '8025:8025'
 volumes:
     db_data:

@@ -25,6 +25,7 @@
  * Stripe (segundos); quien reaccione a los pedidos 'Confirmado' (A10: correos, preparación)
  * debe saber que, si el cobro falla, pasan a 'Anulado'.
  */
+import { notifyOrderConfirmed } from '@/lib/emails/order-emails';
 import { db } from '@/db';
 import { cartFingerprint } from '@/lib/orders/fingerprint';
 import { centsToDecimal, orderNumber } from '@/lib/orders/format';
@@ -372,6 +373,8 @@ export async function createOrder(
                     'No se ha podido cobrar el pago. No se ha hecho ningún cargo.',
                 );
         }
+        // El pedido de tarjeta ya está cobrado: se avisa al cliente. No lanza ni cambia la respuesta.
+        if (paymentIntentId !== null) await notifyOrderConfirmed(orderId);
         return {
             ok: true,
             created: true,

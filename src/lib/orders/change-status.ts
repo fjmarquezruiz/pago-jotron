@@ -11,6 +11,7 @@ import {
     restoreStockQuery,
     type OrderStatusExtras,
 } from '@/lib/db/queries';
+import { notifyOrderCancelled, notifyTransferReceived } from '@/lib/emails/order-emails';
 import { issueInvoice } from '@/lib/invoices/issue';
 import { getInvoiceIssuer } from '@/lib/invoices/issuer';
 import { refund } from '@/lib/payments';
@@ -226,5 +227,9 @@ export async function changeOrderStatus(
         order.paymentIntentId !== null
             ? await refundQuietly(orderId, order.userId, order.paymentIntentId)
             : 'none';
+    // Los correos van al final y no lanzan: un fallo de envío no toca el cambio ya hecho.
+    if (cancelling) await notifyOrderCancelled(orderId, refunded);
+    else if (from === ORDER_STATUS.PENDING && to === ORDER_STATUS.CONFIRMED)
+        await notifyTransferReceived(orderId);
     return { ok: true, from, to, refund: refunded, invoiceNumber };
 }

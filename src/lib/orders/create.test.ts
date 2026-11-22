@@ -38,6 +38,11 @@ vi.mock('@/lib/db/queries', () => ({
     insertAuditLogQuery: (...a: unknown[]) => insertAuditLogQuery(...a),
 }));
 
+const notifyOrderConfirmed = vi.fn();
+vi.mock('@/lib/emails/order-emails', () => ({
+    notifyOrderConfirmed: (...a: unknown[]) => notifyOrderConfirmed(...a),
+}));
+
 const getAuthorization = vi.fn();
 const capture = vi.fn();
 const cancel = vi.fn();
@@ -117,6 +122,7 @@ beforeEach(() => {
     restoreStockQuery.mockReset().mockResolvedValue(undefined);
     upsertCartItemsQuery.mockReset().mockResolvedValue(undefined);
     insertAuditLogQuery.mockReset().mockResolvedValue(undefined);
+    notifyOrderConfirmed.mockReset().mockResolvedValue(undefined);
     getAuthorization.mockReset().mockResolvedValue(authorized);
     capture.mockReset().mockResolvedValue({ id: 'pi_1', status: 'succeeded', amountCents: TOTAL });
     cancel.mockReset().mockResolvedValue({ id: 'pi_1', status: 'canceled', amountCents: TOTAL });
@@ -584,5 +590,49 @@ describe('createOrder: validaciones comunes', () => {
         expect(await createOrder(USER, { ...transfer, billingAddressId: 9 })).toMatchObject({
             code: 'billing_not_found',
         });
+    });
+});
+
+describe('createOrder: correo de pedido confirmado (RF7)', () => {
+    it('con tarjeta avisa al cliente, después de cobrar', async () => {
+        const events: string[] = [];
+        capture.mockImplementation(async () => {
+            events.push('captura');
+            return { id: 'pi_1', status: 'succeeded', amountCents: TOTAL };
+        });
+        notifyOrderConfirmed.mockImplementation(async () => void events.push('correo'));
+
+        await createOrder(USER, card);
+
+        expect(notifyOrderConfirmed).toHaveBeenCalledWith(12);
+        expect(events).toEqual(['captura', 'correo']);
+    });
+
+    it('si el cobro falla y el pedido se anula, no avisa', async () => {
+        capture.mockRejectedValue(new PaymentError('x', 'card_declined'));
+        getAuthorization
+            .mockResolvedValueOnce(authorized)
+            .mockResolvedValueOnce({ ...authorized, status: 'requires_capture' });
+
+        const result = await createOrder(USER, card);
+
+        expect(result).toMatchObject({ ok: false, code: 'payment_failed' });
+        expect(notifyOrderConfirmed).not.toHaveBeenCalled();
+    });
+
+    it('un reintento de un pedido ya existente no repite el correo', async () => {
+        getOrderByPaymentIntent.mockResolvedValue({
+            id: 12,
+            userId: USER,
+            status: 'Confirmado',
+            paymentMethod: 'Tarjeta',
+        });
+        await createOrder(USER, card);
+        expect(notifyOrderConfirmed).not.toHaveBeenCalled();
+    });
+
+    it('un pedido por transferencia (Pendiente de pago) aún no avisa', async () => {
+        await createOrder(USER, transfer);
+        expect(notifyOrderConfirmed).not.toHaveBeenCalled();
     });
 });

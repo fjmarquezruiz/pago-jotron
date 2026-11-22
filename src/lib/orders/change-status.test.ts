@@ -34,6 +34,13 @@ vi.mock('@/lib/invoices/issue', () => ({ issueInvoice: (...a: unknown[]) => issu
 const getInvoiceIssuer = vi.fn();
 vi.mock('@/lib/invoices/issuer', () => ({ getInvoiceIssuer: () => getInvoiceIssuer() }));
 
+const notifyOrderCancelled = vi.fn();
+const notifyTransferReceived = vi.fn();
+vi.mock('@/lib/emails/order-emails', () => ({
+    notifyOrderCancelled: (...a: unknown[]) => notifyOrderCancelled(...a),
+    notifyTransferReceived: (...a: unknown[]) => notifyTransferReceived(...a),
+}));
+
 const refund = vi.fn();
 vi.mock('@/lib/payments', () => ({ refund: (...a: unknown[]) => refund(...a) }));
 
@@ -93,6 +100,8 @@ beforeEach(() => {
     ]);
     restoreStockQuery.mockReset().mockResolvedValue(undefined);
     insertAuditLogQuery.mockReset().mockResolvedValue(undefined);
+    notifyOrderCancelled.mockReset().mockResolvedValue(undefined);
+    notifyTransferReceived.mockReset().mockResolvedValue(undefined);
     refund.mockReset().mockResolvedValue({ id: 're_1', status: 'succeeded', amountCents: 3345 });
     consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -525,5 +534,64 @@ describe('changeOrderStatus: el cliente (CU7, RNF3)', () => {
             expect.anything(),
             expect.objectContaining({ cancellationTypeId: CUSTOMER_TYPE_ID }),
         );
+    });
+});
+
+describe('changeOrderStatus: correos (RF8)', () => {
+    it('al anular un pedido de tarjeta avisa DESPUÉS del reembolso, con su resultado', async () => {
+        const calls: string[] = [];
+        refund.mockImplementation(async () => {
+            calls.push('refund');
+            return { id: 're_1', status: 'succeeded', amountCents: 3345 };
+        });
+        notifyOrderCancelled.mockImplementation(async () => void calls.push('mail'));
+
+        await changeOrderStatus(5, S.CANCELLED, ADMIN, { cancellationTypeId: 2, now: NOW });
+        expect(notifyOrderCancelled).toHaveBeenCalledWith(5, 'done');
+        expect(calls).toEqual(['refund', 'mail']);
+    });
+
+    it('si el reembolso falla, el correo lo dice', async () => {
+        refund.mockRejectedValue(new Error('stripe caído'));
+        await changeOrderStatus(5, S.CANCELLED, ADMIN, { cancellationTypeId: 2, now: NOW });
+        expect(notifyOrderCancelled).toHaveBeenCalledWith(5, 'failed');
+    });
+
+    it('una anulación sin nada que devolver avisa con none', async () => {
+        getOrderForStatusChange.mockResolvedValue(
+            order({
+                statusId: STATUS_IDS[S.PENDING],
+                paymentMethod: 'Transferencia',
+                paymentIntentId: null,
+            }),
+        );
+        await changeOrderStatus(5, S.CANCELLED, OWNER, { now: NOW });
+        expect(notifyOrderCancelled).toHaveBeenCalledWith(5, 'none');
+    });
+
+    it('Pendiente de pago → Confirmado avisa de que llegó la transferencia', async () => {
+        getOrderForStatusChange.mockResolvedValue(
+            order({
+                statusId: STATUS_IDS[S.PENDING],
+                paymentMethod: 'Transferencia',
+                paymentIntentId: null,
+            }),
+        );
+        await changeOrderStatus(5, S.CONFIRMED, ADMIN, { now: NOW });
+        expect(notifyTransferReceived).toHaveBeenCalledWith(5);
+        expect(notifyOrderCancelled).not.toHaveBeenCalled();
+    });
+
+    it('otros cambios no mandan correo', async () => {
+        await changeOrderStatus(5, S.PROCESSING, ADMIN, { now: NOW });
+        expect(notifyTransferReceived).not.toHaveBeenCalled();
+        expect(notifyOrderCancelled).not.toHaveBeenCalled();
+    });
+
+    it('un cambio rechazado o en conflicto no manda correo', async () => {
+        await changeOrderStatus(5, S.DELIVERED, ADMIN, { now: NOW });
+        changeOrderStatusQuery.mockResolvedValue([{ affectedRows: 0 }]);
+        await changeOrderStatus(5, S.CANCELLED, ADMIN, { cancellationTypeId: 2, now: NOW });
+        expect(notifyOrderCancelled).not.toHaveBeenCalled();
     });
 });

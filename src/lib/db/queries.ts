@@ -1598,3 +1598,51 @@ export async function getUserOrdersPage(
 
 /** Una página del historial, tal como la devuelve `getUserOrdersPage`. */
 export type UserOrdersPage = Awaited<ReturnType<typeof getUserOrdersPage>>;
+
+/** Lo que necesitan los correos de un pedido: a quién escribir y qué decirle. */
+export interface OrderEmailData {
+    orderId: number;
+    email: string;
+    /** Nombre del cliente; puede faltar (la cuenta no lo exige). */
+    name: string | null;
+    /** Importe decimal (`'189.00'`). */
+    total: string;
+    shippingCost: string;
+    paymentMethod: 'Tarjeta' | 'PayPal' | 'Transferencia';
+    /** `datetime` de la BD (UTC). */
+    createdAt: string;
+    lines: { name: string; vintage: number | null; quantity: number; unitPrice: string }[];
+}
+
+/**
+ * Datos de un pedido para sus correos (RF7, RF8): correo y nombre del cliente, importes y líneas.
+ *
+ * @param orderId - `orders.order_id`.
+ * @returns Los datos, o `null` si el pedido no existe.
+ */
+export async function getOrderEmailData(orderId: number): Promise<OrderEmailData | null> {
+    const [row] = await db
+        .select({
+            orderId: orders.id,
+            email: users.email,
+            name: users.name,
+            total: orders.total,
+            shippingCost: orders.shippingCost,
+            paymentMethod: orders.paymentMethod,
+            createdAt: orders.createdAt,
+        })
+        .from(orders)
+        .innerJoin(users, eq(users.id, orders.userId))
+        .where(eq(orders.id, orderId));
+    if (!row) return null;
+    const lines = await orderLinesQuery(orderId);
+    return {
+        ...row,
+        lines: lines.map(({ name, vintage, quantity, unitPrice }) => ({
+            name,
+            vintage,
+            quantity,
+            unitPrice,
+        })),
+    };
+}

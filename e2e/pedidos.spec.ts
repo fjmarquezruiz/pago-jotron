@@ -1,5 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
-import { TEST_USER_ID, closeDb, newDevice, signInWithForm, sql } from './support';
+import { TEST_USER, TEST_USER_ID, closeDb, newDevice, signInWithForm, sql } from './support';
 
 /**
  * RF8: el cliente consulta sus pedidos, los cancela en plazo y no puede cancelar lo que ya no
@@ -12,6 +12,29 @@ import { TEST_USER_ID, closeDb, newDevice, signInWithForm, sql } from './support
 /** Presentación con stock a la que se asignan las líneas de los pedidos de prueba. */
 const VARIANT_ID = 1;
 const QUANTITY = 2;
+/** API de Mailpit (docker compose up -d mailpit): la bandeja donde cae el correo de la tienda. */
+const MAILPIT = 'http://localhost:8025/api/v1';
+
+/** Espera al correo con ese asunto, lo devuelve (con su cuerpo) y lo borra de la bandeja. */
+async function takeMail(subject: string): Promise<{ To: { Address: string }[]; Text: string }> {
+    for (let attempt = 0; attempt < 20; attempt++) {
+        const { messages } = (await (
+            await fetch(`${MAILPIT}/search?query=${encodeURIComponent(`subject:"${subject}"`)}`)
+        ).json()) as { messages: { ID: string }[] };
+        if (messages.length > 0) {
+            const mail = await (await fetch(`${MAILPIT}/message/${messages[0].ID}`)).json();
+            await fetch(`${MAILPIT}/messages`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ IDs: messages.map(({ ID }) => ID) }),
+            });
+            return mail;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    throw new Error(`No llegó a Mailpit el correo «${subject}»`);
+}
+
 /** Otro cliente del seed, para el pedido que no es nuestro. */
 const OTHER_USER_ID = 5;
 
@@ -214,6 +237,12 @@ test.describe('Pedidos del cliente (RF8)', () => {
         expect(audit.map(({ action }) => action)).toContain(
             `Pedido PJ-${id}: Confirmado → Anulado`,
         );
+
+        // Y el cliente recibe el correo de anulación (sin PaymentIntent no hay nada que devolver).
+        const mail = await takeMail(`Pedido PJ-${id} anulado`);
+        expect(mail.To[0].Address).toBe(TEST_USER.email);
+        expect(mail.Text).toContain('ha sido anulado');
+        expect(mail.Text).toContain('No se ha hecho ningún cargo');
     });
 
     test('"Volver" cierra el diálogo y no cancela nada', async () => {

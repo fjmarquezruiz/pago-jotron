@@ -207,7 +207,10 @@ importers:
         version: 14.2.35(@babel/core@7.29.13(supports-color@7.2.0))(@playwright/test@1.65.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       next-auth:
         specifier: ^4.24.15
-        version: 4.24.15(next@14.2.35(@babel/core@7.29.13(supports-color@7.2.0))(@playwright/test@1.65.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        version: 4.24.15(next@14.2.35(@babel/core@7.29.13(supports-color@7.2.0))(@playwright/test@1.65.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(nodemailer@10.6.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      nodemailer:
+        specifier: ^10.6.1
+        version: 10.6.1
       radix-ui:
         specifier: ^1.8.1
         version: 1.8.1(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -248,6 +251,9 @@ importers:
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
+      '@types/nodemailer':
+        specifier: ^8.0.2
+        version: 8.0.2
       '@types/react':
         specifier: ^18
         version: 18.3.31
@@ -2043,6 +2049,9 @@ packages:
   '@types/node@24.19.2':
     resolution: {integrity: sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==}
 
+  '@types/nodemailer@8.0.2':
+    resolution: {integrity: sha512-c7M5ox8p0nEOfbJ2E9Qcmt8/QCu/VzsiAhzBiZbvky2PhKZDHpKB3sQHBM5MEZNkCfBOaS6S9//AGPRTNB7IaA==}
+
   '@types/prop-types@15.7.15':
     resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
 
@@ -3472,6 +3481,10 @@ packages:
   node-releases@2.0.63:
     resolution: {integrity: sha512-6li2QanLsAXpIH2R6j77MzRyvOyrvdTqlKtO4CgBdHGNvN99ZZfyxszHc5o5+IZBWD5u6Hzwg83JoGXmqZNG9Q==}
     engines: {node: '>=18'}
+
+  nodemailer@10.6.1:
+    resolution: {integrity: sha512-d7kfFfS/tR4Aca+SBvRaQ+MXKNv7d2JiRe5TxaRcFT/kYMh4GGPnW9aKksTIEvyEbA7d/7HYWE4YPDEHxzJj/g==}
+    engines: {node: '>=20.0.0'}
 
   normalize-svg-path@1.1.0:
     resolution: {integrity: sha512-r9KHKG2UUeB5LoTouwDzBy2VxXlHsiM6fyLQvnJa0S5hrhzqElH/CH7TUGhT1fVvIYBIKf3OpY4YJ4CK+iaqHg==}
@@ -5802,6 +5815,10 @@ snapshots:
     dependencies:
       undici-types: 7.24.6
 
+  '@types/nodemailer@8.0.2':
+    dependencies:
+      '@types/node': 24.19.2
+
   '@types/prop-types@15.7.15': {}
 
   '@types/react-dom@18.3.7(@types/react@18.3.31)':
@@ -7278,7 +7295,7 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  next-auth@4.24.15(next@14.2.35(@babel/core@7.29.13(supports-color@7.2.0))(@playwright/test@1.65.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+  next-auth@4.24.15(next@14.2.35(@babel/core@7.29.13(supports-color@7.2.0))(@playwright/test@1.65.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(nodemailer@10.6.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
       '@babel/runtime': 7.29.13
       '@panva/hkdf': 1.2.1
@@ -7292,6 +7309,8 @@ snapshots:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
       uuid: 11.1.1
+    optionalDependencies:
+      nodemailer: 10.6.1
 
   next@14.2.35(@babel/core@7.29.13(supports-color@7.2.0))(@playwright/test@1.65.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
@@ -7328,6 +7347,8 @@ snapshots:
 
   node-releases@2.0.63:
     optional: true
+
+  nodemailer@10.6.1: {}
 
   normalize-svg-path@1.1.0:
     dependencies:
