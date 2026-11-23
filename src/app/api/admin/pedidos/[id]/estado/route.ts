@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSessionUser } from '@/lib/auth/session';
+import { requireRole } from '@/lib/auth/require-role';
 import { changeOrderStatus } from '@/lib/orders/change-status';
 import { ORDER_STATUS } from '@/lib/orders/status';
 import { CHANGE_STATUS_HTTP } from '@/lib/orders/status-http';
@@ -35,10 +35,9 @@ const bodySchema = z.object({
  */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
     try {
-        const user = await getSessionUser();
-        if (user === null) return respond({ message: 'Inicia sesión para continuar' }, 401);
-        if (user.role !== 'Administrador')
-            return respond({ message: 'No tienes permiso para esta acción' }, 403);
+        const auth = await requireRole(['Administrador']);
+        if ('response' in auth) return auth.response;
+        const { user } = auth;
 
         const orderId = /^\d+$/.test(params.id) ? Number(params.id) : NaN;
         if (!Number.isSafeInteger(orderId) || orderId < 1 || orderId > MAX_ID)

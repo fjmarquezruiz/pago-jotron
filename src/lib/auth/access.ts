@@ -31,10 +31,16 @@ const AGE_GATE_EXEMPT = [
 const ADMIN_ONLY = [
     '/admin/usuarios',
     '/admin/pedidos',
+    '/admin/envios',
     '/admin/auditoria',
     '/sistema-diseno',
-    // La API de pedidos de administración (la ruta comprueba además el rol por su cuenta).
+    // Las API de administración de cada sección solo del administrador (cada ruta comprueba además
+    // el rol por su cuenta con `requireRole`). El catálogo (`/api/admin/productos`…) es también del
+    // editor y por eso no está aquí.
     '/api/admin/pedidos',
+    '/api/admin/usuarios',
+    '/api/admin/envios',
+    '/api/admin/auditoria',
 ];
 
 /** Comprueba si `path` es `prefix` o cuelga de él (`/admin` sí, `/administracion` no). */
@@ -60,7 +66,9 @@ export function checkAccess(path: string, role: Role | null): 'ok' | 'login' | '
     if (isPublicPath(path)) return 'ok';
     if (!role) return 'login';
     if (ADMIN_ONLY.some((p) => matches(path, p))) return role === 'Administrador' ? 'ok' : 'denied';
-    if (matches(path, '/admin')) return role === 'Cliente' ? 'denied' : 'ok';
+    // El panel y su API: editor y administrador (un cliente no entra, ni por la página ni por la API).
+    if (matches(path, '/admin') || matches(path, '/api/admin'))
+        return role === 'Cliente' ? 'denied' : 'ok';
     return 'ok';
 }
 

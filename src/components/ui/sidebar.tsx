@@ -6,9 +6,20 @@ import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
-const SidebarContext = React.createContext<{ collapsed: boolean }>({ collapsed: false });
+type SidebarVariant = 'default' | 'admin';
+
+const SidebarContext = React.createContext<{ collapsed: boolean; variant: SidebarVariant }>({
+    collapsed: false,
+    variant: 'default',
+});
 
 export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {
+    /**
+     * `default`: el componente Sidebar de Figma (enlace actual en `brand-subtle`). `admin`: el
+     * menú de las páginas del panel (Figma: admin-sidebar): fondo `muted`, logo centrado sin línea
+     * debajo, enlaces de 40 px con el actual en `brand` sólido.
+     */
+    variant?: SidebarVariant;
     /** Solo iconos (64 px). Las etiquetas pasan a tooltip. */
     collapsed?: boolean;
     /** Cabecera (logo o nombre del panel). */
@@ -28,21 +39,36 @@ export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {
  */
 const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
     (
-        { className, collapsed = false, header, footer, onCollapsedChange, children, ...props },
+        {
+            className,
+            variant = 'default',
+            collapsed = false,
+            header,
+            footer,
+            onCollapsedChange,
+            children,
+            ...props
+        },
         ref,
     ) => (
-        <SidebarContext.Provider value={{ collapsed }}>
+        <SidebarContext.Provider value={{ collapsed, variant }}>
             <aside
                 ref={ref}
                 data-collapsed={collapsed || undefined}
                 className={cn(
-                    'flex h-full flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width]',
+                    'flex h-full flex-col border-r border-sidebar-border text-sidebar-foreground transition-[width]',
+                    variant === 'admin'
+                        ? 'gap-gap-xl bg-muted px-inset-xl py-inset-2xl'
+                        : 'bg-sidebar',
                     collapsed ? 'w-16' : 'w-64',
                     className,
                 )}
                 {...props}
             >
-                {(header || onCollapsedChange) && (
+                {variant === 'admin' && header && (
+                    <div className="flex shrink-0 justify-center">{header}</div>
+                )}
+                {variant !== 'admin' && (header || onCollapsedChange) && (
                     <div
                         className={cn(
                             'flex h-16 shrink-0 items-center gap-gap-xs border-b border-sidebar-border',
@@ -65,11 +91,14 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
                 )}
                 <nav
                     aria-label="Panel"
-                    className="flex flex-1 flex-col gap-gap-2xs overflow-y-auto p-inset-xs"
+                    className={cn(
+                        'flex flex-1 flex-col overflow-y-auto',
+                        variant === 'admin' ? 'gap-gap-xs' : 'gap-gap-2xs p-inset-xs',
+                    )}
                 >
                     {children}
                 </nav>
-                {footer && (
+                {footer && variant !== 'admin' && (
                     <div className="shrink-0 border-t border-sidebar-border p-inset-xs">
                         {footer}
                     </div>
@@ -79,6 +108,14 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
     ),
 );
 Sidebar.displayName = 'Sidebar';
+
+/** Grupo de enlaces de la variante `admin`: 2 px entre ellos (Figma: NavigationGroup > Frame). */
+const SidebarGroup = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+    ({ className, ...props }, ref) => (
+        <div ref={ref} className={cn('flex flex-col gap-gap-3xs', className)} {...props} />
+    ),
+);
+SidebarGroup.displayName = 'SidebarGroup';
 
 /** Título de un grupo de enlaces. Se oculta (solo lector de pantalla) con la barra plegada. */
 const SidebarGroupLabel = React.forwardRef<
@@ -119,7 +156,8 @@ export interface SidebarItemProps extends React.AnchorHTMLAttributes<HTMLAnchorE
  */
 const SidebarItem = React.forwardRef<HTMLAnchorElement, SidebarItemProps>(
     ({ className, icon, current, level = 1, trailing, asChild, children, ...props }, ref) => {
-        const { collapsed } = React.useContext(SidebarContext);
+        const { collapsed, variant } = React.useContext(SidebarContext);
+        const admin = variant === 'admin';
         const Comp = asChild ? Slot.Root : 'a';
         const child = asChild && React.isValidElement(children) ? children : null;
         const label = child ? (child.props as { children?: React.ReactNode }).children : children;
@@ -130,7 +168,17 @@ const SidebarItem = React.forwardRef<HTMLAnchorElement, SidebarItemProps>(
                         {icon}
                     </span>
                 )}
-                <span className={cn('flex-1 truncate', collapsed && 'sr-only')}>{label}</span>
+                <span
+                    className={cn(
+                        'flex-1',
+                        // En `admin`, como en Figma, el texto no se recorta: «Registro de actividad»
+                        // roza el borde del enlace y se queda dentro de su relleno.
+                        admin ? 'whitespace-nowrap' : 'truncate',
+                        collapsed && 'sr-only',
+                    )}
+                >
+                    {label}
+                </span>
                 {trailing && !collapsed && <span className="shrink-0">{trailing}</span>}
             </>
         );
@@ -139,12 +187,18 @@ const SidebarItem = React.forwardRef<HTMLAnchorElement, SidebarItemProps>(
                 ref={ref}
                 aria-current={current ? 'page' : undefined}
                 className={cn(
-                    'flex min-h-control-sm items-center gap-gap-xs rounded-lg px-inset-sm text-sm transition-colors',
+                    admin
+                        ? 'flex min-h-control-md w-full cursor-pointer items-center gap-gap-xs rounded-sm px-inset-lg py-inset-xs text-left text-sm font-medium transition-colors'
+                        : 'flex min-h-control-sm items-center gap-gap-xs rounded-lg px-inset-sm text-sm transition-colors',
                     level === 2 && !collapsed && 'pl-9',
                     collapsed && 'justify-center px-0',
-                    current
-                        ? 'bg-brand-subtle font-medium text-brand'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                    admin
+                        ? current
+                            ? 'bg-brand text-primary-foreground'
+                            : 'text-muted-foreground hover:bg-secondary hover:text-foreground disabled:pointer-events-none disabled:opacity-50'
+                        : current
+                          ? 'bg-brand-subtle font-medium text-brand'
+                          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
                     className,
                 )}
                 {...props}
@@ -220,4 +274,4 @@ function SidebarSubmenu({ label, icon, defaultOpen, current, children }: Sidebar
     );
 }
 
-export { Sidebar, SidebarGroupLabel, SidebarItem, SidebarSubmenu };
+export { Sidebar, SidebarGroup, SidebarGroupLabel, SidebarItem, SidebarSubmenu };

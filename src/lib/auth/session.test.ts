@@ -6,6 +6,10 @@ vi.mock('next-auth', () => ({
 }));
 // Las opciones de NextAuth importan el cliente de BD: aquí solo hace falta que sean reconocibles.
 vi.mock('@/lib/auth-options', () => ({ authOptions: { marker: 'auth-options' } }));
+const isUserActive = vi.fn();
+vi.mock('@/lib/db/queries', () => ({
+    isUserActive: (...args: unknown[]) => isUserActive(...args),
+}));
 
 import { getSessionUser, getSessionUserId } from './session';
 
@@ -58,6 +62,8 @@ describe('getSessionUserId', () => {
 describe('getSessionUser', () => {
     beforeEach(() => {
         getServerSession.mockReset();
+        isUserActive.mockReset();
+        isUserActive.mockResolvedValue(true);
     });
 
     it('devuelve el id y el rol de la sesión', async () => {
@@ -73,5 +79,18 @@ describe('getSessionUser', () => {
     ])('devuelve null si %s', async (_, session) => {
         getServerSession.mockResolvedValue(session);
         await expect(getSessionUser()).resolves.toBeNull();
+    });
+
+    it('devuelve null si la cuenta está desactivada aunque el JWT siga vigente', async () => {
+        getServerSession.mockResolvedValue({ user: { id: '7', role: 'Administrador' } });
+        isUserActive.mockResolvedValue(false);
+        await expect(getSessionUser()).resolves.toBeNull();
+        expect(isUserActive).toHaveBeenCalledWith(7);
+    });
+
+    it('no consulta la BD si la sesión ya no vale', async () => {
+        getServerSession.mockResolvedValue({ user: { id: 'abc', role: 'Administrador' } });
+        await expect(getSessionUser()).resolves.toBeNull();
+        expect(isUserActive).not.toHaveBeenCalled();
     });
 });

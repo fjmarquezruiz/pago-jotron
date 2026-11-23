@@ -1673,3 +1673,19 @@ export async function getBlockCandidateIds(cutoff: string): Promise<number[]> {
         .limit(BLOCK_BATCH_LIMIT);
     return rows.map(({ id }) => id);
 }
+
+/**
+ * Dice si una cuenta sigue activa (`users.is_active`). La sesión JWT dura aunque se desactive la
+ * cuenta, así que las rutas de administración lo comprueban aquí en cada petición (RF12, RNF3).
+ *
+ * @param userId - `users.user_id`.
+ * @returns `true` si existe y está activa; `false` si está desactivada o ya no existe.
+ */
+export async function isUserActive(userId: number): Promise<boolean> {
+    const [row] = await db
+        .select({ isActive: users.isActive })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+    return row?.isActive === true;
+}

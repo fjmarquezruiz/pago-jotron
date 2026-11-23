@@ -1,5 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { isUserActive } from '@/lib/db/queries';
 import { MAX_ID } from '@/lib/validations/ids';
 import type { Role } from '@/types/auth';
 
@@ -31,7 +32,11 @@ export async function getSessionUserId(): Promise<number | null> {
  * comprueban el rol por su cuenta (RNF3): el middleware ya filtra, pero una API no debe fiarse
  * solo de eso.
  *
- * @returns `{ id, role }`, o `null` si no hay sesión, su id no es válido o falta el rol.
+ * El JWT sigue vigente aunque se desactive la cuenta, así que se consulta `users.is_active`: una
+ * cuenta desactivada cuenta como sin sesión (RF12).
+ *
+ * @returns `{ id, role }`, o `null` si no hay sesión, su id no es válido, falta el rol o la cuenta
+ * está desactivada.
  */
 export async function getSessionUser(): Promise<{ id: number; role: Role } | null> {
     const session = await getServerSession(authOptions);
@@ -39,5 +44,6 @@ export async function getSessionUser(): Promise<{ id: number; role: Role } | nul
     const role = session?.user?.role;
     if (!Number.isInteger(id) || id < 1 || id > MAX_ID) return null;
     if (role !== 'Cliente' && role !== 'Editor' && role !== 'Administrador') return null;
+    if (!(await isUserActive(id))) return null;
     return { id, role };
 }
