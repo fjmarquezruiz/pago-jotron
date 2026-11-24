@@ -7,6 +7,7 @@ import {
     hasAdminUserFilters,
     otherRoles,
     registrationText,
+    selfChangeWarning,
     userFullName,
     userNumber,
 } from './users';
@@ -77,6 +78,21 @@ describe('textos de la ficha', () => {
     it('otherRoles', () => {
         expect(otherRoles('Cliente')).toEqual(['Editor', 'Administrador']);
         expect(otherRoles('Administrador')).toEqual(['Cliente', 'Editor']);
+    });
+});
+
+describe('selfChangeWarning', () => {
+    it('desactivarse o pasar a Cliente pierde el panel', () => {
+        expect(selfChangeWarning('disable')).toBe('Perderás el acceso al panel ahora mismo.');
+        expect(selfChangeWarning('Cliente')).toBe('Perderás el acceso al panel ahora mismo.');
+    });
+    it('pasar a Editor solo pierde las secciones de administrador, tal como las dice el menú', () => {
+        expect(selfChangeWarning('Editor')).toBe(
+            'Dejarás de ver Pedidos, Usuarios, Tipos de envío y Registro de actividad.',
+        );
+    });
+    it('ser Administrador no pierde nada', () => {
+        expect(selfChangeWarning('Administrador')).toBeNull();
     });
 });
 

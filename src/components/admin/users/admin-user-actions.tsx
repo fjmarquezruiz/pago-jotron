@@ -18,7 +18,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from '@/components/ui/toast';
-import { otherRoles } from '@/lib/admin/users';
+import { otherRoles, selfChangeWarning } from '@/lib/admin/users';
 import type { Role } from '@/types/auth';
 import { changeAccessRequest } from './change-access-request';
 
@@ -33,9 +33,6 @@ export interface AdminUserActionsProps {
     /** Es la cuenta de quien mira la ficha: al desactivarla o degradarla pierde el acceso al panel. */
     isSelf: boolean;
 }
-
-/** Aviso cuando el administrador se cambia a sí mismo: las páginas y la API leen su rol y su estado de la BD en cada petición. */
-const SELF_WARNING = 'Perderás el acceso al panel ahora mismo.';
 
 type Dialog =
     | { kind: 'role'; to: Role }
@@ -157,7 +154,9 @@ export function AdminUserActions({
                                     <Strong>{name}</Strong> pasará de {role} a{' '}
                                     <Strong>{dialog.to}</Strong>.
                                 </p>
-                                {isSelf && <p>{SELF_WARNING}</p>}
+                                {isSelf && selfChangeWarning(dialog.to) && (
+                                    <p>{selfChangeWarning(dialog.to)}</p>
+                                )}
                             </div>
                         </AlertDialogDescription>
                     </DialogFrame>
@@ -203,7 +202,7 @@ export function AdminUserActions({
                                     Esta acción se puede revertir: puedes volver a activar la cuenta
                                     cuando quieras.
                                 </p>
-                                {isSelf && <p>{SELF_WARNING}</p>}
+                                {isSelf && <p>{selfChangeWarning('disable')}</p>}
                             </div>
                         </AlertDialogDescription>
                     </DialogFrame>
