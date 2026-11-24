@@ -32,7 +32,7 @@ const ALL = 'todos';
  * Barra de filtros del listado de pedidos (Figma: FilterBar de orders-list): "Filtros activos:" con
  * un chip por filtro y "Limpiar todo" a la izquierda; a la derecha, "Filtrar" (popover con estado y
  * fechas) y la lupa. Como en la lista de bodegas (wineries-list-search-open), la lupa se cambia por
- * un campo "Buscar..." de 176 px en el mismo hueco, y lo buscado sale como un chip con el texto. Se
+ * un campo "Número o correo" de 176 px en el mismo hueco, y lo buscado sale como un chip con el texto. Se
  * busca por número de pedido o por correo del cliente. Todo viaja en la URL y al aplicar se vuelve
  * a la página 1. Sin "Exportar CSV": fuera del MVP1.
  *
@@ -181,7 +181,7 @@ export function AdminOrdersFilters({ filters }: { filters: AdminOrderFilters }) 
                     >
                         <SearchInput
                             aria-label="Buscar por número de pedido o correo"
-                            placeholder="Buscar..."
+                            placeholder="Número o correo"
                             size="sm"
                             autoFocus={!filters.q}
                             value={query}

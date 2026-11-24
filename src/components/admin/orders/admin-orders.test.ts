@@ -58,7 +58,7 @@ describe('AdminOrdersFilters', () => {
     it('cerrada, la búsqueda es la lupa', () => {
         const html = renderToStaticMarkup(createElement(AdminOrdersFilters, { filters: {} }));
         expect(html).toContain('aria-label="Buscar pedidos"');
-        expect(html).not.toContain('Buscar...');
+        expect(html).not.toContain('Número o correo');
     });
 });
 

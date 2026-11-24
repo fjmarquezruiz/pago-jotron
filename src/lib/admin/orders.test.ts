@@ -74,19 +74,22 @@ describe('adminRangeText', () => {
 
 describe('parseOrderSearch', () => {
     it.each([
-        ['4521', 4521],
-        ['PJ-4521', 4521],
-        ['#pj-4521', 4521],
-        [' pj4521 ', 4521],
-    ])('%s es un número de pedido', (text, id) => {
-        expect(parseOrderSearch(text)).toEqual({ kind: 'id', id });
+        ['PJ', ''],
+        ['pj-', ''],
+        ['PJ-4521', '4521'],
+        ['#pj-45', '45'],
+        [' pj4521 ', '4521'],
+    ])('%s busca por el principio del número de pedido', (text, idPrefix) => {
+        expect(parseOrderSearch(text)).toEqual({ idPrefix, email: null });
+    });
+    it('solo cifras: número o correo', () => {
+        expect(parseOrderSearch('45')).toEqual({ idPrefix: '45', email: '45' });
     });
     it('lo demás busca en el correo', () => {
-        expect(parseOrderSearch('lucia@x.es')).toEqual({ kind: 'email', text: 'lucia@x.es' });
-        expect(parseOrderSearch('PJ-12abc')).toEqual({ kind: 'email', text: 'PJ-12abc' });
+        expect(parseOrderSearch('lucia@x.es')).toEqual({ idPrefix: null, email: 'lucia@x.es' });
+        expect(parseOrderSearch('PJ-12abc')).toEqual({ idPrefix: null, email: 'PJ-12abc' });
     });
-    it('un id imposible o vacío', () => {
-        expect(parseOrderSearch('0')).toEqual({ kind: 'email', text: '0' });
+    it('sin texto no se busca', () => {
         expect(parseOrderSearch('   ')).toBeNull();
         expect(parseOrderSearch(undefined)).toBeNull();
     });

@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gte, lt, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
 import { db } from '@/db';
 import { cancellationTypes, invoices, orders, orderStatuses, users } from '@/db/schema';
 import { parseOrderSearch, type AdminOrderFilters } from '@/lib/admin/orders';
@@ -14,6 +14,11 @@ function nextDay(isoDate: string): string {
     return date.toISOString().slice(0, 10);
 }
 
+/** `columna like patrón escape '!'` (ver `LIKE_ESCAPE`). */
+function likeEscaped(column: SQLWrapper, pattern: string): SQL {
+    return sql`${column} like ${pattern} escape ${sql.raw(`'${LIKE_ESCAPE}'`)}`;
+}
+
 /** `WHERE` del listado: estado, fechas y búsqueda por número o por correo del cliente. */
 function adminOrdersCondition({ status, from, to, q }: AdminOrderFilters): SQL | undefined {
     const conditions: SQL[] = [];
@@ -21,10 +26,15 @@ function adminOrdersCondition({ status, from, to, q }: AdminOrderFilters): SQL |
     if (from) conditions.push(gte(orders.createdAt, `${from} 00:00:00`));
     if (to) conditions.push(lt(orders.createdAt, `${nextDay(to)} 00:00:00`));
     const search = parseOrderSearch(q);
-    if (search?.kind === 'id') conditions.push(eq(orders.id, search.id));
-    if (search?.kind === 'email') {
-        const pattern = searchPattern(search.text)!;
-        conditions.push(sql`${users.email} like ${pattern} escape ${sql.raw(`'${LIKE_ESCAPE}'`)}`);
+    if (search) {
+        const matches: SQL[] = [];
+        // El número de pedido es `PJ-<id>`: se busca por el principio del id.
+        if (search.idPrefix)
+            matches.push(likeEscaped(sql`cast(${orders.id} as char)`, `${search.idPrefix}%`));
+        if (search.email) matches.push(likeEscaped(users.email, searchPattern(search.email)!));
+        // `PJ` a secas (sin cifras) no restringe: todos los pedidos son `PJ-…`.
+        if (matches.length > 0)
+            conditions.push(matches.length === 1 ? matches[0] : or(...matches)!);
     }
     return conditions.length > 0 ? and(...conditions) : undefined;
 }

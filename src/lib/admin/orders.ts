@@ -116,23 +116,30 @@ export function adminRangeText({
     return `Mostrando ${first}-${first + shown - 1} de ${total}`;
 }
 
+/** Cómo se busca un texto: por el principio del número de pedido, dentro del correo, o ambas. */
+export interface OrderSearch {
+    /** Principio del id del pedido (`'10'` encuentra 10, 100, 101…); `''` no filtra por id. `null` si no se busca por id. */
+    idPrefix: string | null;
+    /** Texto que debe aparecer en el correo del cliente; `null` si no se busca por correo. */
+    email: string | null;
+}
+
 /**
- * Cómo se busca el texto de la barra: `id` si es un número de pedido (`4521`, `PJ-4521`,
- * `#PJ-4521`) y `email` en cualquier otro caso (se busca dentro del correo del cliente).
+ * Cómo se busca el texto de la barra:
+ * - `PJ`, `PJ-`, `#PJ-45`: número de pedido por su principio (`PJ` solo no filtra: todos son `PJ-…`).
+ * - Solo cifras (`45`): principio del número de pedido o parte del correo.
+ * - Cualquier otro texto: dentro del correo del cliente.
  *
+ * @param q - Texto de la barra.
  * @returns La forma de buscar, o `null` si no hay nada que buscar.
  */
-export function parseOrderSearch(
-    q: string | undefined,
-): { kind: 'id'; id: number } | { kind: 'email'; text: string } | null {
+export function parseOrderSearch(q: string | undefined): OrderSearch | null {
     const text = q?.trim();
     if (!text) return null;
-    const match = /^#?(?:pj-?)?(\d{1,10})$/i.exec(text);
-    if (match) {
-        const id = Number(match[1]);
-        if (Number.isSafeInteger(id) && id >= 1) return { kind: 'id', id };
-    }
-    return { kind: 'email', text };
+    const prefixed = /^#?pj-?(\d{0,10})$/i.exec(text);
+    if (prefixed) return { idPrefix: prefixed[1], email: null };
+    if (/^\d{1,10}$/.test(text)) return { idPrefix: text, email: text };
+    return { idPrefix: null, email: text };
 }
 
 /** Botón principal del detalle y a qué estado lleva. */
