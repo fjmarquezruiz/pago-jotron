@@ -237,15 +237,21 @@ describe('changeOrderStatus: Entregado emite la factura (RF8)', () => {
         expect(calls).toEqual(['estado', 'factura']);
     });
 
-    it('si faltan los datos fiscales de la tienda, falla la entrega sin tocar la BD', async () => {
+    it('si faltan los datos fiscales de la tienda, rechaza la entrega sin tocar la BD', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
         delivered();
         getInvoiceIssuer.mockImplementation(() => {
             throw new Error(
                 'Faltan los datos fiscales del emisor de las facturas: INVOICE_ISSUER_NAME',
             );
         });
-        await expect(changeOrderStatus(5, S.DELIVERED, ADMIN, { now: NOW })).rejects.toThrow(
-            'INVOICE_ISSUER_NAME',
+        await expect(changeOrderStatus(5, S.DELIVERED, ADMIN, { now: NOW })).resolves.toEqual({
+            ok: false,
+            code: 'invoice_unavailable',
+            message: 'Faltan los datos fiscales de la tienda',
+        });
+        expect(console.error).toHaveBeenCalledWith(
+            expect.objectContaining({ message: expect.stringContaining('INVOICE_ISSUER_NAME') }),
         );
         expect(getInvoiceSource).not.toHaveBeenCalled();
         expect(transaction).not.toHaveBeenCalled();

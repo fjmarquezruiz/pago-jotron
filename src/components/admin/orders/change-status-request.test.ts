@@ -24,7 +24,7 @@ describe('changeStatusRequest', () => {
         );
         expect(outcome).toEqual({ kind: 'changed', refund: 'none', invoiceNumber: 'F-2026-0001' });
     });
-    it.each([409, 400])('un %s con mensaje es un rechazo', async (status) => {
+    it.each([409, 400, 503])('un %s con mensaje es un rechazo', async (status) => {
         await expect(
             changeStatusRequest(7, 'Enviado', undefined, reply(status, { message: 'No' })),
         ).resolves.toEqual({ kind: 'rejected', message: 'No' });

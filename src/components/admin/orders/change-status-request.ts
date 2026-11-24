@@ -8,7 +8,7 @@ export type ChangeStatusOutcome =
           refund: 'none' | 'done' | 'failed';
           invoiceNumber: string | null;
       }
-    /** La API lo rechazó (409 transición no permitida o cambio simultáneo; 400 motivo no válido). */
+    /** La API lo rechazó con motivo: 409 transición no permitida o cambio simultáneo, 400 motivo no válido, 503 faltan los datos fiscales de la tienda. */
     | { kind: 'rejected'; message: string }
     /** Cualquier otro fallo (sin red, sesión caducada, 500). */
     | { kind: 'error' };
@@ -47,7 +47,7 @@ export async function changeStatusRequest(
                 invoiceNumber: typeof body?.invoiceNumber === 'string' ? body.invoiceNumber : null,
             };
         if (
-            (response.status === 409 || response.status === 400) &&
+            (response.status === 409 || response.status === 400 || response.status === 503) &&
             typeof body?.message === 'string'
         )
             return { kind: 'rejected', message: body.message };

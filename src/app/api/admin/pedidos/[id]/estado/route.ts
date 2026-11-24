@@ -31,7 +31,7 @@ const bodySchema = z.object({
  *
  * Respuestas: 200 `{ status, refund, invoiceNumber }` (`invoiceNumber` solo al entregar); 400 id o cuerpo no válidos o motivo inexistente; 401 sin
  * sesión; 403 sin el rol; 404 no existe; 409 transición no permitida o el pedido cambió a la
- * vez; 500 error interno.
+ * vez; 503 faltan los datos fiscales de la tienda (`INVOICE_ISSUER_*`) al entregar; 500 error interno.
  */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
     try {

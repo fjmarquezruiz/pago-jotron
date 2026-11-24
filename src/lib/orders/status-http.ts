@@ -7,5 +7,6 @@ export const CHANGE_STATUS_HTTP: Record<ChangeStatusFailureCode, number> = {
     invalid_transition: 409,
     cancel_window_closed: 409,
     invalid_cancellation_type: 400,
+    invoice_unavailable: 503,
     conflict: 409,
 };
