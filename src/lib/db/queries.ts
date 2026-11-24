@@ -30,6 +30,7 @@ import { toPositiveInt } from '@/lib/catalog/pagination';
 import { priceRangeBounds } from '@/lib/catalog/price-range';
 import { toVintageOptions, type CatalogFilterOptions } from '@/lib/catalog/filter-options';
 import { LIKE_ESCAPE, searchPattern } from '@/lib/catalog/search';
+import type { Role } from '@/types/auth';
 import type { AddressInput } from '@/lib/validations/address';
 import type { ProfileInput } from '@/lib/validations/profile';
 import {
@@ -1672,4 +1673,23 @@ export async function getBlockCandidateIds(cutoff: string): Promise<number[]> {
         .orderBy(asc(orders.statusUpdatedAt), asc(orders.id))
         .limit(BLOCK_BATCH_LIMIT);
     return rows.map(({ id }) => id);
+}
+
+/**
+ * Estado actual de una cuenta en la BD: si sigue activa (`users.is_active`) y su rol. La sesión
+ * JWT dura aunque se desactive la cuenta o se cambie su rol, así que las rutas y páginas lo
+ * consultan aquí en cada petición en vez de fiarse del token (RF12, RNF3).
+ *
+ * @param userId - `users.user_id`.
+ * @returns `{ isActive, role }`, o `null` si la cuenta ya no existe.
+ */
+export async function getUserAccess(
+    userId: number,
+): Promise<{ isActive: boolean; role: Role } | null> {
+    const [row] = await db
+        .select({ isActive: users.isActive, role: users.role })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+    return row ? { isActive: row.isActive === true, role: row.role } : null;
 }
