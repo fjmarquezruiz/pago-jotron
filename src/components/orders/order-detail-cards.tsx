@@ -40,6 +40,36 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 /**
+ * Subtotal, envío, IVA y total de un pedido (Figma: Details Table), con los importes de
+ * `detail.quote` (calculados con los precios guardados). Lo comparten la tarjeta del cliente y la
+ * caja del panel.
+ *
+ * @param props.quote - `detail.quote`.
+ */
+export function OrderSummaryRows({ quote }: { quote: OrderDetail['quote'] }) {
+    return (
+        <>
+            <dl className="flex flex-col gap-1">
+                <Row label="Subtotal" value={formatCents(quote.subtotalCents)} />
+                <Row
+                    label="Envío"
+                    value={quote.shippingCents === 0 ? 'Gratis' : formatCents(quote.shippingCents)}
+                />
+                <Row label="IVA" value="Incluido" />
+            </dl>
+            <Separator />
+            <div
+                aria-live="polite"
+                className="flex items-baseline justify-between whitespace-nowrap"
+            >
+                <p className="text-sm font-medium">Total</p>
+                <p className="text-lg font-semibold">{formatCents(quote.totalCents)}</p>
+            </div>
+        </>
+    );
+}
+
+/**
  * Columna derecha del detalle (Figma: Details Table y Detail-Card): resumen del pedido con el
  * subtotal, el envío, el IVA y el total (de `detail.quote`, calculado con los precios guardados),
  * dirección de envío con el método de entrega e información de pago. Sin número de seguimiento ni
@@ -60,24 +90,7 @@ export function OrderDetailCards({ detail }: { detail: OrderDetail }) {
     return (
         <div className="flex w-full flex-col gap-gap-lg lg:max-w-95">
             <DetailCard title="Resumen del pedido" titleId="order-summary-title">
-                <dl className="flex flex-col gap-1">
-                    <Row label="Subtotal" value={formatCents(quote.subtotalCents)} />
-                    <Row
-                        label="Envío"
-                        value={
-                            quote.shippingCents === 0 ? 'Gratis' : formatCents(quote.shippingCents)
-                        }
-                    />
-                    <Row label="IVA" value="Incluido" />
-                </dl>
-                <Separator />
-                <div
-                    aria-live="polite"
-                    className="flex items-baseline justify-between whitespace-nowrap"
-                >
-                    <p className="text-sm font-medium">Total</p>
-                    <p className="text-lg font-semibold">{formatCents(quote.totalCents)}</p>
-                </div>
+                <OrderSummaryRows quote={quote} />
             </DetailCard>
             <DetailCard title="Dirección de envío" titleId="order-address-title">
                 <div className="flex flex-col gap-1">

@@ -73,3 +73,22 @@ export function parseOrderHistoryParams(
         ...(range.hasta && { to: range.hasta }),
     };
 }
+
+/** Texto de búsqueda máximo del listado de administración (un correo cabe de sobra). */
+const ADMIN_SEARCH_MAX = 100;
+
+/**
+ * Lee los `searchParams` de `/admin/pedidos`: los mismos que el historial del cliente más `q`
+ * (número de pedido o correo del cliente). Nunca falla: un `q` vacío, repetido o demasiado largo
+ * se ignora.
+ *
+ * @param input - `searchParams` de la página.
+ * @returns La página (1 por defecto) y los filtros válidos.
+ */
+export function parseAdminOrderParams(
+    input: Record<string, string | string[] | undefined>,
+): OrderHistoryParams & { q?: string } {
+    const base = parseOrderHistoryParams(input);
+    const raw = typeof input.q === 'string' ? input.q.trim() : '';
+    return raw && raw.length <= ADMIN_SEARCH_MAX ? { ...base, q: raw } : base;
+}

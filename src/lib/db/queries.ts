@@ -1414,6 +1414,36 @@ export async function getUserInvoice(
 /** `order_statuses` por segunda vez: el estado del que venía un pedido Bloqueado. */
 const blockedFromStatus = alias(orderStatuses, 'blocked_from_status');
 
+/** Campos del pedido que comparten la vista del cliente y la del panel. */
+const orderDetailFields = {
+    id: orders.id,
+    status: orderStatuses.name,
+    paymentMethod: orders.paymentMethod,
+    createdAt: orders.createdAt,
+    /** Cuándo entró en el estado actual. */
+    statusUpdatedAt: orders.statusUpdatedAt,
+    /** Estado que tenía al bloquearse; `null` si no está Bloqueado. */
+    blockedFrom: blockedFromStatus.name,
+    /** Número de su factura (`F-2026-0001`); `null` si aún no tiene. */
+    invoiceNumber: invoices.number,
+    /** Quién anuló el pedido; `null` si no está anulado o lo anuló el sistema (cobro fallido). */
+    cancelledBy: orders.cancelledBy,
+    shippingCost: orders.shippingCost,
+    shippingTypeName: shippingTypes.name,
+    minDeliveryDays: shippingTypes.minDeliveryDays,
+    maxDeliveryDays: shippingTypes.maxDeliveryDays,
+    recipientName: addresses.recipientName,
+    streetType: addresses.streetType,
+    streetName: addresses.streetName,
+    number: addresses.number,
+    floor: addresses.floor,
+    postalCode: addresses.postalCode,
+    city: addresses.city,
+    province: addresses.province,
+    country: addresses.country,
+    phone: addresses.phone,
+};
+
 /**
  * Consulta de un pedido de un usuario con su estado, su tipo de envío y su dirección de envío.
  * Filtra por usuario: el pedido de otra cuenta no se devuelve aunque exista. La dirección se lee
@@ -1425,34 +1455,7 @@ const blockedFromStatus = alias(orderStatuses, 'blocked_from_status');
  */
 export function userOrderQuery(userId: number, orderId: number) {
     return db
-        .select({
-            id: orders.id,
-            status: orderStatuses.name,
-            paymentMethod: orders.paymentMethod,
-            createdAt: orders.createdAt,
-            /** Cuándo entró en el estado actual. */
-            statusUpdatedAt: orders.statusUpdatedAt,
-            /** Estado que tenía al bloquearse; `null` si no está Bloqueado. */
-            blockedFrom: blockedFromStatus.name,
-            /** Número de su factura (`F-2026-0001`); `null` si aún no tiene. */
-            invoiceNumber: invoices.number,
-            /** Quién anuló el pedido; `null` si no está anulado o lo anuló el sistema (cobro fallido). */
-            cancelledBy: orders.cancelledBy,
-            shippingCost: orders.shippingCost,
-            shippingTypeName: shippingTypes.name,
-            minDeliveryDays: shippingTypes.minDeliveryDays,
-            maxDeliveryDays: shippingTypes.maxDeliveryDays,
-            recipientName: addresses.recipientName,
-            streetType: addresses.streetType,
-            streetName: addresses.streetName,
-            number: addresses.number,
-            floor: addresses.floor,
-            postalCode: addresses.postalCode,
-            city: addresses.city,
-            province: addresses.province,
-            country: addresses.country,
-            phone: addresses.phone,
-        })
+        .select(orderDetailFields)
         .from(orders)
         .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
         .leftJoin(blockedFromStatus, eq(blockedFromStatus.id, orders.blockedFromStatusId))
@@ -1460,6 +1463,32 @@ export function userOrderQuery(userId: number, orderId: number) {
         .innerJoin(shippingTypes, eq(shippingTypes.id, orders.shippingTypeId))
         .leftJoin(addresses, eq(addresses.id, orders.shippingAddressId))
         .where(and(eq(orders.id, orderId), eq(orders.userId, userId)));
+}
+
+/**
+ * Consulta de un pedido sin filtrar por cuenta, para el panel (CU11): el mismo pedido y, además, el
+ * nombre, el correo y el teléfono de su cliente. Solo la usan las páginas y rutas del administrador.
+ *
+ * @param orderId - `orders.order_id`.
+ * @returns La consulta, lista para ejecutar con `await`.
+ */
+export function adminOrderQuery(orderId: number) {
+    return db
+        .select({
+            ...orderDetailFields,
+            customerName: users.name,
+            customerLastName: users.lastName,
+            customerEmail: users.email,
+            customerPhone: users.phone,
+        })
+        .from(orders)
+        .innerJoin(orderStatuses, eq(orderStatuses.id, orders.statusId))
+        .leftJoin(blockedFromStatus, eq(blockedFromStatus.id, orders.blockedFromStatusId))
+        .leftJoin(invoices, eq(invoices.orderId, orders.id))
+        .innerJoin(shippingTypes, eq(shippingTypes.id, orders.shippingTypeId))
+        .leftJoin(addresses, eq(addresses.id, orders.shippingAddressId))
+        .innerJoin(users, eq(users.id, orders.userId))
+        .where(eq(orders.id, orderId));
 }
 
 /**
