@@ -19,13 +19,17 @@ interface OrderHistoryPaginationProps {
     totalPages: number;
     /** Filtros que se conservan en cada enlace. */
     filters: HistoryFilters;
+    /** Enlace a una página; por defecto el del historial del cliente. El panel pasa el suyo. */
+    hrefFor?: (page: number) => string;
+    /** Deja Anterior y Siguiente a la vista (sin enlace) aunque solo haya una página (Figma: orders-list-filtered). */
+    alwaysShowPager?: boolean;
 }
 
 /**
  * Pie de la tabla del historial (Figma: AdminPagination): el rango mostrado a la izquierda y, a la
  * derecha, Anterior, las páginas (con `…`) y Siguiente. Cada página es un enlace `?pagina=N` que
  * conserva los filtros; en la primera y la última, Anterior y Siguiente quedan sin enlace. Con una
- * sola página solo se ve el rango.
+ * sola página solo se ve el rango, salvo con `alwaysShowPager`.
  *
  * @example
  * <OrderHistoryPagination summary="Mostrando 1–10 de 142" page={1} totalPages={15} filters={{}} />
@@ -35,12 +39,14 @@ export function OrderHistoryPagination({
     page,
     totalPages,
     filters,
+    hrefFor,
+    alwaysShowPager = false,
 }: OrderHistoryPaginationProps) {
-    const href = (target: number) => orderHistoryHref({ ...filters, page: target });
+    const href = hrefFor ?? ((target: number) => orderHistoryHref({ ...filters, page: target }));
     return (
         <div className="flex min-h-control-xs flex-wrap items-center justify-between gap-x-gap-md gap-y-gap-xs">
             <p className="text-xs text-muted-foreground">{summary}</p>
-            {totalPages > 1 && (
+            {(totalPages > 1 || alwaysShowPager) && (
                 <Pagination className="mx-0 w-auto">
                     <PaginationContent className="gap-gap-xs">
                         <PaginationItem>

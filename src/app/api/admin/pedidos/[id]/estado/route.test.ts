@@ -116,9 +116,23 @@ describe('PATCH /api/admin/pedidos/[id]/estado', () => {
         ['invalid_transition', 409],
         ['conflict', 409],
         ['invalid_cancellation_type', 400],
+        ['invoice_unavailable', 503],
     ])('traduce el rechazo %s a %i', async (code, status) => {
         changeOrderStatus.mockResolvedValue({ ok: false, code, message: 'no' });
         expect((await patch('5', { status: 'En proceso' })).status).toBe(status);
+    });
+
+    it('si faltan los datos fiscales, el 503 lleva el motivo para el administrador', async () => {
+        changeOrderStatus.mockResolvedValue({
+            ok: false,
+            code: 'invoice_unavailable',
+            message: 'Faltan los datos fiscales de la tienda',
+        });
+        const response = await patch('5', { status: 'Entregado' });
+        expect(response.status).toBe(503);
+        await expect(response.json()).resolves.toEqual({
+            message: 'Faltan los datos fiscales de la tienda',
+        });
     });
 
     it('un fallo inesperado responde 500', async () => {

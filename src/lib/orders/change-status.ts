@@ -13,7 +13,7 @@ import {
 } from '@/lib/db/queries';
 import { notifyOrderCancelled, notifyTransferReceived } from '@/lib/emails/order-emails';
 import { issueInvoice } from '@/lib/invoices/issue';
-import { getInvoiceIssuer } from '@/lib/invoices/issuer';
+import { getInvoiceIssuer, type InvoiceIssuer } from '@/lib/invoices/issuer';
 import { refund } from '@/lib/payments';
 import { CUSTOMER_CANCELLATION_DESCRIPTION } from './cancellation';
 import { orderNumber } from './format';
@@ -47,6 +47,7 @@ export type ChangeStatusFailureCode =
     | 'invalid_transition'
     | 'cancel_window_closed'
     | 'invalid_cancellation_type'
+    | 'invoice_unavailable'
     | 'conflict';
 
 /** Qué pasó con el dinero al anular: `none` si no había nada que devolver. */
@@ -186,7 +187,16 @@ export async function changeOrderStatus(
     // Los datos fiscales de la tienda se leen ahora, antes de tocar la BD: si faltan, la entrega
     // falla sin cambiar nada y la factura ya nace con ellos (no se vuelve a mirar el entorno).
     const delivering = to === ORDER_STATUS.DELIVERED;
-    const issuer = delivering ? getInvoiceIssuer() : null;
+    let issuer: InvoiceIssuer | null = null;
+    if (delivering) {
+        try {
+            issuer = getInvoiceIssuer();
+        } catch (error) {
+            // El mensaje nombra las variables que faltan (nunca sus valores): queda en el registro del servidor.
+            console.error(error);
+            return fail('invoice_unavailable', 'Faltan los datos fiscales de la tienda');
+        }
+    }
     // Las líneas del pedido no cambian: se leen antes de la transacción y la factura se emite dentro.
     const invoiceSource = delivering ? await getInvoiceSource(orderId) : null;
     if (delivering && invoiceSource === null) return fail('not_found', 'El pedido no existe');

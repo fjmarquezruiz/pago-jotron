@@ -66,7 +66,7 @@ export function AdminPage({ breadcrumb, title, description, actions, children }:
                 <div className="flex min-h-control-md items-center gap-gap-md">
                     <h1 className="min-w-0 flex-1 text-2xl font-medium">{title}</h1>
                     {actions && (
-                        <div className="flex shrink-0 items-center gap-gap-xs">{actions}</div>
+                        <div className="flex shrink-0 items-center gap-gap-sm">{actions}</div>
                     )}
                 </div>
                 {description && <p className="text-xs text-muted-foreground">{description}</p>}

@@ -1,6 +1,7 @@
 import { Stepper } from '@/components/ui/stepper';
 import { cn } from '@/lib/utils';
 import type { OrderStatus } from '@/lib/orders/status';
+import { adminCancellationLabel, adminStepperProgress } from '@/lib/admin/orders';
 import { cancellationLabel, stepperProgress, type PaymentMethod } from '@/lib/orders/status-ui';
 
 interface OrderStepperProps {
@@ -16,6 +17,12 @@ interface OrderStepperProps {
      * estado. Un paso sin fecha solo lleva su nombre.
      */
     dates?: Partial<Record<OrderStatus, string>>;
+    /**
+     * Seguimiento del panel (Figma: admin-order-blocked): Bloqueado es un paso en error entre los
+     * alcanzados y los que faltan, y la anulación se nombra desde la tienda ("Cancelado por el
+     * cliente"), no desde el cliente.
+     */
+    admin?: boolean;
     className?: string;
 }
 
@@ -39,9 +46,11 @@ export function OrderStepper({
     paymentMethod,
     cancelledBy = null,
     dates,
+    admin = false,
     className,
 }: OrderStepperProps) {
-    const { steps, current, errorStep } = stepperProgress({ status, blockedFrom, paymentMethod });
+    const base = stepperProgress({ status, blockedFrom, paymentMethod });
+    const { steps, current, errorStep } = admin ? adminStepperProgress(base, status) : base;
     const stepper = (orientation: 'horizontal' | 'vertical') => (
         <Stepper
             aria-label="Estado del pedido"
@@ -51,7 +60,10 @@ export function OrderStepper({
             current={current}
             errorStep={errorStep ?? undefined}
             steps={steps.map((step) => ({
-                label: step === 'Anulado' ? cancellationLabel(cancelledBy) : step,
+                label:
+                    step === 'Anulado'
+                        ? (admin ? adminCancellationLabel : cancellationLabel)(cancelledBy)
+                        : step,
                 description: dates?.[step],
             }))}
         />

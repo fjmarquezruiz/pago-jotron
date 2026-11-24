@@ -69,19 +69,23 @@ export function AdminEmptyState({
  * @param props.title - Por ejemplo «No se puede cargar el catálogo».
  * @param props.description - Texto de apoyo; por defecto el de Figma.
  * @param props.onRetry - Qué hace «Reintentar».
+ * @param props.icon - Icono de Lucide; por defecto la copa.
  */
 export function AdminErrorState({
     title,
     description = 'Se ha producido un problema al conectar con el servidor de la base de datos. Comprueba tu conexión o contacta con un administrador.',
     onRetry,
+    icon,
 }: {
     title: string;
     description?: string;
     onRetry?: () => void;
+    icon?: React.ReactNode;
 }) {
     const router = useRouter();
     return (
         <StateBox
+            icon={icon}
             title={title}
             description={description}
             actions={

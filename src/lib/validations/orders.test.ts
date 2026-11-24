@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ORDER_HISTORY_MAX_PAGE, parseOrderHistoryParams } from './orders';
+import { ORDER_HISTORY_MAX_PAGE, parseAdminOrderParams, parseOrderHistoryParams } from './orders';
 
 describe('parseOrderHistoryParams', () => {
     it('sin parámetros: primera página y sin filtros', () => {
@@ -87,5 +87,22 @@ describe('parseOrderHistoryParams', () => {
         ).toEqual({
             page: 1,
         });
+    });
+});
+
+describe('parseAdminOrderParams', () => {
+    it('lee los filtros del historial y la búsqueda recortada', () => {
+        expect(parseAdminOrderParams({ pagina: '2', estado: 'Enviado', q: '  PJ-4521 ' })).toEqual({
+            page: 2,
+            status: 'Enviado',
+            q: 'PJ-4521',
+        });
+    });
+    it.each([
+        ['vacío', { q: '   ' }],
+        ['repetido', { q: ['a', 'b'] }],
+        ['demasiado largo', { q: 'x'.repeat(101) }],
+    ])('ignora un q %s', (_, input) => {
+        expect(parseAdminOrderParams(input)).toEqual({ page: 1 });
     });
 });
