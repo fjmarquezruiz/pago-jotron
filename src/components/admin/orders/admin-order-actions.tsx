@@ -2,16 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, X } from 'lucide-react';
+import { Download } from 'lucide-react';
 import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
-    AlertDialogContent,
     AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -25,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toast';
 import type { OrderStatus } from '@/lib/orders/status';
+import { DialogFrame, Strong } from '@/components/admin/admin-dialog-frame';
 import { changeStatusRequest } from './change-status-request';
 
 /** Lo que el servidor ya ha decidido que el administrador puede hacer con este pedido. */
@@ -43,49 +40,6 @@ export interface AdminOrderActionsProps {
     reasons: { id: number; description: string }[];
     /** Descarga de la factura: solo en Entregado y con factura emitida. */
     invoiceHref: string | null;
-}
-
-/** Texto en negrita dentro de la frase de un modal. */
-const Strong = ({ children }: { children: React.ReactNode }) => (
-    <span className="font-semibold">{children}</span>
-);
-
-/**
- * Cabecera, cuerpo y pie de los modales del panel (Figma: admin-order-status-modal y
- * admin-order-cancel-modal): 480 px, título de 18 px, cerrar de 36 px a 24 px del borde, cuerpo de
- * 14 px con 24 px de relleno y pie con 24 px abajo.
- */
-function DialogFrame({
-    title,
-    busy,
-    children,
-    footer,
-}: {
-    title: string;
-    busy: boolean;
-    children: React.ReactNode;
-    footer: React.ReactNode;
-}) {
-    return (
-        <AlertDialogContent className="max-w-120 gap-0 overflow-clip rounded-sm p-0">
-            <AlertDialogHeader className="relative flex-row items-center gap-gap-md border-b py-inset-lg pr-16 pl-inset-xl">
-                <AlertDialogTitle className="text-lg font-medium">{title}</AlertDialogTitle>
-                <AlertDialogCancel
-                    aria-label="Cerrar"
-                    disabled={busy}
-                    className="absolute top-4 right-6 size-control-sm border-0 p-0 text-foreground"
-                >
-                    <X aria-hidden="true" className="size-4" />
-                </AlertDialogCancel>
-            </AlertDialogHeader>
-            <div className="flex flex-col gap-gap-lg p-inset-xl text-sm text-foreground">
-                {children}
-            </div>
-            <AlertDialogFooter className="flex-row justify-end gap-gap-md border-t px-inset-xl pt-inset-lg pb-inset-xl">
-                {footer}
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    );
 }
 
 /** Estado de un cambio en curso y cómo avisar de su resultado; lo comparten los dos modales. */

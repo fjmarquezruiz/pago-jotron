@@ -23,6 +23,8 @@ interface AdminPageProps {
     title: string;
     /** Frase bajo el título. */
     description?: string;
+    /** Insignias junto al título (Figma: user-detail, el rol). */
+    titleBadges?: React.ReactNode;
     /** Botones a la derecha del título. */
     actions?: React.ReactNode;
     children?: React.ReactNode;
@@ -36,7 +38,14 @@ interface AdminPageProps {
  * @example
  * <AdminPage breadcrumb={[{ label: 'Catálogo' }]} title="Catálogo" description="…">…</AdminPage>
  */
-export function AdminPage({ breadcrumb, title, description, actions, children }: AdminPageProps) {
+export function AdminPage({
+    breadcrumb,
+    title,
+    description,
+    titleBadges,
+    actions,
+    children,
+}: AdminPageProps) {
     const crumbs: AdminCrumb[] = [{ label: 'Pago de Jotrón', href: '/' }, ...breadcrumb];
     return (
         <>
@@ -64,7 +73,14 @@ export function AdminPage({ breadcrumb, title, description, actions, children }:
             </Breadcrumb>
             <div className="flex flex-col gap-1.5">
                 <div className="flex min-h-control-md items-center gap-gap-md">
-                    <h1 className="min-w-0 flex-1 text-2xl font-medium">{title}</h1>
+                    {titleBadges ? (
+                        <div className="flex min-w-0 flex-1 items-center gap-gap-sm">
+                            <h1 className="min-w-0 text-2xl font-medium">{title}</h1>
+                            {titleBadges}
+                        </div>
+                    ) : (
+                        <h1 className="min-w-0 flex-1 text-2xl font-medium">{title}</h1>
+                    )}
                     {actions && (
                         <div className="flex shrink-0 items-center gap-gap-sm">{actions}</div>
                     )}
