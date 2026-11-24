@@ -6,6 +6,7 @@ import {
     RotateCcw,
     ShoppingBag,
     Users,
+    Truck,
     Wine,
     type LucideIcon,
 } from 'lucide-react';
@@ -39,7 +40,7 @@ export const ADMIN_NAV: readonly AdminNavItem[] = [
     { label: 'Tipologías', href: '/admin/tipologias', icon: Wine, roles: EDITOR_UP },
     { label: 'Pedidos', href: '/admin/pedidos', icon: ShoppingBag, roles: ADMIN_ONLY },
     { label: 'Usuarios', href: '/admin/usuarios', icon: Users, roles: ADMIN_ONLY },
-    { label: 'Tipos de envío', href: '/admin/envios', icon: Wine, roles: ADMIN_ONLY },
+    { label: 'Tipos de envío', href: '/admin/envios', icon: Truck, roles: ADMIN_ONLY },
     {
         label: 'Registro de actividad',
         href: '/admin/auditoria',
