@@ -111,7 +111,11 @@ const data = (over: Partial<AdminUser> = {}): AdminUser => ({
 });
 const render = (d: AdminUser) =>
     renderToStaticMarkup(
-        createElement(AdminUserDetail, { data: d, now: new Date('2026-01-26T12:00:00Z') }),
+        createElement(AdminUserDetail, {
+            data: d,
+            now: new Date('2026-01-26T12:00:00Z'),
+            currentUserId: 99,
+        }),
     );
 
 describe('AdminUserDetail', () => {

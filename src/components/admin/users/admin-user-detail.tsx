@@ -56,8 +56,18 @@ function streetLine(a: AdminUser['addresses'][number]): string {
  *
  * @param props.data - La ficha (`getAdminUser`).
  * @param props.now - Reloj, para "hace N días".
+ * @param props.currentUserId - Cuenta de quien mira, para avisarle si se cambia a sí misma.
  */
-export function AdminUserDetail({ data, now }: { data: AdminUser; now: Date }) {
+export function AdminUserDetail({
+    data,
+    now,
+    currentUserId,
+}: {
+    data: AdminUser;
+    now: Date;
+    /** Cuenta de quien mira la ficha (`getSessionUser`). */
+    currentUserId: number;
+}) {
     const { user, orders, addresses, orderCount, spent, isLastAdmin } = data;
     const name = userFullName(user);
     return (
@@ -81,6 +91,7 @@ export function AdminUserDetail({ data, now }: { data: AdminUser; now: Date }) {
                     role={user.role}
                     isActive={user.isActive}
                     isLastAdmin={isLastAdmin}
+                    isSelf={user.id === currentUserId}
                 />
             }
         >

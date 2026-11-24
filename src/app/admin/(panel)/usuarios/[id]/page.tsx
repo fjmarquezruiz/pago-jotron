@@ -30,5 +30,5 @@ export default async function AdminUserPage({ params }: { params: { id: string }
     const data = await getAdminUser(userId);
     if (data === null) notFound();
 
-    return <AdminUserDetail data={data} now={new Date()} />;
+    return <AdminUserDetail data={data} now={new Date()} currentUserId={user.id} />;
 }

@@ -30,7 +30,12 @@ export interface AdminUserActionsProps {
     isActive: boolean;
     /** Es el único administrador activo: cambiarle el rol o desactivarlo dejaría la tienda sin ninguno. */
     isLastAdmin: boolean;
+    /** Es la cuenta de quien mira la ficha: al desactivarla o degradarla pierde el acceso al panel. */
+    isSelf: boolean;
 }
+
+/** Aviso cuando el administrador se cambia a sí mismo: las páginas y la API leen su rol y su estado de la BD en cada petición. */
+const SELF_WARNING = 'Perderás el acceso al panel ahora mismo.';
 
 type Dialog =
     | { kind: 'role'; to: Role }
@@ -52,6 +57,7 @@ export function AdminUserActions({
     role,
     isActive,
     isLastAdmin,
+    isSelf,
 }: AdminUserActionsProps) {
     const router = useRouter();
     const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -145,8 +151,14 @@ export function AdminUserActions({
                             </>
                         }
                     >
-                        <AlertDialogDescription className="text-sm text-foreground">
-                            <Strong>{name}</Strong> pasará de {role} a <Strong>{dialog.to}</Strong>.
+                        <AlertDialogDescription asChild>
+                            <div className="flex flex-col gap-gap-lg text-sm text-foreground">
+                                <p>
+                                    <Strong>{name}</Strong> pasará de {role} a{' '}
+                                    <Strong>{dialog.to}</Strong>.
+                                </p>
+                                {isSelf && <p>{SELF_WARNING}</p>}
+                            </div>
                         </AlertDialogDescription>
                     </DialogFrame>
                 )}
@@ -191,6 +203,7 @@ export function AdminUserActions({
                                     Esta acción se puede revertir: puedes volver a activar la cuenta
                                     cuando quieras.
                                 </p>
+                                {isSelf && <p>{SELF_WARNING}</p>}
                             </div>
                         </AlertDialogDescription>
                     </DialogFrame>
