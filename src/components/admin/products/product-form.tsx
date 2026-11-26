@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { AdminBox } from '@/components/admin/admin-box';
 import { AdminFormPage } from '@/components/admin/admin-form-page';
 import { AdminSalesToggle } from '@/components/admin/admin-sales-toggle';
+import { SalesBlockOrders } from '@/components/admin/sales-block-orders';
 import { Field, FieldControl, FieldLabel, FieldMessage } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -108,14 +109,18 @@ export function ProductForm({ options, product }: ProductFormProps) {
 
     async function setBlocked(isBlocked: boolean): Promise<boolean> {
         if (!product) return false;
-        const saved = await setProductBlockedRequest(product.id, isBlocked);
-        if (saved) {
+        const outcome = await setProductBlockedRequest(product.id, isBlocked);
+        if (outcome.kind === 'saved') {
             toast.success(isBlocked ? 'Ventas bloqueadas' : 'Producto a la venta');
             router.refresh();
-        } else {
-            toast.error('No se ha podido cambiar el estado. Inténtalo de nuevo.');
+            return true;
         }
-        return saved;
+        toast.error(
+            outcome.kind === 'rejected'
+                ? outcome.message
+                : 'No se ha podido cambiar el estado. Inténtalo de nuevo.',
+        );
+        return false;
     }
 
     const title = product ? product.name : 'Añadir un nuevo producto';
@@ -141,6 +146,12 @@ export function ProductForm({ options, product }: ProductFormProps) {
                         name={product.name}
                         context={`de ${product.wineryName}`}
                         onChange={setBlocked}
+                        blockExtra={
+                            <SalesBlockOrders
+                                url={`/api/admin/productos/${product.id}/estado`}
+                                scope="product"
+                            />
+                        }
                     />
                 )
             }

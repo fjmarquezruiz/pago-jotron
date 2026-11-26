@@ -41,6 +41,8 @@ export interface AdminValuesTableProps<Row> {
     onDelete?: (row: Row) => void;
     /** Para ocultar la papelera de una fila concreta (el valor está en uso): no se borra. */
     canDelete?: (row: Row) => boolean;
+    /** Ancho de la columna «Acciones» como clase de Tailwind; por defecto `w-25` (100 px). */
+    actionsWidth?: string;
 }
 
 /**
@@ -71,6 +73,7 @@ export function AdminValuesTable<Row>({
     onEdit,
     onDelete,
     canDelete = () => true,
+    actionsWidth = 'w-25',
 }: AdminValuesTableProps<Row>) {
     const hasActions = Boolean(editHref || onEdit || onDelete);
 
@@ -144,7 +147,7 @@ export function AdminValuesTable<Row>({
                         {columns.map((column) => (
                             <col key={column.key} className={column.width} />
                         ))}
-                        {hasActions && <col className="w-25" />}
+                        {hasActions && <col className={actionsWidth} />}
                     </colgroup>
                     <TableHeader>
                         <TableRow className="bg-transparent hover:bg-transparent">

@@ -241,6 +241,7 @@ const WRITE_STATUS = {
     slug_taken: 409,
     duplicate_variant: 409,
     stock_conflict: 409,
+    parent_blocked: 409,
 } as const;
 
 /**

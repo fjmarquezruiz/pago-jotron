@@ -1,5 +1,6 @@
 import { catalogRoute, parseCatalogId, readJsonBody, respond } from '@/lib/admin/catalog-api';
 import { setWinerySalesBlocked } from '@/lib/admin/winery-service';
+import { getAffectedOrders } from '@/lib/db/admin-sales-impact';
 import { wineryBlockSchema } from '@/lib/validations/admin-wineries';
 
 // Depende de la sesión de cada petición: nunca se genera ni se guarda de antemano.
@@ -29,6 +30,22 @@ export const PATCH = catalogRoute<{ id: string }>(
         const result = await setWinerySalesBlocked(user, id, parsed.data.isBlocked);
         if (!result.ok) return respond({ message: result.message }, 404);
         return respond({ changed: result.changed });
+    },
+    ['Administrador'],
+);
+
+/**
+ * Pedidos en curso con productos de la bodega: los que avisa el modal de bloqueo. Solo lectura; no cambia ningún
+ * pedido. SOLO el Administrador. Se comprueba aquí además de en el middleware (RNF3).
+ *
+ * Respuestas: 200 `{ orders: [{ id, number, status }] }`; 400 id no válido; 401; 403 sin el rol; 500.
+ */
+export const GET = catalogRoute<{ id: string }>(
+    async ({ params }) => {
+        const id = parseCatalogId(params.id);
+        if (id === null)
+            return respond({ message: 'El identificador de la bodega no es válido' }, 400);
+        return respond({ orders: await getAffectedOrders('winery', id) });
     },
     ['Administrador'],
 );

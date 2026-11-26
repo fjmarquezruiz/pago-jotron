@@ -11,6 +11,7 @@ import { AdminConfirmDialog } from '@/components/admin/admin-confirm-dialog';
 import { Strong } from '@/components/admin/admin-dialog-frame';
 import { AdminFormPage } from '@/components/admin/admin-form-page';
 import { AdminSalesToggle } from '@/components/admin/admin-sales-toggle';
+import { SalesBlockOrders } from '@/components/admin/sales-block-orders';
 import { AdminValuesTable } from '@/components/admin/admin-values-table';
 import { denominationRequest } from '@/components/admin/denominations/denomination-requests';
 import { OrderHistoryPagination } from '@/components/orders/order-history-pagination';
@@ -210,6 +211,27 @@ export function AdminDenominationForm({
                             article="La"
                             name={denomination.name}
                             onChange={setBlocked}
+                            blockTitle="¿Bloquear las ventas de la denominación?"
+                            blockConfirmLabel="Bloquear ventas"
+                            blockBody={
+                                <>
+                                    <p>
+                                        Vas a bloquear las ventas de la{' '}
+                                        <Strong>D.O. {denomination.name}</Strong>. Sus vinos y pasas
+                                        dejarán de venderse en la tienda de inmediato.
+                                    </p>
+                                    <p>
+                                        Las bodegas no se bloquean: sus productos de otras
+                                        denominaciones se siguen vendiendo.
+                                    </p>
+                                </>
+                            }
+                            blockExtra={
+                                <SalesBlockOrders
+                                    url={`/api/admin/denominaciones/${denomination.id}/ventas`}
+                                    scope="denomination"
+                                />
+                            }
                         />
                     ) : undefined
                 }

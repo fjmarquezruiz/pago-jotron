@@ -15,6 +15,7 @@ import {
     wineries,
 } from '@/db/schema';
 import { changedFields, salesChangeText } from '@/lib/admin/catalog';
+import { canReleaseSales } from '@/lib/admin/sales-block';
 import { auditedCatalogChange, type CatalogTx } from '@/lib/admin/catalog-api';
 import { isDuplicateEntryError } from '@/lib/db/errors';
 import type { ProductFormValues } from '@/lib/validations/admin-products';
@@ -27,7 +28,8 @@ export type ProductWriteFailureCode =
     | 'invalid_variant'
     | 'slug_taken'
     | 'duplicate_variant'
-    | 'stock_conflict';
+    | 'stock_conflict'
+    | 'parent_blocked';
 
 export type ProductWriteResult<T> =
     { ok: true; value: T } | { ok: false; code: ProductWriteFailureCode; message: string };
@@ -407,13 +409,40 @@ export async function setProductBlocked(
 ): Promise<ProductWriteResult<{ changed: boolean }>> {
     return auditedCatalogChange<ProductWriteResult<{ changed: boolean }>>(async (tx) => {
         const [current] = await tx
-            .select({ name: products.name, isBlocked: products.isBlocked })
+            .select({
+                name: products.name,
+                isBlocked: products.isBlocked,
+                wineryId: products.wineryId,
+                denominationId: products.guaranteeOfOriginId,
+            })
             .from(products)
             .where(eq(products.id, productId))
             .for('update');
         if (!current) return { result: fail('not_found', 'El producto no existe'), audit: null };
         if (current.isBlocked === isBlocked)
             return { result: { ok: true, value: { changed: false } }, audit: null };
+        if (!isBlocked) {
+            // Poner a la venta: su bodega y su D.O. deben estarlo (se leen bloqueadas contra un
+            // bloqueo que llegue a la vez).
+            const [[winery], [denomination]] = await Promise.all([
+                tx
+                    .select({ isBlocked: wineries.isBlocked })
+                    .from(wineries)
+                    .where(eq(wineries.id, current.wineryId))
+                    .for('share'),
+                tx
+                    .select({ isBlocked: guaranteesOfOrigin.isBlocked })
+                    .from(guaranteesOfOrigin)
+                    .where(eq(guaranteesOfOrigin.id, current.denominationId))
+                    .for('share'),
+            ]);
+            const release = canReleaseSales({
+                wineryBlocked: winery?.isBlocked ?? false,
+                denominationBlocked: denomination?.isBlocked ?? false,
+            });
+            if (!release.ok)
+                return { result: fail('parent_blocked', release.message), audit: null };
+        }
         await tx.update(products).set({ isBlocked }).where(eq(products.id, productId));
         return {
             result: { ok: true, value: { changed: true } },

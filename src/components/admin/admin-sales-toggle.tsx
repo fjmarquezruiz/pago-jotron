@@ -25,8 +25,14 @@ export interface AdminSalesToggleProps {
     onChange: (nextIsBlocked: boolean) => Promise<boolean>;
     /** Sin permiso (el bloqueo de bodega y D.O. es solo del administrador) o mientras se carga. */
     disabled?: boolean;
-    /** Lo que va entre el texto y los botones del modal de bloqueo: el aviso y la tabla de pedidos en curso. Espera al punto 5. */
+    /** Lo que va entre el texto y los botones del modal de bloqueo: el aviso y la tabla de pedidos en curso (`SalesBlockOrders`). Se monta al abrir el modal. */
     blockExtra?: React.ReactNode;
+    /** Título del modal de bloqueo; por defecto «Bloquear {noun}». Figma: «¿Bloquear ventas de la bodega?». */
+    blockTitle?: string;
+    /** Texto del botón de bloquear; por defecto «Bloquear». Figma (bodega, D.O.): «Bloquear ventas». */
+    blockConfirmLabel?: string;
+    /** Párrafos del modal de bloqueo en lugar de la frase por defecto (la de bodega y D.O. de Figma es más larga). */
+    blockBody?: React.ReactNode;
 }
 
 /**
@@ -51,6 +57,9 @@ export function AdminSalesToggle({
     onChange,
     disabled = false,
     blockExtra,
+    blockTitle,
+    blockConfirmLabel,
+    blockBody,
 }: AdminSalesToggleProps) {
     const [confirming, setConfirming] = useState<'block' | 'release' | null>(null);
     const [busy, setBusy] = useState(false);
@@ -85,8 +94,16 @@ export function AdminSalesToggle({
             <AdminConfirmDialog
                 open={confirming !== null}
                 onOpenChange={(open) => !open && setConfirming(null)}
-                title={confirming === 'release' ? `Poner a la venta ${noun}` : `Bloquear ${noun}`}
-                confirmLabel={confirming === 'release' ? 'Poner a la venta' : 'Bloquear'}
+                title={
+                    confirming === 'release'
+                        ? `Poner a la venta ${noun}`
+                        : (blockTitle ?? `Bloquear ${noun}`)
+                }
+                confirmLabel={
+                    confirming === 'release'
+                        ? 'Poner a la venta'
+                        : (blockConfirmLabel ?? 'Bloquear')
+                }
                 tone="default"
                 busy={busy}
                 onConfirm={() => void apply(confirming === 'block')}
@@ -98,10 +115,12 @@ export function AdminSalesToggle({
                         {context ? `, ${context},` : ''} volverá a poder comprarse en la web.
                     </p>
                 ) : (
-                    <p>
-                        {article} {noun} <Strong>{name}</Strong>
-                        {context ? `, ${context},` : ''} dejará de poder comprarse en la web.
-                    </p>
+                    (blockBody ?? (
+                        <p>
+                            {article} {noun} <Strong>{name}</Strong>
+                            {context ? `, ${context},` : ''} dejará de poder comprarse en la web.
+                        </p>
+                    ))
                 )}
             </AdminConfirmDialog>
         </>

@@ -76,7 +76,7 @@ export function AdminConfirmDialog({
                         </>
                     }
                 >
-                    <AlertDialogDescription asChild>
+                    <AlertDialogDescription asChild className="text-foreground">
                         <div className="flex flex-col gap-gap-lg text-sm text-foreground">
                             {children}
                         </div>
