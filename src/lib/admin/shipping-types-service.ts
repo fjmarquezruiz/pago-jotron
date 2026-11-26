@@ -8,7 +8,7 @@ import { changedFields } from '@/lib/admin/catalog';
 import { auditedCatalogChange } from '@/lib/admin/catalog-api';
 import { canDeactivateShipping } from '@/lib/admin/shipping-types';
 import {
-    countOtherActiveShippingTypes,
+    lockActiveShippingTypeIds,
     insertShippingType,
     lockShippingType,
     updateShippingTypeRow,
@@ -101,6 +101,8 @@ export async function updateShippingType(
 ): Promise<ShippingResult<{ changed: boolean }>> {
     try {
         return await auditedCatalogChange<ShippingResult<{ changed: boolean }>>(async (tx) => {
+            // Primero todos los activos y luego la fila concreta, siempre en ese orden.
+            const activeIds = await lockActiveShippingTypeIds(tx);
             const before = await lockShippingType(tx, id);
             if (before === null)
                 return { result: fail('not_found', 'El tipo de envío no existe'), audit: null };
@@ -118,7 +120,7 @@ export async function updateShippingType(
             if (fields.length === 0)
                 return { result: { ok: true, value: { changed: false } }, audit: null };
             if (!before.isBlocked && input.isBlocked) {
-                const others = await countOtherActiveShippingTypes(tx, id);
+                const others = activeIds.filter((activeId) => activeId !== id).length;
                 if (!canDeactivateShipping(others))
                     return { result: fail('last_active', LAST_ACTIVE), audit: null };
             }

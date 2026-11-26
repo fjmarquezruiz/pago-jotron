@@ -10,12 +10,12 @@ vi.mock('@/db', () => ({
 }));
 const insertShippingType = vi.fn();
 const lockShippingType = vi.fn();
-const countOtherActiveShippingTypes = vi.fn();
+const lockActiveShippingTypeIds = vi.fn();
 const updateShippingTypeRow = vi.fn();
 vi.mock('@/lib/db/admin-shipping', () => ({
     insertShippingType: (...a: unknown[]) => insertShippingType(...a),
     lockShippingType: (...a: unknown[]) => lockShippingType(...a),
-    countOtherActiveShippingTypes: (...a: unknown[]) => countOtherActiveShippingTypes(...a),
+    lockActiveShippingTypeIds: (...a: unknown[]) => lockActiveShippingTypeIds(...a),
     updateShippingTypeRow: (...a: unknown[]) => updateShippingTypeRow(...a),
 }));
 
@@ -42,7 +42,7 @@ beforeEach(() => {
     for (const mock of [
         insertShippingType,
         lockShippingType,
-        countOtherActiveShippingTypes,
+        lockActiveShippingTypeIds,
         updateShippingTypeRow,
         insertAuditLogQuery,
     ])
@@ -96,11 +96,10 @@ describe('updateShippingType', () => {
             'tx',
             expect.objectContaining({ action: 'Tipo de envío 2: cambia: precio' }),
         );
-        expect(countOtherActiveShippingTypes).not.toHaveBeenCalled();
     });
     it('no desactiva el último activo', async () => {
         lockShippingType.mockResolvedValue(stored);
-        countOtherActiveShippingTypes.mockResolvedValue(0);
+        lockActiveShippingTypeIds.mockResolvedValue([2]);
         const result = await updateShippingType(admin, 2, { ...input, isBlocked: true });
         expect(result).toMatchObject({ ok: false, code: 'last_active' });
         expect(updateShippingTypeRow).not.toHaveBeenCalled();
@@ -108,14 +107,19 @@ describe('updateShippingType', () => {
     });
     it('desactiva si queda otro activo', async () => {
         lockShippingType.mockResolvedValue(stored);
-        countOtherActiveShippingTypes.mockResolvedValue(2);
+        lockActiveShippingTypeIds.mockResolvedValue([1, 2, 3]);
         const result = await updateShippingType(admin, 2, { ...input, isBlocked: true });
         expect(result).toEqual({ ok: true, value: { changed: true } });
-        expect(countOtherActiveShippingTypes).toHaveBeenCalledWith('tx', 2);
+        expect(lockActiveShippingTypeIds).toHaveBeenCalledWith('tx');
+        // Primero todos los activos y después la fila concreta: mismo orden en cada petición.
+        expect(lockActiveShippingTypeIds.mock.invocationCallOrder[0]).toBeLessThan(
+            lockShippingType.mock.invocationCallOrder[0],
+        );
     });
     it('reactivar no comprueba nada', async () => {
         lockShippingType.mockResolvedValue({ ...stored, isBlocked: true });
-        await updateShippingType(admin, 2, input);
-        expect(countOtherActiveShippingTypes).not.toHaveBeenCalled();
+        lockActiveShippingTypeIds.mockResolvedValue([1]);
+        const result = await updateShippingType(admin, 2, input);
+        expect(result).toEqual({ ok: true, value: { changed: true } });
     });
 });

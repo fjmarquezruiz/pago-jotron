@@ -424,18 +424,16 @@ export async function setProductBlocked(
         if (!isBlocked) {
             // Poner a la venta: su bodega y su D.O. deben estarlo (se leen bloqueadas contra un
             // bloqueo que llegue a la vez).
-            const [[winery], [denomination]] = await Promise.all([
-                tx
-                    .select({ isBlocked: wineries.isBlocked })
-                    .from(wineries)
-                    .where(eq(wineries.id, current.wineryId))
-                    .for('share'),
-                tx
-                    .select({ isBlocked: guaranteesOfOrigin.isBlocked })
-                    .from(guaranteesOfOrigin)
-                    .where(eq(guaranteesOfOrigin.id, current.denominationId))
-                    .for('share'),
-            ]);
+            const [winery] = await tx
+                .select({ isBlocked: wineries.isBlocked })
+                .from(wineries)
+                .where(eq(wineries.id, current.wineryId))
+                .for('update');
+            const [denomination] = await tx
+                .select({ isBlocked: guaranteesOfOrigin.isBlocked })
+                .from(guaranteesOfOrigin)
+                .where(eq(guaranteesOfOrigin.id, current.denominationId))
+                .for('update');
             const release = canReleaseSales({
                 wineryBlocked: winery?.isBlocked ?? false,
                 denominationBlocked: denomination?.isBlocked ?? false,

@@ -1,4 +1,4 @@
-import { and, asc, eq, ne } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { shippingTypes } from '@/db/schema';
 import type { CatalogTx } from '@/lib/admin/catalog-api';
@@ -50,18 +50,19 @@ export async function lockShippingType(tx: CatalogTx, id: number) {
 }
 
 /**
- * Cuenta los demás tipos de envío activos (no bloqueados) bloqueando sus filas, para que dos
- * desactivaciones a la vez no dejen el checkout sin ninguno.
- *
- * @param excludedId - El que se desactiva, que no cuenta.
+ * Ids de los tipos de envío activos (no bloqueados), en orden y bloqueando sus filas
+ * (`SELECT … FOR UPDATE`). Se llama ANTES de bloquear la fila concreta: así todas las peticiones
+ * toman los bloqueos en el mismo orden y dos desactivaciones a la vez no se cruzan en un deadlock
+ * ni dejan el checkout sin ninguno.
  */
-export async function countOtherActiveShippingTypes(tx: CatalogTx, excludedId: number) {
+export async function lockActiveShippingTypeIds(tx: CatalogTx): Promise<number[]> {
     const rows = await tx
         .select({ id: shippingTypes.id })
         .from(shippingTypes)
-        .where(and(eq(shippingTypes.isBlocked, false), ne(shippingTypes.id, excludedId)))
+        .where(eq(shippingTypes.isBlocked, false))
+        .orderBy(asc(shippingTypes.id))
         .for('update');
-    return rows.length;
+    return rows.map(({ id }) => id);
 }
 
 /** Cambia los valores de un tipo de envío. Lanza `ER_DUP_ENTRY` si el nombre ya es de otro. */
