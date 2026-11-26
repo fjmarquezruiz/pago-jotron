@@ -71,18 +71,22 @@ export function AdminPage({
                     ))}
                 </BreadcrumbList>
             </Breadcrumb>
-            <div className="flex flex-col gap-1.5">
-                <div className="flex min-h-control-md items-center gap-gap-md">
+            <div className="flex flex-col">
+                <div className="flex min-h-control-md flex-wrap items-center gap-x-gap-md gap-y-gap-sm">
                     {titleBadges ? (
-                        <div className="flex min-w-0 flex-1 items-center gap-gap-sm">
+                        <div className="flex min-w-0 basis-full items-center gap-gap-sm sm:flex-1 sm:basis-0">
                             <h1 className="min-w-0 text-2xl font-medium">{title}</h1>
                             {titleBadges}
                         </div>
                     ) : (
-                        <h1 className="min-w-0 flex-1 text-2xl font-medium">{title}</h1>
+                        <h1 className="min-w-0 basis-full text-2xl font-medium sm:flex-1 sm:basis-0">
+                            {title}
+                        </h1>
                     )}
                     {actions && (
-                        <div className="flex shrink-0 items-center gap-gap-sm">{actions}</div>
+                        <div className="flex shrink-0 flex-wrap items-center gap-gap-sm">
+                            {actions}
+                        </div>
                     )}
                 </div>
                 {description && <p className="text-xs text-muted-foreground">{description}</p>}
