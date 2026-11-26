@@ -11,6 +11,7 @@ import { AdminConfirmDialog } from '@/components/admin/admin-confirm-dialog';
 import { Strong } from '@/components/admin/admin-dialog-frame';
 import { AdminFormPage } from '@/components/admin/admin-form-page';
 import { AdminSalesToggle } from '@/components/admin/admin-sales-toggle';
+import { SalesBlockOrders } from '@/components/admin/sales-block-orders';
 import { AdminValuesTable } from '@/components/admin/admin-values-table';
 import { SalesStatusBadge } from '@/components/admin/wineries/winery-status-badge';
 import { wineryRequest } from '@/components/admin/wineries/winery-requests';
@@ -231,6 +232,20 @@ export function AdminWineryForm({ data, canBlock = false }: AdminWineryFormProps
                             article="La"
                             name={winery.name}
                             onChange={setBlocked}
+                            blockTitle="¿Bloquear ventas de la bodega?"
+                            blockConfirmLabel="Bloquear ventas"
+                            blockBody={
+                                <p>
+                                    Vas a bloquear las ventas de <Strong>{winery.name}</Strong>. Sus
+                                    productos dejarán de estar a la venta en la tienda de inmediato.
+                                </p>
+                            }
+                            blockExtra={
+                                <SalesBlockOrders
+                                    url={`/api/admin/bodegas/${winery.id}/ventas`}
+                                    scope="winery"
+                                />
+                            }
                         />
                     ) : undefined
                 }

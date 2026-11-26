@@ -1,6 +1,7 @@
 import { catalogRoute, parseCatalogId, readJsonBody, respond } from '@/lib/admin/catalog-api';
 import { productWriteStatus } from '@/lib/admin/products';
 import { setProductBlocked } from '@/lib/db/admin-products-write';
+import { getAffectedOrders } from '@/lib/db/admin-sales-impact';
 import { productSalesSchema } from '@/lib/validations/admin-products';
 
 // Depende de la sesión de cada petición: nunca se genera ni se guarda de antemano.
@@ -25,4 +26,16 @@ export const PATCH = catalogRoute<{ id: string }>(async ({ request, params, user
     const result = await setProductBlocked(user, id, parsed.data.isBlocked);
     if (!result.ok) return respond({ message: result.message }, productWriteStatus(result.code));
     return respond(result.value);
+});
+
+/**
+ * Pedidos en curso con este producto: los que avisa el modal de bloqueo. Solo lectura; no cambia ningún
+ * pedido. Editor o Administrador. Se comprueba aquí además de en el middleware (RNF3).
+ *
+ * Respuestas: 200 `{ orders: [{ id, number, status }] }`; 400 id no válido; 401; 403 sin el rol; 500.
+ */
+export const GET = catalogRoute<{ id: string }>(async ({ params }) => {
+    const id = parseCatalogId(params.id);
+    if (id === null) return respond({ message: 'El identificador del producto no es válido' }, 400);
+    return respond({ orders: await getAffectedOrders('product', id) });
 });

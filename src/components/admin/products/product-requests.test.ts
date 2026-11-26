@@ -66,10 +66,24 @@ describe('saveProductRequest', () => {
 });
 
 describe('setProductBlockedRequest', () => {
-    it('true si se guardó y false si no', async () => {
-        expect(await setProductBlockedRequest(3, true, json({ changed: true }))).toBe(true);
-        expect(await setProductBlockedRequest(3, true, json({}, 404))).toBe(false);
-        expect(await setProductBlockedRequest(3, true, vi.fn().mockRejectedValue(1))).toBe(false);
+    it('saved si se guardó', async () => {
+        expect(await setProductBlockedRequest(3, true, json({ changed: true }))).toEqual({
+            kind: 'saved',
+        });
+    });
+    it('rejected con el motivo en un 409 o un 404', async () => {
+        expect(
+            await setProductBlockedRequest(3, false, json({ message: 'Bodega bloqueada' }, 409)),
+        ).toEqual({ kind: 'rejected', message: 'Bodega bloqueada' });
+        expect(
+            await setProductBlockedRequest(3, true, json({ message: 'No existe' }, 404)),
+        ).toEqual({ kind: 'rejected', message: 'No existe' });
+    });
+    it('error en cualquier otro fallo', async () => {
+        expect(await setProductBlockedRequest(3, true, json({}, 500))).toEqual({ kind: 'error' });
+        expect(await setProductBlockedRequest(3, true, vi.fn().mockRejectedValue(1))).toEqual({
+            kind: 'error',
+        });
     });
 });
 

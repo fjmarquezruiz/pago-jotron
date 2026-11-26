@@ -210,6 +210,43 @@ describe('setProductBlocked', () => {
         expect(audits[0]).toBeNull();
         expect(writes).toHaveLength(0);
     });
+    it('pone a la venta si su bodega y su D.O. lo están', async () => {
+        reads = [
+            [{ name: 'Jotrón', isBlocked: true, wineryId: 1, denominationId: 2 }],
+            [{ isBlocked: false }],
+            [{ isBlocked: false }],
+        ];
+        expect(await setProductBlocked(actor, 5, false)).toEqual({
+            ok: true,
+            value: { changed: true },
+        });
+        expect(audits[0]).toMatchObject({ changes: ['puesta a la venta'] });
+    });
+    it('409 al poner a la venta con la bodega bloqueada: no escribe ni anota', async () => {
+        reads = [
+            [{ name: 'Jotrón', isBlocked: true, wineryId: 1, denominationId: 2 }],
+            [{ isBlocked: true }],
+            [{ isBlocked: false }],
+        ];
+        expect(await setProductBlocked(actor, 5, false)).toMatchObject({
+            ok: false,
+            code: 'parent_blocked',
+            message: expect.stringContaining('su bodega'),
+        });
+        expect(audits[0]).toBeNull();
+        expect(writes).toHaveLength(0);
+    });
+    it('409 al poner a la venta con la D.O. bloqueada', async () => {
+        reads = [
+            [{ name: 'Jotrón', isBlocked: true, wineryId: 1, denominationId: 2 }],
+            [{ isBlocked: false }],
+            [{ isBlocked: true }],
+        ];
+        expect(await setProductBlocked(actor, 5, false)).toMatchObject({
+            ok: false,
+            code: 'parent_blocked',
+        });
+    });
     it('404 si no existe', async () => {
         reads = [[]];
         expect(await setProductBlocked(actor, 5, true)).toMatchObject({

@@ -67,28 +67,40 @@ export async function saveProductRequest(
     }
 }
 
+/** Resultado de bloquear o poner a la venta un producto. */
+export type SetProductBlockedOutcome =
+    | { kind: 'saved' }
+    /** 409: no se puede poner a la venta porque su bodega o su D.O. siguen bloqueadas (o 404). */
+    | { kind: 'rejected'; message: string }
+    /** Cualquier otro fallo (sin red, sesión caducada, 500). */
+    | { kind: 'error' };
+
 /**
- * Pide bloquear las ventas de un producto o ponerlo a la venta.
+ * Bloquea las ventas de un producto o lo pone a la venta (`PATCH /api/admin/productos/[id]/estado`).
  *
  * @param productId - `products.product_id`.
  * @param isBlocked - Estado nuevo.
  * @param request - `fetch` (inyectable para las pruebas).
- * @returns `true` si se guardó.
+ * @returns El resultado, sin lanzar nunca; un rechazo trae el motivo para mostrarlo.
  */
 export async function setProductBlockedRequest(
     productId: number,
     isBlocked: boolean,
     request: typeof fetch = fetch,
-): Promise<boolean> {
+): Promise<SetProductBlockedOutcome> {
     try {
         const response = await request(`/api/admin/productos/${productId}/estado`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ isBlocked }),
         });
-        return response.ok;
+        if (response.ok) return { kind: 'saved' };
+        const body = await readBody(response);
+        if ([404, 409].includes(response.status) && typeof body?.message === 'string')
+            return { kind: 'rejected', message: body.message };
+        return { kind: 'error' };
     } catch {
-        return false;
+        return { kind: 'error' };
     }
 }
 

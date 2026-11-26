@@ -15,6 +15,7 @@ export const CATALOG_ENTITIES = {
     denomination: 'Denominación de origen',
     grape: 'Variedad de uva',
     typology: 'Tipología',
+    shipping_type: 'Tipo de envío',
 } as const;
 
 export type CatalogEntity = keyof typeof CATALOG_ENTITIES;
