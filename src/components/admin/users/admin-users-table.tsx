@@ -86,7 +86,7 @@ export function AdminUsersTable({ rows }: { rows: AdminUsersPage['items'] }) {
                                     <UserStatusBadge isActive={row.isActive} />
                                 </TableCell>
                                 <TableCell align="right">
-                                    <Button asChild variant="ghost" size="icon-xs">
+                                    <Button asChild variant="ghost" size="icon-xxs">
                                         <Link
                                             href={`/admin/usuarios/${row.id}`}
                                             aria-label={`Ver usuario ${userNumber(row.id)}`}

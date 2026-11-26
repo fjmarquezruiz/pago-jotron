@@ -95,7 +95,7 @@ export function AdminOrdersTable({ rows }: { rows: AdminOrdersPage['items'] }) {
                                 </TableCell>
                                 <TableCell align="right">
                                     <div className="flex items-center justify-end gap-gap-2xs">
-                                        <Button asChild variant="ghost" size="icon-xs">
+                                        <Button asChild variant="ghost" size="icon-xxs">
                                             <Link
                                                 href={`/admin/pedidos/${row.id}`}
                                                 aria-label={`Ver pedido ${orderNumber(row.id)}`}
@@ -104,7 +104,7 @@ export function AdminOrdersTable({ rows }: { rows: AdminOrdersPage['items'] }) {
                                             </Link>
                                         </Button>
                                         {hasInvoice(row) && (
-                                            <Button asChild variant="ghost" size="icon-xs">
+                                            <Button asChild variant="ghost" size="icon-xxs">
                                                 <a
                                                     href={`/api/admin/pedidos/${row.id}/factura`}
                                                     aria-label={`Factura del pedido ${orderNumber(row.id)}`}
