@@ -15,17 +15,11 @@ import {
 import { db } from '@/db';
 import { auditLogs, users } from '@/db/schema';
 import { AUDIT_KINDS, type AdminAuditFilters } from '@/lib/admin/audit';
+import { shopDayEndUtc, shopDayStartUtc } from '@/lib/orders/dates';
 import { LIKE_ESCAPE, escapeLike, searchPattern } from '@/lib/catalog/search';
 
 /** `audit_logs.logged_at` como texto `AAAA-MM-DD HH:MM:SS` (UTC), igual que el resto de fechas del panel. */
 const loggedAt = sql<string>`date_format(${auditLogs.loggedAt}, '%Y-%m-%d %H:%i:%s')`;
-
-/** Día siguiente a uno `AAAA-MM-DD`, para comparar con `< día + 1` y que `to` entre entero. */
-function nextDay(isoDate: string): string {
-    const date = new Date(`${isoDate}T00:00:00Z`);
-    date.setUTCDate(date.getUTCDate() + 1);
-    return date.toISOString().slice(0, 10);
-}
 
 /** `columna like patrón escape '!'` (ver `LIKE_ESCAPE`). */
 function likeEscaped(column: SQLWrapper, pattern: string): SQL {
@@ -50,8 +44,8 @@ function kindCondition(kind: NonNullable<AdminAuditFilters['kind']>): SQL | unde
 /** `WHERE` del listado: fechas, usuario, tipo y búsqueda en la acción y en el detalle. */
 function adminAuditCondition({ from, to, userId, kind, q }: AdminAuditFilters): SQL | undefined {
     const conditions: SQL[] = [];
-    if (from) conditions.push(gte(auditLogs.loggedAt, `${from} 00:00:00`));
-    if (to) conditions.push(lt(auditLogs.loggedAt, `${nextDay(to)} 00:00:00`));
+    if (from) conditions.push(gte(auditLogs.loggedAt, shopDayStartUtc(from)));
+    if (to) conditions.push(lt(auditLogs.loggedAt, shopDayEndUtc(to)));
     if (userId) conditions.push(eq(auditLogs.userId, userId));
     if (kind) {
         const byKind = kindCondition(kind);
