@@ -175,7 +175,8 @@ const numberOrNull = (value: string | null) => (value === null ? null : Number(v
 /**
  * Reemplaza las categorías y las etiquetas de cata del producto por las elegidas. Se eligen por
  * nombre: las que ya existen se enlazan (sin distinguir mayúsculas) y las que no se crean en la
- * misma transacción. Si otra petición crea una a la vez (índice único), se vuelve a leer.
+ * misma transacción. Si otra petición crea una a la vez (índice único), se vuelve a leer con
+ * `FOR UPDATE`, que ve el dato actual y no la foto del inicio de la transacción.
  *
  * @returns Los nombres que se han creado nuevos, ya rotulados para el asiento de auditoría.
  */
@@ -202,7 +203,9 @@ async function syncCategoriesAndTags(
                 created.push(`${noun} nueva: ${name}`);
             } catch (error) {
                 if (!isDuplicateEntryError(error, 'name')) throw error;
-                const again = splitKnownNames([name], await read());
+                // Lectura actual (`FOR UPDATE`): una normal lee la foto del inicio de la transacción
+                // y no vería la fila que acaba de crear la otra petición.
+                const again = splitKnownNames([name], await read().for('update'));
                 if (again.known.length === 0) throw error;
                 ids.push(...again.known);
             }
