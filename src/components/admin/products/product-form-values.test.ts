@@ -7,6 +7,7 @@ import {
     inputToNumber,
     numberToInput,
     productToFormValues,
+    withoutWineSections,
 } from './product-form-values';
 
 describe('emptyProductForm', () => {
@@ -33,6 +34,22 @@ describe('productToFormValues', () => {
         description: null,
         isBlocked: false,
         wineryName: 'Pago',
+        visualNote: 'Rojo picota',
+        aromaNote: null,
+        palateNote: null,
+        foodPairing: null,
+        alcoholContent: '14.50',
+        minTemperature: '14.00',
+        maxTemperature: null,
+        agingTime: null,
+        agingMethod: null,
+        production: null,
+        soilType: null,
+        vineyardAltitude: 850,
+        yield: null,
+        categories: ['Tintos'],
+        tastingTags: ['Afrutado'],
+        steps: [{ title: 'Vendimia', description: null }],
         grapes: [{ grapeId: 4, percentage: '70.00' }],
         variants: [
             {
@@ -58,6 +75,21 @@ describe('productToFormValues', () => {
         });
         expect(productFormSchema.safeParse(values).success).toBe(true);
     });
+    it('pasa la ficha: decimales a número, nulos a null o vacío', () => {
+        const values = productToFormValues(product);
+        expect(values).toMatchObject({
+            visualNote: 'Rojo picota',
+            aromaNote: '',
+            alcoholContent: 14.5,
+            minTemperature: 14,
+            maxTemperature: null,
+            vineyardAltitude: 850,
+            yield: null,
+            categories: ['Tintos'],
+            tastingTags: ['Afrutado'],
+            steps: [{ title: 'Vendimia', description: '' }],
+        });
+    });
 });
 
 describe('campos numéricos', () => {
@@ -67,5 +99,28 @@ describe('campos numéricos', () => {
         expect(numberToInput(Number.NaN)).toBe('');
         expect(numberToInput(null)).toBe('');
         expect(numberToInput(0)).toBe('0');
+    });
+});
+
+describe('withoutWineSections', () => {
+    it('vacía los campos de vino y conserva el resto', () => {
+        const values = {
+            ...emptyProductForm(),
+            name: 'Pasas',
+            foodPairing: 'Quesos',
+            visualNote: 'Rojo',
+            tastingTags: ['Afrutado'],
+            alcoholContent: 14,
+            steps: [{ title: 'Vendimia', description: 'Manual' }],
+        };
+        const result = withoutWineSections(values);
+        expect(result).toMatchObject({
+            name: 'Pasas',
+            foodPairing: 'Quesos',
+            visualNote: '',
+            tastingTags: [],
+            alcoholContent: null,
+            steps: [],
+        });
     });
 });

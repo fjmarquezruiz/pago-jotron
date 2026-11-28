@@ -21,6 +21,22 @@ export function emptyProductForm(): ProductFormValues {
         image: null,
         grapes: [],
         variants: [emptyVariant('ml')],
+        categories: [],
+        tastingTags: [],
+        visualNote: '',
+        aromaNote: '',
+        palateNote: '',
+        foodPairing: '',
+        alcoholContent: null,
+        minTemperature: null,
+        maxTemperature: null,
+        agingTime: '',
+        agingMethod: '',
+        production: '',
+        soilType: '',
+        vineyardAltitude: null,
+        yield: null,
+        steps: [],
     };
 }
 
@@ -69,7 +85,31 @@ export function productToFormValues(product: AdminProduct): ProductFormValues {
             loadedStock: variant.stock,
             isBlocked: variant.isBlocked,
         })),
+        categories: product.categories,
+        tastingTags: product.tastingTags,
+        visualNote: product.visualNote ?? '',
+        aromaNote: product.aromaNote ?? '',
+        palateNote: product.palateNote ?? '',
+        foodPairing: product.foodPairing ?? '',
+        alcoholContent: decimalToNumber(product.alcoholContent),
+        minTemperature: decimalToNumber(product.minTemperature),
+        maxTemperature: decimalToNumber(product.maxTemperature),
+        agingTime: product.agingTime ?? '',
+        agingMethod: product.agingMethod ?? '',
+        production: product.production ?? '',
+        soilType: product.soilType ?? '',
+        vineyardAltitude: product.vineyardAltitude,
+        yield: product.yield,
+        steps: product.steps.map((step) => ({
+            title: step.title,
+            description: step.description ?? '',
+        })),
     };
+}
+
+/** Un decimal de la BD (texto) como número; `null` si no hay. */
+function decimalToNumber(value: string | null): number | null {
+    return value === null ? null : Number(value);
 }
 
 /** Un valor numérico del formulario como texto del `<input>`: `NaN` es el campo vacío. */
@@ -80,4 +120,32 @@ export function numberToInput(value: number | null | undefined): string {
 /** Texto de un `<input type="number">` como valor del formulario: vacío es `NaN`. */
 export function inputToNumber(text: string): number {
     return text.trim() === '' ? Number.NaN : Number(text);
+}
+
+/**
+ * Los valores de un producto de pasas: sin los campos que solo tiene el vino (notas de vista,
+ * nariz y boca, etiquetas de cata, ficha técnica, datos clave y pasos de elaboración), que el
+ * formulario de pasas no muestra (Figma: catalogue-create - pasas). Así, cambiar la tipología de
+ * vino a pasas no guarda lo que quedó escrito en secciones ocultas.
+ *
+ * @param values - Valores del formulario.
+ */
+export function withoutWineSections(values: ProductFormValues): ProductFormValues {
+    return {
+        ...values,
+        visualNote: '',
+        aromaNote: '',
+        palateNote: '',
+        tastingTags: [],
+        alcoholContent: null,
+        minTemperature: null,
+        maxTemperature: null,
+        agingTime: '',
+        agingMethod: '',
+        production: '',
+        soilType: '',
+        vineyardAltitude: null,
+        yield: null,
+        steps: [],
+    };
 }

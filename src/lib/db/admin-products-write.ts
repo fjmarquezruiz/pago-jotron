@@ -4,18 +4,24 @@
  * referencia que no existe, el stock que cambió mientras se editaba) se devuelven como resultado,
  * sin lanzar: la ruta decide el código HTTP. Solo las llama una ruta que ya exigió el rol.
  */
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import {
+    categories,
     grapes,
     guaranteesOfOrigin,
+    productCategories,
     productGrapes,
+    productSteps,
+    productTastingTags,
     products,
     productVariants,
+    tastingTags,
     typologies,
     wineries,
 } from '@/db/schema';
 import { changedFields, salesChangeText } from '@/lib/admin/catalog';
 import { canReleaseSales } from '@/lib/admin/sales-block';
+import { decimalOrNull, splitKnownNames, textOrNull } from '@/lib/admin/product-sheet';
 import { auditedCatalogChange, type CatalogTx } from '@/lib/admin/catalog-api';
 import { isDuplicateEntryError } from '@/lib/db/errors';
 import type { ProductFormValues } from '@/lib/validations/admin-products';
@@ -48,6 +54,22 @@ const FIELD_LABELS = {
     image: 'imagen',
     grapes: 'uvas',
     variants: 'presentaciones',
+    categories: 'categorías',
+    tastingTags: 'etiquetas de cata',
+    visualNote: 'nota visual',
+    aromaNote: 'nota en nariz',
+    palateNote: 'nota en boca',
+    foodPairing: 'maridaje',
+    alcoholContent: 'graduación',
+    minTemperature: 'temperatura mínima',
+    maxTemperature: 'temperatura máxima',
+    agingTime: 'crianza',
+    agingMethod: 'método de crianza',
+    production: 'producción',
+    soilType: 'tipo de suelo',
+    vineyardAltitude: 'altitud del viñedo',
+    yield: 'rendimiento',
+    steps: 'elaboración',
 } as const;
 
 /** Un producto reducido a lo que el formulario edita, para comparar antes y después. */
@@ -60,6 +82,22 @@ type Snapshot = {
     description: string;
     image: string | null;
     grapes: { grapeId: number; percentage: number }[];
+    categories: string[];
+    tastingTags: string[];
+    visualNote: string;
+    aromaNote: string;
+    palateNote: string;
+    foodPairing: string;
+    alcoholContent: number | null;
+    minTemperature: number | null;
+    maxTemperature: number | null;
+    agingTime: string;
+    agingMethod: string;
+    production: string;
+    soilType: string;
+    vineyardAltitude: number | null;
+    yield: number | null;
+    steps: { title: string; description: string }[];
     variants: {
         id: number;
         format: string;
@@ -109,6 +147,101 @@ async function missingReference(tx: CatalogTx, input: ProductFormValues): Promis
 
 const toDecimal = (value: number) => value.toFixed(2);
 
+/** Columnas de `products` que llegan de la ficha (notas, ficha técnica y datos clave); vacío es `NULL`. */
+function sheetColumns(input: ProductFormValues) {
+    return {
+        visualNote: textOrNull(input.visualNote),
+        aromaNote: textOrNull(input.aromaNote),
+        palateNote: textOrNull(input.palateNote),
+        foodPairing: textOrNull(input.foodPairing),
+        alcoholContent: decimalOrNull(input.alcoholContent),
+        minTemperature: decimalOrNull(input.minTemperature),
+        maxTemperature: decimalOrNull(input.maxTemperature),
+        agingTime: textOrNull(input.agingTime),
+        agingMethod: textOrNull(input.agingMethod),
+        production: textOrNull(input.production),
+        soilType: textOrNull(input.soilType),
+        vineyardAltitude: input.vineyardAltitude,
+        yield: input.yield,
+    };
+}
+
+/** Nombres ordenados sin distinguir mayúsculas, para comparar antes y después. */
+const sortedNames = (names: string[]) => names.map((name) => name.trim().toLowerCase()).sort();
+
+/** Un decimal de la BD (texto) como número, o `null`. */
+const numberOrNull = (value: string | null) => (value === null ? null : Number(value));
+
+/**
+ * Reemplaza las categorías y las etiquetas de cata del producto por las elegidas. Se eligen por
+ * nombre: las que ya existen se enlazan (sin distinguir mayúsculas) y las que no se crean en la
+ * misma transacción. Si otra petición crea una a la vez (índice único), se vuelve a leer con
+ * `FOR UPDATE`, que ve el dato actual y no la foto del inicio de la transacción.
+ *
+ * @returns Los nombres que se han creado nuevos, ya rotulados para el asiento de auditoría.
+ */
+async function syncCategoriesAndTags(
+    tx: CatalogTx,
+    productId: number,
+    input: ProductFormValues,
+): Promise<string[]> {
+    const created: string[] = [];
+
+    async function idsFor(
+        table: typeof categories | typeof tastingTags,
+        names: string[],
+        noun: string,
+    ): Promise<number[]> {
+        if (names.length === 0) return [];
+        const read = () => tx.select({ id: table.id, name: table.name }).from(table);
+        const { known, toCreate } = splitKnownNames(names, await read());
+        const ids = [...known];
+        for (const name of toCreate) {
+            try {
+                const [inserted] = await tx.insert(table).values({ name });
+                ids.push(Number(inserted.insertId));
+                created.push(`${noun} nueva: ${name}`);
+            } catch (error) {
+                if (!isDuplicateEntryError(error, 'name')) throw error;
+                // Lectura actual (`FOR UPDATE`): una normal lee la foto del inicio de la transacción
+                // y no vería la fila que acaba de crear la otra petición.
+                const again = splitKnownNames([name], await read().for('update'));
+                if (again.known.length === 0) throw error;
+                ids.push(...again.known);
+            }
+        }
+        return ids;
+    }
+
+    const categoryIds = await idsFor(categories, input.categories, 'categoría');
+    const tagIds = await idsFor(tastingTags, input.tastingTags, 'etiqueta de cata');
+    await tx.delete(productCategories).where(eq(productCategories.productId, productId));
+    if (categoryIds.length > 0)
+        await tx
+            .insert(productCategories)
+            .values(categoryIds.map((categoryId) => ({ productId, categoryId })));
+    await tx.delete(productTastingTags).where(eq(productTastingTags.productId, productId));
+    if (tagIds.length > 0)
+        await tx
+            .insert(productTastingTags)
+            .values(tagIds.map((tastingTagId) => ({ productId, tastingTagId })));
+    return created;
+}
+
+/** Reemplaza los pasos de elaboración del producto; la posición es el lugar en la lista (1…n). */
+async function syncSteps(tx: CatalogTx, productId: number, input: ProductFormValues) {
+    await tx.delete(productSteps).where(eq(productSteps.productId, productId));
+    if (input.steps.length > 0)
+        await tx.insert(productSteps).values(
+            input.steps.map((step, index) => ({
+                productId,
+                position: index + 1,
+                title: step.title,
+                description: textOrNull(step.description),
+            })),
+        );
+}
+
 /**
  * Crea un producto con sus uvas y presentaciones (CU9). El slug sale del nombre y la añada
  * (`tinto-roble-2023`).
@@ -139,6 +272,7 @@ export async function createProduct(
                     vintage: input.vintage,
                     image: input.image,
                     description: input.description || null,
+                    ...sheetColumns(input),
                 });
                 const id = Number(inserted.insertId);
                 if (input.grapes.length > 0)
@@ -160,6 +294,8 @@ export async function createProduct(
                         isBlocked: variant.isBlocked,
                     })),
                 );
+                const createdNames = await syncCategoriesAndTags(tx, id, input);
+                await syncSteps(tx, id, input);
                 return {
                     result: { ok: true, value: { id, slug } },
                     audit: {
@@ -167,7 +303,7 @@ export async function createProduct(
                         id,
                         name: input.name,
                         actor,
-                        changes: ['creado'],
+                        changes: ['creado', ...createdNames],
                     },
                 };
             },
@@ -227,6 +363,24 @@ export async function updateProduct(
                 .select()
                 .from(productGrapes)
                 .where(eq(productGrapes.productId, productId));
+            const existingCategories = await tx
+                .select({ name: categories.name })
+                .from(productCategories)
+                .innerJoin(categories, eq(categories.id, productCategories.categoryId))
+                .where(eq(productCategories.productId, productId));
+            const existingTags = await tx
+                .select({ name: tastingTags.name })
+                .from(productTastingTags)
+                .innerJoin(tastingTags, eq(tastingTags.id, productTastingTags.tastingTagId))
+                .where(eq(productTastingTags.productId, productId));
+            const existingSteps = await tx
+                .select({
+                    title: productSteps.title,
+                    description: productSteps.description,
+                })
+                .from(productSteps)
+                .where(eq(productSteps.productId, productId))
+                .orderBy(asc(productSteps.position));
 
             const byId = new Map(existingVariants.map((variant) => [variant.id, variant]));
             const seenIds = new Set<number>();
@@ -272,6 +426,25 @@ export async function updateProduct(
                         percentage: Number(grape.percentage),
                     }))
                     .sort((a, b) => a.grapeId - b.grapeId),
+                categories: sortedNames(existingCategories.map((row) => row.name)),
+                tastingTags: sortedNames(existingTags.map((row) => row.name)),
+                visualNote: current.visualNote ?? '',
+                aromaNote: current.aromaNote ?? '',
+                palateNote: current.palateNote ?? '',
+                foodPairing: current.foodPairing ?? '',
+                alcoholContent: numberOrNull(current.alcoholContent),
+                minTemperature: numberOrNull(current.minTemperature),
+                maxTemperature: numberOrNull(current.maxTemperature),
+                agingTime: current.agingTime ?? '',
+                agingMethod: current.agingMethod ?? '',
+                production: current.production ?? '',
+                soilType: current.soilType ?? '',
+                vineyardAltitude: current.vineyardAltitude,
+                yield: current.yield,
+                steps: existingSteps.map((step) => ({
+                    title: step.title,
+                    description: step.description ?? '',
+                })),
                 variants: existingVariants
                     .map((variant) => ({
                         id: variant.id,
@@ -344,8 +517,11 @@ export async function updateProduct(
                     vintage: input.vintage,
                     image: input.image,
                     description: input.description || null,
+                    ...sheetColumns(input),
                 })
                 .where(eq(products.id, productId));
+            const createdNames = await syncCategoriesAndTags(tx, productId, input);
+            await syncSteps(tx, productId, input);
 
             let nextCreated = 0;
             const after: Snapshot = {
@@ -359,6 +535,22 @@ export async function updateProduct(
                 grapes: input.grapes
                     .map((grape) => ({ grapeId: grape.grapeId, percentage: grape.percentage }))
                     .sort((a, b) => a.grapeId - b.grapeId),
+                categories: sortedNames(input.categories),
+                tastingTags: sortedNames(input.tastingTags),
+                visualNote: input.visualNote,
+                aromaNote: input.aromaNote,
+                palateNote: input.palateNote,
+                foodPairing: input.foodPairing,
+                alcoholContent: input.alcoholContent,
+                minTemperature: input.minTemperature,
+                maxTemperature: input.maxTemperature,
+                agingTime: input.agingTime,
+                agingMethod: input.agingMethod,
+                production: input.production,
+                soilType: input.soilType,
+                vineyardAltitude: input.vineyardAltitude,
+                yield: input.yield,
+                steps: input.steps,
                 variants: [
                     ...input.variants.map((variant) => ({
                         id: variant.variantId ?? createdIds[nextCreated++],
@@ -377,7 +569,7 @@ export async function updateProduct(
                 ].sort((a, b) => a.id - b.id),
             };
 
-            const changes = changedFields(before, after, FIELD_LABELS);
+            const changes = [...changedFields(before, after, FIELD_LABELS), ...createdNames];
             return {
                 result: { ok: true, value: { changed: changes.length > 0 } },
                 audit:

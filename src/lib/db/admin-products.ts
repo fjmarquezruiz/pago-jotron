@@ -5,11 +5,16 @@
 import { and, asc, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { db } from '@/db';
 import {
+    categories,
     grapes,
     guaranteesOfOrigin,
+    productCategories,
     productGrapes,
+    productSteps,
+    productTastingTags,
     products,
     productVariants,
+    tastingTags,
     typologies,
     wineries,
 } from '@/db/schema';
@@ -109,8 +114,9 @@ export type AdminProductsPage = Awaited<ReturnType<typeof getAdminProductsPage>>
 export type AdminProductRow = AdminProductsPage['items'][number];
 
 /**
- * Un producto para el formulario de edición: sus datos, sus uvas con porcentaje y todas sus
- * presentaciones (también las bloqueadas), de menor a mayor capacidad.
+ * Un producto para el formulario de edición: sus datos (también los de la ficha: notas de cata,
+ * ficha técnica y datos clave), sus uvas con porcentaje, categorías, etiquetas de cata (por
+ * nombre), pasos de elaboración por posición y todas sus presentaciones (también las bloqueadas), de menor a mayor capacidad.
  *
  * @param productId - `products.product_id`.
  * @returns El producto, o `null` si no existe.
@@ -127,6 +133,19 @@ export async function getAdminProduct(productId: number) {
             vintage: products.vintage,
             image: products.image,
             description: products.description,
+            visualNote: products.visualNote,
+            aromaNote: products.aromaNote,
+            palateNote: products.palateNote,
+            foodPairing: products.foodPairing,
+            alcoholContent: products.alcoholContent,
+            minTemperature: products.minTemperature,
+            maxTemperature: products.maxTemperature,
+            agingTime: products.agingTime,
+            agingMethod: products.agingMethod,
+            production: products.production,
+            soilType: products.soilType,
+            vineyardAltitude: products.vineyardAltitude,
+            yield: products.yield,
             isBlocked: products.isBlocked,
             wineryName: wineries.name,
         })
@@ -134,7 +153,7 @@ export async function getAdminProduct(productId: number) {
         .innerJoin(wineries, eq(wineries.id, products.wineryId))
         .where(eq(products.id, productId));
     if (!product) return null;
-    const [productGrapeRows, variants] = await Promise.all([
+    const [productGrapeRows, variants, categoryRows, tagRows, stepRows] = await Promise.all([
         db
             .select({ grapeId: productGrapes.grapeId, percentage: productGrapes.percentage })
             .from(productGrapes)
@@ -153,8 +172,32 @@ export async function getAdminProduct(productId: number) {
             .from(productVariants)
             .where(eq(productVariants.productId, productId))
             .orderBy(asc(productVariants.capacity), asc(productVariants.id)),
+        db
+            .select({ name: categories.name })
+            .from(productCategories)
+            .innerJoin(categories, eq(categories.id, productCategories.categoryId))
+            .where(eq(productCategories.productId, productId))
+            .orderBy(asc(categories.name)),
+        db
+            .select({ name: tastingTags.name })
+            .from(productTastingTags)
+            .innerJoin(tastingTags, eq(tastingTags.id, productTastingTags.tastingTagId))
+            .where(eq(productTastingTags.productId, productId))
+            .orderBy(asc(tastingTags.name)),
+        db
+            .select({ title: productSteps.title, description: productSteps.description })
+            .from(productSteps)
+            .where(eq(productSteps.productId, productId))
+            .orderBy(asc(productSteps.position)),
     ]);
-    return { ...product, grapes: productGrapeRows, variants };
+    return {
+        ...product,
+        grapes: productGrapeRows,
+        variants,
+        categories: categoryRows.map((row) => row.name),
+        tastingTags: tagRows.map((row) => row.name),
+        steps: stepRows,
+    };
 }
 
 /** Un producto tal como lo carga `getAdminProduct`. */
@@ -166,31 +209,42 @@ export type AdminProduct = NonNullable<Awaited<ReturnType<typeof getAdminProduct
  * seguir apuntando a una.
  */
 export async function getAdminProductOptions() {
-    const [wineryRows, guaranteeRows, typologyRows, grapeRows] = await Promise.all([
-        db
-            .select({ id: wineries.id, name: wineries.name })
-            .from(wineries)
-            .orderBy(asc(wineries.name)),
-        db
-            .select({ id: guaranteesOfOrigin.id, name: guaranteesOfOrigin.name })
-            .from(guaranteesOfOrigin)
-            .orderBy(asc(guaranteesOfOrigin.name)),
-        db
-            .select({
-                id: typologies.id,
-                name: typologies.name,
-                productType: typologies.productType,
-                taxRate: typologies.taxRate,
-            })
-            .from(typologies)
-            .orderBy(asc(typologies.filterOrder), asc(typologies.name)),
-        db.select({ id: grapes.id, name: grapes.name }).from(grapes).orderBy(asc(grapes.name)),
-    ]);
+    const [wineryRows, guaranteeRows, typologyRows, grapeRows, categoryRows, tagRows] =
+        await Promise.all([
+            db
+                .select({ id: wineries.id, name: wineries.name })
+                .from(wineries)
+                .orderBy(asc(wineries.name)),
+            db
+                .select({ id: guaranteesOfOrigin.id, name: guaranteesOfOrigin.name })
+                .from(guaranteesOfOrigin)
+                .orderBy(asc(guaranteesOfOrigin.name)),
+            db
+                .select({
+                    id: typologies.id,
+                    name: typologies.name,
+                    productType: typologies.productType,
+                    taxRate: typologies.taxRate,
+                })
+                .from(typologies)
+                .orderBy(asc(typologies.filterOrder), asc(typologies.name)),
+            db.select({ id: grapes.id, name: grapes.name }).from(grapes).orderBy(asc(grapes.name)),
+            db
+                .select({ id: categories.id, name: categories.name })
+                .from(categories)
+                .orderBy(asc(categories.name)),
+            db
+                .select({ id: tastingTags.id, name: tastingTags.name })
+                .from(tastingTags)
+                .orderBy(asc(tastingTags.name)),
+        ]);
     return {
         wineries: wineryRows,
         guarantees: guaranteeRows,
         typologies: typologyRows,
         grapes: grapeRows,
+        categories: categoryRows,
+        tastingTags: tagRows,
     };
 }
 

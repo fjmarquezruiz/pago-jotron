@@ -9,7 +9,7 @@ let duplicate: Error | null = null;
 /** Consulta falsa: cualquier método encadenado devuelve la misma y, al esperarla, saca la siguiente lectura. */
 function chain(op: string) {
     const query: Record<string, unknown> = {};
-    for (const method of ['from', 'where', 'for', 'set', 'values', 'orderBy', 'limit'])
+    for (const method of ['from', 'innerJoin', 'where', 'for', 'set', 'values', 'orderBy', 'limit'])
         query[method] = (values?: unknown) => {
             if (method === 'set' || method === 'values') writes.push({ op, values });
             return query;
@@ -41,6 +41,25 @@ import type { ProductFormValues } from '@/lib/validations/admin-products';
 
 const actor = { id: 7, role: 'Editor' as const };
 
+const emptySheet = {
+    categories: [],
+    tastingTags: [],
+    visualNote: '',
+    aromaNote: '',
+    palateNote: '',
+    foodPairing: '',
+    alcoholContent: null,
+    minTemperature: null,
+    maxTemperature: null,
+    agingTime: '',
+    agingMethod: '',
+    production: '',
+    soilType: '',
+    vineyardAltitude: null,
+    yield: null,
+    steps: [],
+};
+
 const form = (stock: number, loadedStock: number) =>
     ({
         name: 'Jotrón Reserva',
@@ -51,6 +70,7 @@ const form = (stock: number, loadedStock: number) =>
         description: '',
         image: null,
         grapes: [],
+        ...emptySheet,
         variants: [
             {
                 variantId: 10,
@@ -74,6 +94,19 @@ const product = {
     vintage: 2019,
     description: null,
     image: null,
+    visualNote: null,
+    aromaNote: null,
+    palateNote: null,
+    foodPairing: null,
+    alcoholContent: null,
+    minTemperature: null,
+    maxTemperature: null,
+    agingTime: null,
+    agingMethod: null,
+    production: null,
+    soilType: null,
+    vineyardAltitude: null,
+    yield: null,
 };
 const variantRow = (stock: number) => ({
     id: 10,
@@ -85,13 +118,19 @@ const variantRow = (stock: number) => ({
     stock,
     isBlocked: false,
 });
-/** Lecturas de un guardado: producto, bodega, D.O., tipología, presentaciones y uvas. */
+/**
+ * Lecturas de un guardado: producto, bodega, D.O., tipología, presentaciones, uvas, categorías,
+ * etiquetas y pasos (las tres últimas vacías si no se indican).
+ */
 const readsFor = (currentStock: number) => [
     [product],
     [{ id: 1 }],
     [{ id: 1 }],
     [{ id: 1 }],
     [variantRow(currentStock)],
+    [],
+    [],
+    [],
     [],
 ];
 const stockWrites = () =>
@@ -165,6 +204,57 @@ describe('updateProduct: control optimista del stock', () => {
         expect(await updateProduct(actor, 5, form(10, 10))).toMatchObject({
             ok: false,
             code: 'invalid_reference',
+        });
+    });
+});
+
+describe('updateProduct: ficha (3b)', () => {
+    it('anota los campos de la ficha que cambian y guarda NULL en los vacíos', async () => {
+        reads = readsFor(10);
+        const input = { ...form(10, 10), visualNote: 'Rojo picota', alcoholContent: 14.5 };
+        const result = await updateProduct(actor, 5, input);
+        expect(result).toEqual({ ok: true, value: { changed: true } });
+        expect(audits[0]).toMatchObject({ changes: ['nota visual', 'graduación'] });
+        expect(
+            writes.find((w) => (w.values as { visualNote?: string })?.visualNote)?.values,
+        ).toMatchObject({ visualNote: 'Rojo picota', alcoholContent: '14.50', agingTime: null });
+    });
+    it('reemplaza los pasos con su posición y lo anota', async () => {
+        reads = readsFor(10);
+        const input = {
+            ...form(10, 10),
+            steps: [
+                { title: 'Vendimia', description: '' },
+                { title: 'Crianza', description: '24 meses' },
+            ],
+        };
+        await updateProduct(actor, 5, input);
+        expect(audits[0]).toMatchObject({ changes: ['elaboración'] });
+        const stepWrite = writes.find((w) => Array.isArray(w.values));
+        expect(stepWrite?.values).toEqual([
+            { productId: 5, position: 1, title: 'Vendimia', description: null },
+            { productId: 5, position: 2, title: 'Crianza', description: '24 meses' },
+        ]);
+    });
+    it('crea la categoría que no existe y lo anota', async () => {
+        // Las lecturas de categorías, etiquetas y pasos actuales van antes que la de nombres.
+        reads = [
+            [product],
+            [{ id: 1 }],
+            [{ id: 1 }],
+            [{ id: 1 }],
+            [variantRow(10)],
+            [],
+            [],
+            [],
+            [],
+            [{ id: 1, name: 'Tintos' }],
+        ];
+        const input = { ...form(10, 10), categories: ['tintos', 'Ecológico'] };
+        const result = await updateProduct(actor, 5, input);
+        expect(result).toEqual({ ok: true, value: { changed: true } });
+        expect(audits[0]).toMatchObject({
+            changes: ['categorías', 'categoría nueva: Ecológico'],
         });
     });
 });

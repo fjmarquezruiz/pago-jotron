@@ -25,11 +25,15 @@ import { productFormSchema, type ProductFormValues } from '@/lib/validations/adm
 import {
     emptyProductForm,
     inputToNumber,
+    withoutWineSections,
     numberToInput,
     productToFormValues,
 } from './product-form-values';
 import { ProductGrapesField } from './product-grapes-field';
 import { ProductImageField } from './product-image-field';
+import { ProductKeyDataBox, ProductTechnicalBox } from './product-spec-boxes';
+import { ProductStepsBox } from './product-steps-box';
+import { ProductValuesField } from './product-values-field';
 import { saveProductRequest, setProductBlockedRequest } from './product-requests';
 import { ProductVariantsBox } from './product-variants-box';
 
@@ -51,10 +55,12 @@ export interface ProductFormProps {
 
 /**
  * Formulario de producto, único para crear y editar y para vino y pasas (Figma: admin-product-edit
- * y catalogue-create - pasas), solo con lo del punto 3a: información básica (nombre, bodega,
- * tipología con su IVA de solo lectura, uvas con %, denominación de origen, añada), descripción,
- * imagen y presentaciones con stock. Las notas de cata, etiquetas, categorías, maridaje, pasos,
- * ficha técnica y datos clave son del punto 3b.
+ * y catalogue-create - pasas): información básica (nombre, bodega, tipología con su IVA de solo
+ * lectura, uvas con %, denominación de origen, añada, categorías, notas de vista, nariz y boca y
+ * etiquetas de cata), descripción, maridaje, imagen, presentaciones con stock y, debajo, ficha
+ * técnica, datos clave y elaboración. Con una tipología de pasas solo se ven los campos de
+ * catalogue-create - pasas (sin notas, etiquetas de cata, ficha técnica, datos clave ni
+ * elaboración) y, al guardar, esos campos viajan vacíos.
  *
  * React Hook Form con `productFormSchema` (el mismo esquema que valida la API). Al guardar se pide
  * `POST`/`PATCH /api/admin/productos` y se refresca la página (`router.refresh()`); si el stock
@@ -90,9 +96,13 @@ export function ProductForm({ options, product }: ProductFormProps) {
 
     const typology = options.typologies.find((item) => item.id === watch('typologyId'));
     const name = watch('name');
+    const isWine = typology?.productType !== 'Pasas';
 
     async function save(values: ProductFormValues) {
-        const outcome = await saveProductRequest(product?.id, values);
+        const outcome = await saveProductRequest(
+            product?.id,
+            typology?.productType === 'Pasas' ? withoutWineSections(values) : values,
+        );
         if (outcome.kind === 'saved') {
             toast.success(product ? 'Producto guardado' : 'Producto creado');
             if (outcome.id !== undefined) router.push(`${ADMIN_PRODUCTS_PATH}/${outcome.id}`);
@@ -317,6 +327,79 @@ export function ProductForm({ options, product }: ProductFormProps) {
                             />
                             <FieldMessage>{errors.vintage?.message}</FieldMessage>
                         </Field>
+
+                        <Controller
+                            control={control}
+                            name="categories"
+                            render={({ field }) => (
+                                <ProductValuesField
+                                    className="col-span-4"
+                                    label="Categorías"
+                                    addLabel="Añadir categoría"
+                                    noun="categoría"
+                                    options={options.categories.map((item) => item.name)}
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    maxLength={100}
+                                    error={
+                                        errors.categories?.message ??
+                                        errors.categories?.find?.((item) => item)?.message
+                                    }
+                                />
+                            )}
+                        />
+
+                        {isWine && (
+                            <>
+                                <div className="col-span-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                    {(
+                                        [
+                                            ['visualNote', 'Nota visual'],
+                                            ['aromaNote', 'Nota en nariz'],
+                                            ['palateNote', 'Nota en boca'],
+                                        ] as const
+                                    ).map(([key, label]) => (
+                                        <Field key={key} invalid={Boolean(errors[key])}>
+                                            <FieldLabel
+                                                indicator="optional"
+                                                className={OPTIONAL_LABEL}
+                                            >
+                                                {label}
+                                            </FieldLabel>
+                                            <FieldControl>
+                                                <Textarea
+                                                    size="sm"
+                                                    className="min-h-25"
+                                                    {...register(key)}
+                                                />
+                                            </FieldControl>
+                                            <FieldMessage>{errors[key]?.message}</FieldMessage>
+                                        </Field>
+                                    ))}
+                                </div>
+
+                                <Controller
+                                    control={control}
+                                    name="tastingTags"
+                                    render={({ field }) => (
+                                        <ProductValuesField
+                                            className="col-span-4"
+                                            label="Etiquetas de cata"
+                                            addLabel="Añadir etiqueta"
+                                            noun="etiqueta de cata"
+                                            options={options.tastingTags.map((item) => item.name)}
+                                            value={field.value}
+                                            onChange={field.onChange}
+                                            maxLength={50}
+                                            error={
+                                                errors.tastingTags?.message ??
+                                                errors.tastingTags?.find?.((item) => item)?.message
+                                            }
+                                        />
+                                    )}
+                                />
+                            </>
+                        )}
                     </div>
 
                     <div className="flex flex-col content-start gap-4">
@@ -332,6 +415,19 @@ export function ProductForm({ options, product }: ProductFormProps) {
                                 />
                             </FieldControl>
                             <FieldMessage>{errors.description?.message}</FieldMessage>
+                        </Field>
+                        <Field invalid={Boolean(errors.foodPairing)}>
+                            <FieldLabel indicator="optional" className={OPTIONAL_LABEL}>
+                                Maridaje
+                            </FieldLabel>
+                            <FieldControl>
+                                <Textarea
+                                    size="sm"
+                                    className="min-h-25"
+                                    {...register('foodPairing')}
+                                />
+                            </FieldControl>
+                            <FieldMessage>{errors.foodPairing?.message}</FieldMessage>
                         </Field>
                         <Controller
                             control={control}
@@ -357,6 +453,17 @@ export function ProductForm({ options, product }: ProductFormProps) {
                 form={form}
                 defaultUnit={defaultCapacityUnit(typology?.productType)}
             />
+
+            {isWine && (
+                <>
+                    <ProductTechnicalBox form={form} className="lg:col-start-1" />
+                    <ProductKeyDataBox form={form} className="lg:col-start-1" />
+                    <ProductStepsBox
+                        form={form}
+                        className="lg:col-start-2 lg:row-span-2 lg:row-start-3 lg:self-start"
+                    />
+                </>
+            )}
         </AdminFormPage>
     );
 }
