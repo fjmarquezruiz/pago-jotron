@@ -90,6 +90,55 @@ export const productGrapeSchema = z.object({
         }),
 });
 
+/** Decimal opcional con como mucho dos decimales entre 0 y 100 (graduación, temperaturas). */
+const optionalPercent = (message: string) =>
+    z
+        .number({ error: message })
+        .min(0, message)
+        .max(100, message)
+        .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-6, {
+            message: 'Usa como mucho dos decimales',
+        })
+        .nullable();
+
+/** Texto opcional: recortado y con un máximo de caracteres. */
+const optionalText = (max: number, message: string) => z.string().trim().max(max, message);
+
+/** Lista de nombres (categorías, etiquetas de cata) sin repetir, sin distinguir mayúsculas. */
+const nameList = (itemMax: number, noun: string) =>
+    z
+        .array(
+            z
+                .string()
+                .trim()
+                .min(1, `Escribe el nombre de la ${noun}`)
+                .max(itemMax, `El nombre admite como máximo ${itemMax} caracteres`),
+        )
+        .max(20, `Demasiadas ${noun}s`)
+        .superRefine((names, ctx) => {
+            const seen = new Set<string>();
+            names.forEach((name, index) => {
+                const key = name.toLowerCase();
+                if (seen.has(key))
+                    ctx.addIssue({
+                        code: 'custom',
+                        path: [index],
+                        message: `Esa ${noun} ya está añadida`,
+                    });
+                seen.add(key);
+            });
+        });
+
+/** Un paso de la elaboración (`product_steps`); su posición es su lugar en la lista. */
+export const productStepSchema = z.object({
+    title: z
+        .string()
+        .trim()
+        .min(1, 'Escribe el título del paso')
+        .max(100, 'El título admite como máximo 100 caracteres'),
+    description: optionalText(2000, 'La descripción del paso es demasiado larga'),
+});
+
 /** Una presentación del producto (`product_variants`). */
 export const productVariantSchema = z.object({
     /** `variant_id` de una presentación que ya existe; ausente en las nuevas. */
@@ -127,6 +176,8 @@ export const productVariantSchema = z.object({
  * - Hay al menos una presentación y no se repite el par formato + capacidad (índice único de la
  *   BD `uq_variant_format`).
  * - La imagen, si hay, es un `public_id` de la carpeta de productos de Cloudinary.
+ * - Categorías y etiquetas de cata van por nombre, sin repetir; si no existen se crean al guardar.
+ * - La temperatura máxima de servicio no es menor que la mínima.
  */
 export const productFormSchema = z
     .object({
@@ -152,6 +203,32 @@ export const productFormSchema = z
             .nullable(),
         grapes: z.array(productGrapeSchema).max(20, 'Demasiadas variedades'),
         variants: z.array(productVariantSchema).min(1, 'Añade al menos una presentación').max(30),
+        categories: nameList(100, 'categoría'),
+        tastingTags: nameList(50, 'etiqueta'),
+        visualNote: optionalText(2000, 'La nota visual es demasiado larga'),
+        aromaNote: optionalText(2000, 'La nota en nariz es demasiado larga'),
+        palateNote: optionalText(2000, 'La nota en boca es demasiado larga'),
+        foodPairing: optionalText(2000, 'El maridaje es demasiado largo'),
+        alcoholContent: optionalPercent('La graduación debe estar entre 0 y 100'),
+        minTemperature: optionalPercent('La temperatura debe estar entre 0 y 100'),
+        maxTemperature: optionalPercent('La temperatura debe estar entre 0 y 100'),
+        agingTime: optionalText(100, 'La crianza admite como máximo 100 caracteres'),
+        agingMethod: optionalText(2000, 'El método de crianza es demasiado largo'),
+        production: optionalText(50, 'La producción admite como máximo 50 caracteres'),
+        soilType: optionalText(100, 'El tipo de suelo admite como máximo 100 caracteres'),
+        vineyardAltitude: z
+            .number({ error: 'La altitud es un número entero' })
+            .int('La altitud es un número entero')
+            .min(0, 'La altitud no puede ser negativa')
+            .max(10_000, 'La altitud es demasiado alta')
+            .nullable(),
+        yield: z
+            .number({ error: 'El rendimiento es un número entero' })
+            .int('El rendimiento es un número entero')
+            .min(1, 'El rendimiento debe ser mayor que 0')
+            .max(MAX_ID, 'El rendimiento es demasiado alto')
+            .nullable(),
+        steps: z.array(productStepSchema).max(30, 'Demasiados pasos'),
     })
     .superRefine((value, ctx) => {
         const seenGrapes = new Set<number>();
@@ -170,6 +247,16 @@ export const productFormSchema = z
                 code: 'custom',
                 path: ['grapes'],
                 message: 'Los porcentajes de uva no pueden sumar más de 100 %',
+            });
+        if (
+            value.minTemperature !== null &&
+            value.maxTemperature !== null &&
+            value.minTemperature > value.maxTemperature
+        )
+            ctx.addIssue({
+                code: 'custom',
+                path: ['maxTemperature'],
+                message: 'La temperatura máxima no puede ser menor que la mínima',
             });
         const seenVariants = new Set<string>();
         value.variants.forEach((variant, index) => {

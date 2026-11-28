@@ -8,8 +8,17 @@ export interface StepProps extends Omit<
     React.TextareaHTMLAttributes<HTMLTextAreaElement>,
     'title'
 > {
-    /** Título del paso. */
+    /** Título del paso. Con `onTitleChange` es el texto del campo editable. */
     title: React.ReactNode;
+    /**
+     * Si se pasa, el título es un campo de texto (con `title` como valor, que entonces debe ser
+     * una cadena) en lugar de una etiqueta fija; mismo tamaño, color y peso que la etiqueta.
+     */
+    onTitleChange?: (value: string) => void;
+    /** Texto de ayuda del título editable. */
+    titlePlaceholder?: string;
+    /** Máximo de caracteres del título editable. */
+    titleMaxLength?: number;
     /** Estado del paso: marca el icono y el color del título. */
     status?: 'upcoming' | 'current' | 'completed';
     /** Mensaje de error bajo las notas. Pone el borde en rojo. */
@@ -38,6 +47,9 @@ const Step = React.forwardRef<HTMLTextAreaElement, StepProps>(
             status = 'upcoming',
             error,
             onRemove,
+            onTitleChange,
+            titlePlaceholder = 'Título del paso',
+            titleMaxLength,
             size = 'md',
             disabled,
             placeholder = 'Añade notas sobre este paso…',
@@ -70,16 +82,35 @@ const Step = React.forwardRef<HTMLTextAreaElement, StepProps>(
                             className="size-4 shrink-0 text-destructive"
                         />
                     )}
-                    <label
-                        htmlFor={notesId}
-                        className={cn(
-                            'flex-1 truncate font-medium',
-                            status === 'current' ? 'text-foreground' : 'text-muted-foreground',
-                        )}
-                    >
-                        {title}
-                        {status === 'completed' && <span className="sr-only"> (completado)</span>}
-                    </label>
+                    {onTitleChange ? (
+                        <input
+                            type="text"
+                            value={typeof title === 'string' ? title : ''}
+                            onChange={(event) => onTitleChange(event.target.value)}
+                            placeholder={titlePlaceholder}
+                            maxLength={titleMaxLength}
+                            disabled={disabled}
+                            aria-label="Título del paso"
+                            aria-invalid={!!error || undefined}
+                            className={cn(
+                                'min-w-0 flex-1 truncate bg-transparent font-medium outline-none placeholder:text-muted-foreground',
+                                status === 'current' ? 'text-foreground' : 'text-muted-foreground',
+                            )}
+                        />
+                    ) : (
+                        <label
+                            htmlFor={notesId}
+                            className={cn(
+                                'flex-1 truncate font-medium',
+                                status === 'current' ? 'text-foreground' : 'text-muted-foreground',
+                            )}
+                        >
+                            {title}
+                            {status === 'completed' && (
+                                <span className="sr-only"> (completado)</span>
+                            )}
+                        </label>
+                    )}
                     {onRemove && (
                         <button
                             type="button"
@@ -97,6 +128,7 @@ const Step = React.forwardRef<HTMLTextAreaElement, StepProps>(
                     rows={1}
                     disabled={disabled}
                     placeholder={placeholder}
+                    aria-label={onTitleChange ? 'Descripción del paso' : undefined}
                     aria-invalid={!!error || undefined}
                     aria-describedby={error ? errorId : undefined}
                     className="field-sizing-content min-h-6 resize-none bg-transparent text-foreground outline-none placeholder:text-muted-foreground"

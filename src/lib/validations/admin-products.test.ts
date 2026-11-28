@@ -28,12 +28,113 @@ const valid = (): ProductFormValues => ({
             isBlocked: false,
         },
     ],
+    categories: [],
+    tastingTags: [],
+    visualNote: '',
+    aromaNote: '',
+    palateNote: '',
+    foodPairing: '',
+    alcoholContent: null,
+    minTemperature: null,
+    maxTemperature: null,
+    agingTime: '',
+    agingMethod: '',
+    production: '',
+    soilType: '',
+    vineyardAltitude: null,
+    yield: null,
+    steps: [],
 });
 
 const errorsOf = (input: unknown) => {
     const result = productFormSchema.safeParse(input);
     return result.success ? [] : result.error.issues.map((i) => [i.path.join('.'), i.message]);
 };
+
+describe('productFormSchema: ficha (3b)', () => {
+    it('acepta la ficha completa', () => {
+        expect(
+            productFormSchema.safeParse({
+                ...valid(),
+                categories: ['Tintos', 'Ecológico'],
+                tastingTags: ['Afrutado'],
+                visualNote: ' Rojo picota ',
+                alcoholContent: 14.5,
+                minTemperature: 14,
+                maxTemperature: 16,
+                vineyardAltitude: 850,
+                yield: 4500,
+                steps: [{ title: 'Vendimia', description: '' }],
+            }).success,
+        ).toBe(true);
+    });
+    it('no repite categorías ni etiquetas, sin distinguir mayúsculas', () => {
+        const errors = errorsOf({
+            ...valid(),
+            categories: ['Tintos', 'tintos'],
+            tastingTags: ['Salino', 'SALINO'],
+        });
+        expect(errors).toContainEqual(['categories.1', 'Esa categoría ya está añadida']);
+        expect(errors).toContainEqual(['tastingTags.1', 'Esa etiqueta ya está añadida']);
+    });
+    it('límites de nombre: vacío y demasiado largo', () => {
+        const errors = errorsOf({
+            ...valid(),
+            categories: [' '],
+            tastingTags: ['x'.repeat(51)],
+        });
+        expect(errors).toContainEqual(['categories.0', 'Escribe el nombre de la categoría']);
+        expect(errors).toContainEqual([
+            'tastingTags.0',
+            'El nombre admite como máximo 50 caracteres',
+        ]);
+    });
+    it('la temperatura máxima no es menor que la mínima', () => {
+        expect(errorsOf({ ...valid(), minTemperature: 16, maxTemperature: 14 })).toContainEqual([
+            'maxTemperature',
+            'La temperatura máxima no puede ser menor que la mínima',
+        ]);
+        expect(
+            productFormSchema.safeParse({ ...valid(), minTemperature: 14, maxTemperature: null })
+                .success,
+        ).toBe(true);
+    });
+    it('graduación y temperaturas: entre 0 y 100 y con dos decimales', () => {
+        expect(errorsOf({ ...valid(), alcoholContent: 101 })).toContainEqual([
+            'alcoholContent',
+            'La graduación debe estar entre 0 y 100',
+        ]);
+        expect(errorsOf({ ...valid(), minTemperature: 14.123 })).toContainEqual([
+            'minTemperature',
+            'Usa como mucho dos decimales',
+        ]);
+    });
+    it('altitud y rendimiento son enteros: altitud ≥ 0 y rendimiento > 0', () => {
+        const errors = errorsOf({ ...valid(), vineyardAltitude: -1, yield: 0 });
+        expect(errors).toContainEqual(['vineyardAltitude', 'La altitud no puede ser negativa']);
+        expect(errors).toContainEqual(['yield', 'El rendimiento debe ser mayor que 0']);
+        expect(errorsOf({ ...valid(), yield: 1.5 })).toContainEqual([
+            'yield',
+            'El rendimiento es un número entero',
+        ]);
+    });
+    it('los pasos llevan título y límites de longitud', () => {
+        const errors = errorsOf({
+            ...valid(),
+            steps: [{ title: ' ', description: 'x'.repeat(2001) }],
+            production: 'x'.repeat(51),
+        });
+        expect(errors).toContainEqual(['steps.0.title', 'Escribe el título del paso']);
+        expect(errors).toContainEqual([
+            'steps.0.description',
+            'La descripción del paso es demasiado larga',
+        ]);
+        expect(errors).toContainEqual([
+            'production',
+            'La producción admite como máximo 50 caracteres',
+        ]);
+    });
+});
 
 describe('productFormSchema', () => {
     it('acepta un producto válido y recorta el nombre', () => {
